@@ -1056,7 +1056,15 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       }
 
       const prompt: StylePrompt = {
-        descriptors: [...DEFAULT_DESCRIPTORS],
+        // Was hardcoded to the FULL 8-item DEFAULT_DESCRIPTORS regardless of
+        // what the user actually typed/edited in promptText — forced
+        // genre-diluting phrases ("distorted supersaw leads", "gated pads")
+        // into every ACE caption and duplicated tags already covered by
+        // `clean` (e.g. "rock-dnb crossover" appearing twice, confirmed in
+        // the raw ACE log). The starter textarea text (DEFAULT_DESCRIPTORS
+        // slice) already reaches ACE via `text: clean` below when the user
+        // hasn't edited it away; nothing else needs to force it back in.
+        descriptors: [],
         energy,
         darkness,
         chaos,

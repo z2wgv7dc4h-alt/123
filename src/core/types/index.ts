@@ -300,14 +300,18 @@ export const DEFAULT_BIT_DEPTH = 16 as const; // OfflineAudioContext render; Ske
 /** Empty: artist names allowed as style descriptors (the user 2026-09-14). */
 export const ARTIST_NAME_BLOCKLIST = [] as const;
 
+// "distorted supersaw leads" (trance/EDM-coded, not DnB-idiomatic) and
+// "gated pads" (vague filler) removed 2026-09-15 — genre dilution traced in
+// the raw ACE model log: the caption's own "thinking" expansion drifted
+// toward "fuses elements of trance and drum and bass" with the old wording.
 export const DEFAULT_DESCRIPTORS = [
   'energetic dancefloor drum and bass',
   'rock-dnb crossover',
-  'distorted supersaw leads',
+  'distorted guitar riffs',
   'reese bass',
   'half-time break',
   '174 bpm',
-  'gated pads',
+  'rolling breakbeats',
   'aggressive transient drums',
 ] as const;
 

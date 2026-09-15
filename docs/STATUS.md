@@ -72,6 +72,45 @@ documentation, all of it is still in git history if ever needed.
   commits and doc updates happen contemporaneously with code changes, not
   batched at session end (standing instruction from the user).
 
+## Important: Sketch and Studio share almost nothing
+
+Realized mid-session (2026-09-15) after the user pushed back on why Sketch
+fixes should matter to them at all, given they have a working GPU: **Sketch
+(OfflineStub) and Studio (ACE) are nearly independent rendering paths.** They
+share only the deterministic arrangement *skeleton* — same seed + same knobs
+(energy/darkness/chaos/songShape) + same Expand/Repeat edits produce the same
+song shape (length, section boundaries, BPM, key) on either backend, because
+both call the same `structureEngine.plan()`. ACE never receives OfflineStub's
+actual generated drum hits or bass notes — it only gets the caption text, the
+section timing tags, BPM, and its own seed. **This means every audio-synthesis
+fix below (voice leading, key-following, hat density/filtering, reese bass)
+only affects Sketch's own sound and has zero effect on what Studio/ACE
+produces.** The lever for Studio quality is caption/prompt engineering and
+inference parameters, not the OfflineStub synthesis code. Also found in the
+same pass: `AceStepBackend.ts` hardcodes `breakDensity: 0.55` while
+`OfflineStubBackend.ts` derives it from the chaos knob (`0.4 + chaos*0.4 +
+...`) — so even the shared arrangement isn't perfectly identical between the
+two backends for the same seed right now (not yet fixed; low-impact since it
+only shifts perc-hit/fill density, not core song shape).
+
+- **ACE caption engineering** (2026-09-15, `buildAceCaption.ts`): the caption
+  sent to ACE was generic and vague — led with a fused "rock drum and bass"
+  phrase, buried "174 bpm" mid-sentence, and filled the rest with mood
+  adjectives ("energetic dancefloor, solid drive") that could just as well
+  describe house or techno — nothing told the model this was specifically
+  drum and bass. Researched ACE-Step's own prompting conventions
+  ([deapi.ai guide](https://deapi.ai/blog/ace-step-1-5-prompting-guide-how-to-write-tags-structure-lyrics-and-generate-better-music))
+  and real DnB subgenre terminology: genre tags should lead, be concrete
+  (name real sound sources, not adjectives), 5-12 keywords before signal
+  dilutes, BPM last. Rewrote to lead with an unambiguous "drum and bass"
+  genre lock plus concrete vocabulary (rolling breakbeats, sub bass, reese
+  bass, amen/jungle breakbeat chops, jump up bassline, neurofunk-leaning —
+  mapped from the existing energy/darkness/chaos bands) before introducing
+  the rock-crossover flavor, with BPM moved to the end. Existing
+  knob-sensitivity test contract preserved (5/5 passing). **Not yet
+  confirmed by ear** — this is the first fix aimed at Studio specifically
+  rather than Sketch.
+
 ## Open questions — not yet resolved
 
 - **Does the composition/style actually match the target reference sound**
