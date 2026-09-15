@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   DEFAULT_BPM,
+  DEFAULT_BARS,
   DEFAULT_BIT_DEPTH,
   DEFAULT_DESCRIPTORS,
   DEFAULT_SAMPLE_RATE,
@@ -472,7 +473,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   seed: 17400,
   keepSeed: false,
   bpm: DEFAULT_BPM,
-  bars: 32,
+  bars: DEFAULT_BARS,
   energy: 0.75,
   darkness: 0.45,
   chaos: 0.25,
@@ -676,7 +677,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         energy: 0.75,
         darkness: 0.45,
         chaos: 0.25,
-        bars: 32,
+        bars: DEFAULT_BARS,
       };
       return {
         vibe: null,
@@ -684,7 +685,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         energy: 0.75,
         darkness: 0.45,
         chaos: 0.25,
-        bars: 32,
+        bars: DEFAULT_BARS,
         vibeKnobUndo: null,
         // Style Ref persist: keep ownership attest so user can re-attach without re-checking
         ownerConfirmed: st.ownerConfirmed,

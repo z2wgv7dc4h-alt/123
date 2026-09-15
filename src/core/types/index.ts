@@ -344,6 +344,8 @@ export interface MixerState {
 export type ProductTier = 'sketch' | 'studio';
 
 export const DEFAULT_BPM = 174;
+/** 64 bars @174 ≈ 88 s: ACE needs room for build + drop (32 bars = 44 s was too short). */
+export const DEFAULT_BARS = 64;
 export const DEFAULT_PPQ = 480;
 export const DEFAULT_SAMPLE_RATE = 48000 as const;
 export const DEFAULT_BIT_DEPTH = 16 as const; // OfflineAudioContext render; Sketch export may re-encode 24 via encodeWav

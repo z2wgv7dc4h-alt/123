@@ -7,7 +7,7 @@
  */
 import { describe, expect, it, afterEach } from 'vitest';
 import { buildAceCaption, LEGACY_STARTER_GUITAR_PHRASES } from '../core/prompt/buildAceCaption';
-import { DEFAULT_DESCRIPTORS } from '../core/types';
+import { DEFAULT_DESCRIPTORS, DEFAULT_BARS } from '../core/types';
 import {
   AceStepBackend,
   ACE_BASE_INFERENCE_STEPS,
@@ -16,6 +16,7 @@ import {
   aceSamplerFor,
 } from '../core/backends/AceStepBackend';
 import { heardAudioPathChip } from '../ui/lib/retailLabels';
+import { GENRE_TEMPLATES } from '../ui/lib/genreTemplates';
 
 const STARTER = DEFAULT_DESCRIPTORS.slice(0, 4).join(', ');
 const OLD_STARTER = 'energetic dancefloor drum and bass, rock-dnb crossover, distorted guitar riffs, reese bass';
@@ -42,6 +43,18 @@ describe('buildAceCaption quality pack', () => {
     const htd = buildAceCaption({ ...knobs, userText: user, songShape: 'half-time-drop' });
     expect(htd).toMatch(/half-time snare on 3/);
     expect(htd).not.toMatch(/bpm|rock/i);
+  });
+
+  it('default length leaves room for build and drop; festival template keeps its sound words', () => {
+    expect(DEFAULT_BARS).toBe(64);
+    expect((DEFAULT_BARS * 4 * 60) / 174).toBeGreaterThan(80);
+    const t = GENRE_TEMPLATES.find((g) => g.id === 'festival-anthem');
+    expect(t).toBeTruthy();
+    const cap = buildAceCaption({ energy: 0.9, darkness: 0.4, chaos: 0.3, userText: t!.promptText });
+    expect(cap).toMatch(/supersaw/);
+    expect(cap).toMatch(/distorted guitars/);
+    expect(cap).toMatch(/anthemic stadium drop/);
+    expect(cap).not.toMatch(/bpm/i);
   });
 
   it('old saved starter text no longer smuggles guitar in', () => {

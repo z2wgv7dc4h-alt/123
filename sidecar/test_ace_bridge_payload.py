@@ -19,6 +19,7 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertIs(p["thinking"], True)
         self.assertIs(p["use_cot_caption"], False)
         self.assertIs(p["use_cot_language"], False)
+        self.assertEqual(p["lm_cfg_scale"], 2.0)
         self.assertEqual(p["inference_steps"], 64)
         self.assertIs(p["use_adg"], True)
         self.assertEqual(p["model"], "acestep-v15-base")

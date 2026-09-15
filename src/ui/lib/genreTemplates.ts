@@ -71,6 +71,14 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
     chaos: 0.4,
   },
   {
+    id: 'festival-anthem',
+    label: 'Festival anthem',
+    promptText: 'festival drum and bass, huge supersaw synth leads, heavy distorted guitars, massive reese bass, punchy breakbeat drums, long riser build, anthemic stadium drop, loud polished master',
+    energy: 0.9,
+    darkness: 0.4,
+    chaos: 0.3,
+  },
+  {
     id: 'forest-fog',
     label: 'Forest fog',
     promptText: 'atmospheric jungle, organic breaks, misty pads, soft sub, 174 bpm',

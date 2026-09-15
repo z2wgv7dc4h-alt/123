@@ -181,6 +181,8 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
         "thinking": True,
         "use_cot_caption": False,
         "use_cot_language": False,
+        # Gradio's LM CFG default (API default is 2.5); Gradio output was clearer.
+        "lm_cfg_scale": 2.0,
         "bpm": bpm,
         "audio_duration": duration_sec,
         "time_signature": "4",
