@@ -9,6 +9,9 @@ import {
   ACE_DCW_ENABLED,
   ACE_DCW_MODE,
   ACE_COVER_STRENGTH,
+  ACE_COVER_STRENGTH_MIN,
+  ACE_COVER_STRENGTH_MAX,
+  clampCoverStrength,
 } from '../core/backends/AceStepBackend';
 import { deriveBreakDensity } from '../core/structure/StructureEngine';
 
@@ -236,6 +239,34 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(result.acePayload?.thinking).toBe(false);
     // Honesty: only now may the manifest claim ACE consumed the reference.
     expect(result.manifest.styleReference?.acePathActive).toBe(true);
+  });
+
+  it('default cover strength is 0.55 and overrides clamp to 0.35-0.7', async () => {
+    const base = {
+      file: new Blob([fakeWav], { type: 'audio/wav' }),
+      intensity: 0.6,
+      estimatedBpm: 172,
+      energy: 0.7,
+      fileName: 'mine.wav',
+      ownerAttested: true,
+    };
+    expect(ACE_COVER_STRENGTH).toBe(0.55);
+    expect(clampCoverStrength(undefined)).toBe(0.55);
+    expect(clampCoverStrength(0.45)).toBe(0.45);
+    expect(clampCoverStrength(0.1)).toBe(ACE_COVER_STRENGTH_MIN);
+    expect(clampCoverStrength(0.9)).toBe(ACE_COVER_STRENGTH_MAX);
+
+    const noOverride = await renderWith(base);
+    expect(noOverride.sentBody?.audioCoverStrength).toBe(ACE_COVER_STRENGTH);
+
+    const inRange = await renderWith({ ...base, coverStrength: 0.45 });
+    expect(inRange.sentBody?.audioCoverStrength).toBe(0.45);
+
+    const tooHigh = await renderWith({ ...base, coverStrength: 0.9 });
+    expect(tooHigh.sentBody?.audioCoverStrength).toBe(0.7);
+
+    const tooLow = await renderWith({ ...base, coverStrength: 0.1 });
+    expect(tooLow.sentBody?.audioCoverStrength).toBe(0.35);
   });
 
   it('never sends audio without ownership attestation', async () => {

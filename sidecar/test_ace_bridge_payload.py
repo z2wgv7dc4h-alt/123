@@ -73,6 +73,34 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertEqual(p["inference_steps"], 8)
         self.assertIs(p["use_adg"], False)
 
+    def test_cover_strength_default_and_clamp(self):
+        self.assertEqual(bridge.clamp_cover_strength(None), 0.55)
+        self.assertEqual(bridge.clamp_cover_strength(0.45), 0.45)
+        self.assertEqual(bridge.clamp_cover_strength(0.1), 0.35)
+        self.assertEqual(bridge.clamp_cover_strength(0.9), 0.7)
+        self.assertEqual(bridge.clamp_cover_strength("0.5"), 0.5)
+
+    def test_status_note_reports_cover_strength_in_effect(self):
+        cover = bridge.format_payload_note(
+            "acestep-v15-base",
+            {
+                "inference_steps": 64,
+                "use_adg": True,
+                "thinking": False,
+                "task_type": "cover",
+                "audio_cover_strength": 0.55,
+            },
+        )
+        self.assertIn("task_type=cover", cover)
+        self.assertIn("audio_cover_strength=0.55", cover)
+        self.assertIn("thinking=False", cover)
+        plain = bridge.format_payload_note(
+            "acestep-v15-base",
+            {"inference_steps": 64, "use_adg": True, "thinking": True},
+        )
+        self.assertIn("task_type=text2music", plain)
+        self.assertNotIn("audio_cover_strength", plain)
+
     def test_fallback_prompt_has_no_guitar_or_rock(self):
         p = bridge.build_render_payload({"checkpointId": "acestep-v15-base"})
         self.assertNotIn("guitar", p["prompt"].lower())

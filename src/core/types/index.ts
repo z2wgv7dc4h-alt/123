@@ -190,6 +190,11 @@ export interface RenderJob {
     energy: number;
     fileName: string;
     ownerAttested: boolean;
+    /**
+     * Optional audio2audio (cover) strength override, clamped to ACE's
+     * validated 0.35-0.7 window. Absent = backends default.
+     */
+    coverStrength?: number;
     /** Fingerprint hash for manifest provenance (no raw audio). */
     hash?: string;
     /** High-frequency proxy from Vibe Mirror (0..1). */

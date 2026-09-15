@@ -82,11 +82,20 @@ export const ACE_DCW_MODE = 'low' as const;
  */
 export const ACE_THINKING = true;
 /**
- * Cover strength for real audio2audio. ACE-Step's own API doc recommends
- * low values (~0.2) for style transfer; the schema default of 1.0 is
- * closer to literal reconstruction of the source.
+ * Cover strength for real audio2audio (style-ref attached only). ACE-Step's
+ * own API doc recommends ~0.2 for light style transfer; the schema default
+ * of 1.0 is closer to literal reconstruction. 0.55 is the default here, and
+ * overrides are clamped to the validated 0.35-0.7 window.
  */
-export const ACE_COVER_STRENGTH = 0.25;
+export const ACE_COVER_STRENGTH = 0.55;
+export const ACE_COVER_STRENGTH_MIN = 0.35;
+export const ACE_COVER_STRENGTH_MAX = 0.7;
+
+/** Clamp a cover-strength override into ACE's validated window. */
+export function clampCoverStrength(value?: number | null): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ACE_COVER_STRENGTH;
+  return Math.min(ACE_COVER_STRENGTH_MAX, Math.max(ACE_COVER_STRENGTH_MIN, value));
+}
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -300,7 +309,7 @@ export class AceStepBackend implements AudioBackend {
             ? {
                 srcAudioBase64,
                 srcAudioFileName: job.styleReference?.fileName ?? 'style-ref.wav',
-                audioCoverStrength: ACE_COVER_STRENGTH,
+                audioCoverStrength: clampCoverStrength(job.styleReference?.coverStrength),
               }
             : {}),
           prompt: {

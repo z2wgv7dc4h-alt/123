@@ -74,6 +74,32 @@ DEFAULT_DIT_MODEL = "acestep-v15-base"
 # "inference_steps=64 or higher" + use_adg=True. Turbo: "recommended 8".
 BASE_INFERENCE_STEPS = 64
 TURBO_INFERENCE_STEPS = 8
+# audio2audio cover strength: ACE docs recommend ~0.2 for light style
+# transfer; default 0.55 here, overrides clamped to the 0.35-0.7 window.
+COVER_STRENGTH_DEFAULT = 0.55
+COVER_STRENGTH_MIN = 0.35
+COVER_STRENGTH_MAX = 0.7
+
+
+def clamp_cover_strength(value: object) -> float:
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return COVER_STRENGTH_DEFAULT
+    return max(COVER_STRENGTH_MIN, min(COVER_STRENGTH_MAX, num))
+
+
+def format_payload_note(dit_model: str, payload: dict) -> str:
+    """Per-job status line: sampler settings + the cover strength in effect."""
+    task_type = str(payload.get("task_type") or "text2music")
+    note = (
+        f"DiT {dit_model}, {payload['inference_steps']} steps, "
+        f"use_adg={payload['use_adg']}, thinking={payload['thinking']}, "
+        f"task_type={task_type}"
+    )
+    if task_type == "cover":
+        note += f", audio_cover_strength={payload['audio_cover_strength']}"
+    return note
 
 
 def is_turbo_model(name: str | None) -> bool:
@@ -465,7 +491,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if src_audio_b64:
                 payload["task_type"] = "cover"
-                payload["audio_cover_strength"] = float(req.get("audioCoverStrength") or 0.25)
+                payload["audio_cover_strength"] = clamp_cover_strength(req.get("audioCoverStrength"))
                 # Cover/repaint skip the LM regardless — don't pretend otherwise.
                 payload["thinking"] = False
                 fields = {k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
@@ -579,6 +605,8 @@ class Handler(BaseHTTPRequestHandler):
                 for sid in stem_ids
             ]
 
+            payload_note = format_payload_note(dit_model, payload)
+
             json_response(
                 self,
                 200,
@@ -595,8 +623,7 @@ class Handler(BaseHTTPRequestHandler):
                     "audioFormat": "wav",
                     "warnings": [
                         "ACE GPU mix â€” kick/snare/hats/bass are mix placeholders until LEGO extract",
-                        f"DiT {dit_model}, {payload['inference_steps']} steps, "
-                        f"use_adg={payload['use_adg']}, thinking={payload['thinking']}",
+                        payload_note,
                         "No artist-clone / no catalog rip â€” original composition only",
                         f"task_id={task_id}",
                     ],
