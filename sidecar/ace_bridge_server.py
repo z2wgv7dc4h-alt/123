@@ -66,6 +66,38 @@ DEFAULT_PROMPT = (
     "174 bpm, stadium energy, original composition, instrumental"
 )
 
+# Our arrangement's Section.name -> ACE's temporal lyric structure tag.
+# Caption (prompt) is the global vibe; lyrics is where ACE gets timing/structure —
+# without this every render is one flat instrumental blob with no real drop.
+_SECTION_LYRIC_TAG = {
+    "intro": "[Intro]",
+    "build": "[Build]",
+    "drop": "[Drop]",
+    "break": "[Breakdown]",
+    "breakdown": "[Breakdown]",
+    "outro": "[Outro]",
+}
+
+
+def build_section_lyrics(structure_ref: object) -> str:
+    """[Instrumental] when no section list is sent; else one temporal tag per
+    section in bar order, so ACE's build/drop/breakdown land where the
+    arrangement map says they do instead of a single undifferentiated pass."""
+    if not isinstance(structure_ref, dict):
+        return "[Instrumental]"
+    sections = structure_ref.get("sections")
+    if not isinstance(sections, list) or not sections:
+        return "[Instrumental]"
+    tags: list[str] = []
+    for sec in sections:
+        if not isinstance(sec, dict):
+            continue
+        name = str(sec.get("name") or "").lower()
+        tag = _SECTION_LYRIC_TAG.get(name)
+        if tag:
+            tags.append(tag)
+    return "\n".join(tags) if tags else "[Instrumental]"
+
 
 def cors_origin(handler: BaseHTTPRequestHandler) -> str:
     origin = handler.headers.get("Origin") or ""
@@ -296,10 +328,11 @@ class Handler(BaseHTTPRequestHandler):
         duration_sec = max(10.0, min(240.0, duration_bars * 4 * 60.0 / max(bpm, 1)))
         job_id = str(req.get("jobId") or f"bridge-{int(time.time())}")
         seed = int(req.get("seed") or 42)
+        lyrics = build_section_lyrics(req.get("structureRef"))
 
         payload = {
             "prompt": prompt,
-            "lyrics": "[Instrumental]",
+            "lyrics": lyrics,
             "thinking": True,
             "bpm": bpm,
             "audio_duration": duration_sec,

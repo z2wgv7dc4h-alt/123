@@ -1016,16 +1016,19 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       }
       let backend;
       // Product tier owns audio path. Soft-pass forbidden: Sketch must never
-      // call selectBest — that prefers ACE whenever GPU is up.
+      // prefer ACE. aceHasGpu was just re-probed above (line ~979) — do NOT
+      // probe again here. The registry's best-pick helper re-probes
+      // internally and silently falls back to offline-stub on any hiccup, no
+      // error, no toast — that redundant second probe was why Generate
+      // sometimes used Sketch even with Studio/GPU showing live seconds earlier.
       const studioAce = s.productTier === 'studio' && s.aceHasGpu;
-      const selectBestFn = backendRegistry.selectBest;
       if (studioAce) {
-        try {
-          backend = await selectBestFn();
-          // selectBest already set the activeId in the registry
-          set({ backendId: backend.id });
-        } catch (e) {
-          // Fallback to offline-stub if selectBest fails for any reason
+        const aceBackend = backendRegistry.get('ace-step-1.5');
+        if (aceBackend) {
+          backendRegistry.setActive(aceBackend.id);
+          backend = aceBackend;
+          set({ backendId: aceBackend.id });
+        } else {
           backendRegistry.setActive('offline-stub');
           backend = backendRegistry.active();
           set({ backendId: 'offline-stub' });

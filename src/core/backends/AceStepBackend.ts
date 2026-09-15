@@ -217,6 +217,14 @@ export class AceStepBackend implements AudioBackend {
             bpm: structure.bpm,
             bars: structure.bars,
             samplesPerBar: structure.samplesPerBar,
+            // ACE has zero temporal signal without this — bridge maps these to
+            // lyric section tags so the drop/build/breakdown actually land where
+            // the arrangement map says they do, instead of one flat instrumental blob.
+            sections: structure.sections.map((s) => ({
+              name: s.name,
+              startBar: s.startBar,
+              lengthBars: s.lengthBars,
+            })),
           },
           stemSchemaVersion: job.stemSchemaVersion,
           checkpointId: 'acestep-v15-base',

@@ -1,4 +1,7 @@
 node_modules/
+__pycache__/
+*.pyc
+_cos-runs/bridge-verify*.log
 dist/
 dist-ssr/
 exports/

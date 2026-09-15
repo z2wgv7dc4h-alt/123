@@ -78,7 +78,7 @@ function paint(
   const g = canvas.getContext('2d');
   if (!g) return;
   g.clearRect(0, 0, w, h);
-  g.fillStyle = '#0a0d14';
+  g.fillStyle = '#0a0510';
   g.fillRect(0, 0, w, h);
 
   const mid = h / 2;
@@ -97,7 +97,7 @@ function paint(
     const x1 = ((Math.min(r1, viewEnd) - viewStart) / viewSpan) * w;
     const amp = peaks[i]! * (h * 0.42);
     const played = r0 <= progress;
-    g.fillStyle = played ? 'rgba(110, 231, 255, 0.88)' : 'rgba(124, 92, 255, 0.55)';
+    g.fillStyle = played ? 'rgba(0, 229, 255, 0.92)' : 'rgba(255, 46, 232, 0.5)';
     g.fillRect(x0, mid - amp, Math.max(1, x1 - x0 - 1), amp * 2);
   }
 
@@ -107,16 +107,16 @@ function paint(
   if (dropWash && dropWash.end > dropWash.start) {
     const dx0 = toX(dropWash.start);
     const dx1 = toX(dropWash.end);
-    g.fillStyle = 'rgba(110, 231, 255, 0.12)';
+    g.fillStyle = 'rgba(255, 46, 232, 0.14)';
     g.fillRect(dx0, 0, Math.max(1, dx1 - dx0), h);
   }
 
   if (loop && loop.end > loop.start) {
     const x0 = toX(loop.start);
     const x1 = toX(loop.end);
-    g.fillStyle = 'rgba(245, 197, 66, 0.18)';
+    g.fillStyle = 'rgba(255, 159, 61, 0.18)';
     g.fillRect(x0, 0, Math.max(1, x1 - x0), h);
-    g.strokeStyle = 'rgba(245, 197, 66, 0.85)';
+    g.strokeStyle = 'rgba(255, 159, 61, 0.85)';
     g.lineWidth = Math.max(1, dpr);
     g.beginPath();
     g.moveTo(x0, 0);
@@ -128,12 +128,16 @@ function paint(
 
   if (progress > 0 && progress < 1) {
     const px = toX(progress);
-    g.strokeStyle = 'rgba(232, 236, 245, 0.9)';
-    g.lineWidth = Math.max(1, dpr);
+    g.save();
+    g.shadowColor = 'rgba(0, 229, 255, 0.9)';
+    g.shadowBlur = 6;
+    g.strokeStyle = 'rgba(245, 250, 255, 0.95)';
+    g.lineWidth = Math.max(1.5, dpr);
     g.beginPath();
     g.moveTo(px, 0);
     g.lineTo(px, h);
     g.stroke();
+    g.restore();
   }
 }
 
