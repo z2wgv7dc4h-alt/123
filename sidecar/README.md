@@ -80,7 +80,6 @@ Until `/probe` → `hasGpu: true`, registry keeps **OfflineStubBackend** (CPU sk
 
 ## Legal
 - ACE-Step 1.5 **MIT** — allowed  
-- Forbidden: ACE-Step-DAW / Strudel (AGPL), Matchering / Pedalboard (GPL-3), MusicGen NC, YouTube/catalog rips, artist-clone UI  
+- Personal, non-commercial project: packs/breaks already in-repo are fine. No artist-clone product; no labelling ACE extract as real isolated stems from a track we do not have.
 
 ## Status
-Bridge + `AceStepBackend.render` + Windows setup/start scripts + `docs/TRY_ACE.md` landed. Real audio requires the RTX 5080 running the stack locally. Soft-pass forbidden on ACE without live probe.
