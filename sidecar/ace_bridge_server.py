@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import time
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -113,6 +114,45 @@ def http_json(method: str, url: str, body: dict | None = None, timeout: float = 
         data=data,
         method=method,
         headers={"Content-Type": "application/json", "Accept": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read().decode("utf-8")
+        return resp.status, json.loads(raw) if raw else {}
+
+
+def http_multipart(url: str, fields: dict, file_field: str, filename: str, file_bytes: bytes,
+                   timeout: float = 120.0):
+    """POST multipart/form-data — ACE's /release_task takes a raw Request and
+    accepts uploaded audio as `src_audio` / `reference_audio` file fields
+    (see docs/en/API.md §4.2 "Method B" in the ACE-Step repo). The uploaded
+    file wins over any *_path parameter, so the bridge never has to manage
+    server-side temp paths."""
+    boundary = "----dnbstudio" + uuid.uuid4().hex
+    parts = []
+    for key, value in fields.items():
+        if value is None:
+            continue
+        parts.append(
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"{key}\"\r\n\r\n{value}\r\n".encode("utf-8")
+        )
+    parts.append(
+        (
+            f"--{boundary}\r\n"
+            f"Content-Disposition: form-data; name=\"{file_field}\"; filename=\"{filename}\"\r\n"
+            f"Content-Type: application/octet-stream\r\n\r\n"
+        ).encode("utf-8")
+    )
+    parts.append(file_bytes)
+    parts.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+    data = b"".join(parts)
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method="POST",
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "Accept": "application/json",
+        },
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read().decode("utf-8")
@@ -360,8 +400,31 @@ class Handler(BaseHTTPRequestHandler):
             or os.environ.get("ACESTEP_CONFIG_PATH", "acestep-v15-base"),
         }
 
+        # Real audio2audio: when the browser sends the user's own style-ref
+        # audio, switch from text2music to ACE's `cover` task and hand the
+        # actual file over as a multipart `src_audio` upload. Without this
+        # the reference is reduced to a few scalar knob nudges and the audio
+        # itself is thrown away.
+        src_audio_b64 = req.get("srcAudioBase64")
+        src_audio_name = str(req.get("srcAudioFileName") or "style-ref.wav")
         try:
-            _, released_raw = http_json("POST", f"{ACE_API}/release_task", payload, timeout=60)
+            if src_audio_b64:
+                payload["task_type"] = "cover"
+                payload["audio_cover_strength"] = float(req.get("audioCoverStrength") or 0.25)
+                # Cover/repaint skip the LM regardless — don't pretend otherwise.
+                payload["thinking"] = False
+                fields = {k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
+                          for k, v in payload.items()}
+                _, released_raw = http_multipart(
+                    f"{ACE_API}/release_task",
+                    fields,
+                    "src_audio",
+                    src_audio_name,
+                    base64.b64decode(src_audio_b64),
+                    timeout=120,
+                )
+            else:
+                _, released_raw = http_json("POST", f"{ACE_API}/release_task", payload, timeout=60)
             released, code, err = unwrap(released_raw)
             if code and int(code) >= 400:
                 json_response(

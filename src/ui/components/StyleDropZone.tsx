@@ -66,11 +66,12 @@ export function StyleDropZone() {
         </h2>
         <span className="style-legal">
           {mode === 'simple' ? (
-            <>Optional — drop a track you own to bias mood. Not a clone. Skip anytime.</>
+            <>Optional — drop a track you own. Sketch biases mood; Studio conditions on the audio itself. Original output, not a copy. Skip anytime.</>
           ) : (
             <>
-              Optional. Drop a track <strong>you own</strong> — we bias mood and energy of an original
-              sketch. Not a clone. No YouTube.
+              Optional. Drop a track <strong>you own</strong>. On Sketch we map it to mood/energy
+              only. On Studio the audio itself conditions generation, so the result can resemble
+              it — still an original render, not a copy. No YouTube.
             </>
           )}
         </span>
@@ -153,7 +154,7 @@ export function StyleDropZone() {
 
       {vibe && (
         <div className="vibe-card honesty-card style-ref-ready" role="status">
-          <p className="vibe-banner">Inspired by YOUR file — original output</p>
+          <p className="vibe-banner">Conditioned on YOUR file (Studio) · mood-mapped (Sketch) — original output</p>
           <div className="vibe-meta">
             <strong className="vibe-name style-ref-filename" title={vibe.fileName}>
               {vibe.fileName}

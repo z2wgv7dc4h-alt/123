@@ -226,6 +226,8 @@ export interface StudioState {
   loraPackId: string | null;
   /** Vibe Mirror v0 — local analysis only; BPM display-only. */
   vibe: VibeProfile | null;
+  /** Raw style-ref audio, kept so Studio can do real audio2audio. */
+  vibeFile: File | null;
   vibeBusy: boolean;
   vibeIntensity: number;
   ownerConfirmed: boolean;
@@ -490,6 +492,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   mixer: emptyMixer(),
   loraPackId: 'rock-dnb-energy-v0',
   vibe: null,
+  vibeFile: null,
   vibeBusy: false,
   vibeIntensity: 0.7,
   ownerConfirmed: false,
@@ -637,6 +640,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const priorVibeForReplace = get().vibe;
     try {
       const vibe = await analyzeUserAudio(file);
+      set({ vibeFile: file });
       const prior = get();
       const undo = {
         energy: prior.energy,
@@ -1125,6 +1129,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           styleReference:
             s.vibe && s.ownerConfirmed
               ? {
+                  ...(s.vibeFile ? { file: s.vibeFile } : {}),
                   intensity: s.vibeIntensity,
                   estimatedBpm: s.vibe.estimatedBpm,
                   energy: s.vibe.energy,

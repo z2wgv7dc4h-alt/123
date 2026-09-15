@@ -8,6 +8,7 @@ import {
   ACE_SHIFT,
   ACE_DCW_ENABLED,
   ACE_DCW_MODE,
+  ACE_COVER_STRENGTH,
 } from '../core/backends/AceStepBackend';
 import { deriveBreakDensity } from '../core/structure/StructureEngine';
 
@@ -168,5 +169,86 @@ describe('AceStepBackend full GPU path', () => {
     // High chaos must move density away from the old constant.
     expect(deriveBreakDensity({ chaos })).toBeGreaterThan(0.55);
     expect(sentBody).not.toBeNull();
+  });
+});
+
+describe('AceStepBackend audio2audio (cover) path', () => {
+  const backend = new AceStepBackend();
+  const originalFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const fakeWav = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]);
+  function b64of(bytes: Uint8Array) {
+    let binary = '';
+    bytes.forEach((b) => {
+      binary += String.fromCharCode(b);
+    });
+    return btoa(binary);
+  }
+
+  async function renderWith(styleReference?: Record<string, unknown>) {
+    let sentBody: Record<string, unknown> | null = null;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === ACE_SIDECAR_RENDER_URL) {
+        sentBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({ jobId: 'j', seed: 7, gpuUsed: true, mixWavBase64: b64of(fakeWav) }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw new Error('unexpected fetch');
+    }) as typeof fetch;
+
+    const result = await backend.render({
+      jobId: 'j',
+      seed: 7,
+      bpm: 174,
+      bpmTolerance: 2,
+      durationBars: 8,
+      sampleRateHz: 48000,
+      bitDepth: 16,
+      channels: 2,
+      prompt: { descriptors: ['dnb'], energy: 0.8, darkness: 0.3, chaos: 0.4, text: 'rock dnb' },
+      stemSchemaVersion: 'v0',
+      ...(styleReference ? { styleReference: styleReference as never } : {}),
+    });
+    return { sentBody: sentBody as unknown as Record<string, unknown> | null, result };
+  }
+
+  it('sends the raw reference audio when the user attached and attested one', async () => {
+    const { sentBody, result } = await renderWith({
+      file: new Blob([fakeWav], { type: 'audio/wav' }),
+      intensity: 0.6,
+      estimatedBpm: 172,
+      energy: 0.7,
+      fileName: 'mine.wav',
+      ownerAttested: true,
+    });
+    expect(sentBody?.srcAudioBase64).toBeTruthy();
+    expect(sentBody?.srcAudioFileName).toBe('mine.wav');
+    expect(sentBody?.audioCoverStrength).toBe(ACE_COVER_STRENGTH);
+    // Honesty: only now may the manifest claim ACE consumed the reference.
+    expect(result.manifest.styleReference?.acePathActive).toBe(true);
+  });
+
+  it('never sends audio without ownership attestation', async () => {
+    const { sentBody, result } = await renderWith({
+      file: new Blob([fakeWav], { type: 'audio/wav' }),
+      intensity: 0.6,
+      estimatedBpm: 172,
+      energy: 0.7,
+      fileName: 'mine.wav',
+      ownerAttested: false,
+    });
+    expect(sentBody?.srcAudioBase64).toBeUndefined();
+    expect(result.manifest.styleReference?.acePathActive).toBe(false);
+  });
+
+  it('stays a plain text2music render when no reference is attached', async () => {
+    const { sentBody } = await renderWith();
+    expect(sentBody?.srcAudioBase64).toBeUndefined();
+    expect(sentBody?.audioCoverStrength).toBeUndefined();
   });
 });

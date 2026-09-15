@@ -4,11 +4,11 @@
 
 export const HELP = {
   styleRef:
-    'What: Optional vibe from a track you own. When: Drop MP3/WAV before Generate (or skip). What happens: Biases mood — never clones the file.',
+    'What: Optional reference you own. When: Drop before Generate. What happens: Sketch maps mood only; Studio shapes the sound from it. Original, not a copy.',
   ownerCheck:
-    'What: Your “I own this file” OK. When: Check before a drop attaches. What happens: Analysis stays in this browser — no catalog rips.',
+    'What: Your “I own this file” OK. When: Check before a drop attaches. What happens: Required before the file is used. Audio goes to your local GPU only.',
   vibeIntensity:
-    'What: How strongly your upload nudges the sketch. When: After a Style Ref is attached. What happens: Low = light touch; High = stronger mood. Tempo stays ~174.',
+    'What: How strongly your upload steers the result. When: After a Style Ref is attached. What happens: Low = light touch; High = stronger. Tempo stays ~174.',
   energyNudge:
     'What: Fine-tunes how hard the drop hits. When: After vibe is applied; before next Generate. What happens: Higher = more drive. Applies on next Generate.',
   darknessNudge:
@@ -279,7 +279,7 @@ export type HelpKey = keyof typeof HELP;
 
 /** Tiny plain-English glossary for noobs — UI may link; keep in sync with docs/GLOSSARY.md. */
 export const GLOSSARY_BLURBS = {
-  styleRef: 'Your own file as vibe inspiration — never a clone. Optional.',
+  styleRef: 'Your own file as a reference. Sketch biases mood; Studio conditions on the audio. Optional.',
   generate: 'Build an original ~174 BPM browser sketch. Shortcut G.',
   play: 'Hear the mix preview in this browser. Shortcut Space.',
   exportZip: 'Download dry tracks at 16|24-bit (+ mix_as_heard if remixed). Shortcut E.',

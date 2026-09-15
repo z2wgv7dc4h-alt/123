@@ -178,6 +178,11 @@ export interface RenderJob {
   };
   /** Optional user-owned style reference bias (browser upload only). */
   styleReference?: {
+    /**
+     * The user's actual audio. Present = Studio can do real audio2audio
+     * (ACE `cover`) instead of reducing the reference to scalar knobs.
+     */
+    file?: Blob;
     intensity: number;
     estimatedBpm: number | null;
     energy: number;

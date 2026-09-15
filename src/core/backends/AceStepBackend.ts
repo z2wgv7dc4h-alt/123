@@ -57,6 +57,22 @@ export const ACE_SHIFT = 3.0;
  */
 export const ACE_DCW_ENABLED = true;
 export const ACE_DCW_MODE = 'low' as const;
+/**
+ * Cover strength for real audio2audio. ACE-Step's own API doc recommends
+ * low values (~0.2) for style transfer; the schema default of 1.0 is
+ * closer to literal reconstruction of the source.
+ */
+export const ACE_COVER_STRENGTH = 0.25;
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  const CHUNK = 0x8000; // avoid arg-count limits on large files
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
 
 export const ACE_PROBE_TIMEOUT_MS = 12000;
 export const ACE_RENDER_TIMEOUT_MS = 240_000;
@@ -191,6 +207,13 @@ export class AceStepBackend implements AudioBackend {
       sectionsOverride: job.sectionsOverride,
     });
 
+    // Real audio2audio: when the user attached their own audio, send the
+    // actual bytes so ACE can run `cover` against them. Without this the
+    // reference only ever survives as a few scalar knob nudges.
+    const styleAudio = job.styleReference?.file;
+    const srcAudioBase64 =
+      styleAudio && job.styleReference?.ownerAttested ? await blobToBase64(styleAudio) : undefined;
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ACE_RENDER_TIMEOUT_MS);
     let res: Response;
@@ -213,6 +236,13 @@ export class AceStepBackend implements AudioBackend {
           shift: ACE_SHIFT,
           dcwEnabled: ACE_DCW_ENABLED,
           dcwMode: ACE_DCW_MODE,
+          ...(srcAudioBase64
+            ? {
+                srcAudioBase64,
+                srcAudioFileName: job.styleReference?.fileName ?? 'style-ref.wav',
+                audioCoverStrength: ACE_COVER_STRENGTH,
+              }
+            : {}),
           prompt: {
             text: buildAceCaption({
               energy: job.prompt.energy,
@@ -353,7 +383,10 @@ export class AceStepBackend implements AudioBackend {
       checkpointId: String(data.checkpointId || 'acestep-v15-base'),
       bpmMeasured: Number(data.bpmMeasured ?? structure.bpm),
       gpuUsed: true,
-      acePathActive: Boolean(job.styleReference),
+      // Only true when the reference audio was actually sent for a cover
+      // render — a reference that merely exists but was reduced to knob
+      // nudges must not claim the ACE path consumed it.
+      acePathActive: Boolean(srcAudioBase64),
       notes,
     });
 
