@@ -47,8 +47,8 @@ export const ACE_BASE_INFERENCE_STEPS = 64;
 export const ACE_TURBO_INFERENCE_STEPS = 8;
 /** @deprecated name kept for tests — the base/SFT step count. */
 export const ACE_INFERENCE_STEPS = ACE_BASE_INFERENCE_STEPS;
-/** Studio default DiT when the probe did not name one (start-ace-stack.ps1). */
-export const ACE_DEFAULT_CHECKPOINT = 'acestep-v15-base';
+/** Studio default DiT when the probe did not name one: turbo (ACE README quality Very High). */
+export const ACE_DEFAULT_CHECKPOINT = 'acestep-v15-turbo';
 export const ACE_GUIDANCE_SCALE = 7.0;
 
 export function isTurboCheckpoint(checkpoint: string | null | undefined): boolean {

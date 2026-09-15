@@ -24,14 +24,8 @@ $env:ACESTEP_QUANTIZATION = "false"
 $env:ACESTEP_COMPILE = "false"
 $env:ACESTEP_USE_FLASH_ATTENTION = "false"
 if (-not $env:ACESTEP_LM_BACKEND) { $env:ACESTEP_LM_BACKEND = "pt" }
-# DiT checkpoint: best weights already on disk. SFT if present, else base.
-# Turbo only when the user sets ACESTEP_CONFIG_PATH=acestep-v15-turbo themselves.
-# Nothing is downloaded here.
-if (-not $env:ACESTEP_CONFIG_PATH) {
-  $sftDir = Join-Path $aceRoot "checkpoints\acestep-v15-sft"
-  if (Test-Path $sftDir) { $env:ACESTEP_CONFIG_PATH = "acestep-v15-sft" }
-  else { $env:ACESTEP_CONFIG_PATH = "acestep-v15-base" }
-}
+# DiT: turbo = ACE's highest-rated quality on disk (README: turbo Very High, sft High, base Medium).
+if (-not $env:ACESTEP_CONFIG_PATH) { $env:ACESTEP_CONFIG_PATH = "acestep-v15-turbo" }
 Write-Host "DiT checkpoint: $($env:ACESTEP_CONFIG_PATH)" -ForegroundColor Cyan
 Write-Host "Starting ACE API on 127.0.0.1:8001 ..." -ForegroundColor Cyan
 $ace = Start-Process -PassThru -NoNewWindow -FilePath "uv" -ArgumentList @("run","acestep-api","--host","127.0.0.1","--port","8001") -WorkingDirectory $aceRoot

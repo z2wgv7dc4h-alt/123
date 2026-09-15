@@ -3,7 +3,6 @@ import {
   AceStepBackend,
   ACE_SIDECAR_PROBE_URL,
   ACE_SIDECAR_RENDER_URL,
-  ACE_INFERENCE_STEPS,
   ACE_GUIDANCE_SCALE,
   ACE_SHIFT,
   ACE_DCW_ENABLED,
@@ -92,7 +91,7 @@ describe('AceStepBackend full GPU path', () => {
     expect(mix?.blob).toBeTruthy();
   });
 
-  it('sends named inference params; DCW off on base text2music', async () => {
+  it('sends named inference params; turbo default when no probe', async () => {
     const fakeWav = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]);
     let binary = '';
     fakeWav.forEach((b) => {
@@ -128,13 +127,13 @@ describe('AceStepBackend full GPU path', () => {
     expect(sentBody).not.toBeNull();
     const body = sentBody as unknown as Record<string, unknown>;
     expect(body.thinking).toBe(true);
-    expect(body.inferenceSteps).toBe(ACE_INFERENCE_STEPS);
-    // The plan's section map is what the bridge turns into section-tag lyrics.
+    expect(body.inferenceSteps).toBe(8);
+    // section map still sent; bridge sets lyrics to exactly [Instrumental].
     expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);
     expect(body.shift).toBe(ACE_SHIFT);
-    // DCW off for base/SFT text2music (ACE #1259); turbo and cover keep it on.
-    expect(body.dcwEnabled).toBe(false);
+    // No probe => default turbo, so DCW stays on (base/SFT text2music is off).
+    expect(body.dcwEnabled).toBe(true);
     expect(body.dcwMode).toBe(ACE_DCW_MODE);
     expect(aceDcwEnabled('acestep-v15-turbo', false)).toBe(ACE_DCW_ENABLED);
     expect(aceDcwEnabled('acestep-v15-base', true)).toBe(ACE_DCW_ENABLED);

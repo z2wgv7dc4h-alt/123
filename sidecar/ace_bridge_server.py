@@ -67,9 +67,8 @@ DEFAULT_PROMPT = (
     "rolling reese bass, sub bass, original composition"
 )
 
-# Studio's default DiT when neither ACE nor the env say otherwise. Matches
-# scripts/windows/start-ace-stack.ps1 (SFT if on disk, else base).
-DEFAULT_DIT_MODEL = "acestep-v15-base"
+# Studio default DiT: turbo (ACE README quality Very High).
+DEFAULT_DIT_MODEL = "acestep-v15-turbo"
 # ACE docs/en/INFERENCE.md: base/SFT "recommended 32-64", high quality tip is
 # "inference_steps=64 or higher" + use_adg=True. Turbo: "recommended 8".
 BASE_INFERENCE_STEPS = 64
@@ -131,8 +130,8 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
     - thinking=True: the 5Hz LM plans the track (audio codes). With thinking
       off ACE skipped the LM and produced audio with no arrangement plan.
     - use_cot_caption=False / use_cot_language=False: the LM must not rewrite
-      our concrete DnB caption or invent sung words. The section map below is
-      the only "lyrics" — temporal tags, never vocals.
+      our concrete DnB caption or invent sung words.
+    - lyrics is exactly [Instrumental] — ACE is_instrumental() only matches that.
     - base/SFT: 64 steps + use_adg; turbo: 8 steps, no ADG (ignored there).
     - bpm/duration come from the browser plan when sent (174 default).
     """
@@ -166,7 +165,9 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
 
     return {
         "prompt": prompt,
-        "lyrics": build_section_lyrics(structure_ref),
+        # MUST be exactly [Instrumental]: ACE is_instrumental() only matches that
+        # string; section tags made ACE plan a vocal song (nonsense output).
+        "lyrics": "[Instrumental]",
         "thinking": True,
         "use_cot_caption": False,
         "use_cot_language": False,
