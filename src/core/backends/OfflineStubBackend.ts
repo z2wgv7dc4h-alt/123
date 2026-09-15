@@ -307,6 +307,14 @@ export function applyRockMidGrit(
   }
 }
 
+/** Naive (non-bandlimited) sawtooth from raw time — fine at bass fundamentals
+ * (well under Nyquist headroom at 48kHz) and cheap; the tanh drive downstream
+ * adds harmonics anyway so bandlimiting would be wasted precision here. */
+function sawFromTime(freqHz: number, t: number): number {
+  const cyclePos = (freqHz * t) % 1;
+  return 2 * cyclePos - 1;
+}
+
 function writeBass(
   buf: Float32Array,
   at: number,
@@ -324,42 +332,52 @@ function writeBass(
   // Tempo-synced wobble: 1/4-note LFO at bpm (174 → ~2.9 Hz) — dancefloor, not toy
   const wobbleHz = (bpm / 60) * (character === 'growl' ? 2 : 1); // growl = 1/8 feel
   const wantWobble = opts?.wobble !== false && character !== 'sub';
+  const scratch = character === 'sub' ? null : new Float32Array(len);
   for (let i = 0; i < len && at + i < buf.length; i++) {
     const t = i / sr;
     const phase = 2 * Math.PI * freq * t;
     let s: number;
     if (character === 'sub') {
+      // Subs are near-pure in real production — sine stays correct here.
       s = Math.sin(phase) + Math.sin(phase * 2) * 0.12;
     } else if (character === 'reese') {
-      const d1 = Math.sin(phase * 1.007);
-      const d2 = Math.sin(phase * 0.993);
-      const d3 = Math.sin(phase * 1.014);
+      // Reese = a stack of detuned SAWTOOTH oscillators, not sines — the
+      // dense buzzing "wall of sound" DnB reese basses are known for comes
+      // from sawtooth harmonic content beating against itself, which a
+      // sine stack can't produce (it only chorus-beats faintly).
       const lfo = wantWobble ? 0.5 + 0.5 * Math.sin(2 * Math.PI * wobbleHz * t) : 0.85;
-      // Harmonic morph with LFO = filter-ish movement without GPL plugins
       const bright = 0.35 + 0.65 * lfo;
       const core =
-        Math.sin(phase) * (0.7 - bright * 0.25) +
-        (d1 + d2) * (0.28 + bright * 0.22) +
-        d3 * (0.12 + bright * 0.2) +
-        Math.sin(phase * 3.01) * bright * 0.18 +
-        Math.sin(phase * 4.02) * bright * 0.08;
-      s = Math.tanh(core * (1.4 + bright * 0.55));
+        sawFromTime(freq, t) * 0.5 +
+        sawFromTime(freq * 0.993, t) * (0.32 + bright * 0.18) +
+        sawFromTime(freq * 1.007, t) * (0.32 + bright * 0.18) +
+        sawFromTime(freq * 1.014, t) * (0.18 + bright * 0.14) +
+        sawFromTime(freq * 0.986, t) * (0.18 + bright * 0.14);
+      s = Math.tanh(core * (1.15 + bright * 0.45));
       s *= 0.55 + 0.45 * lfo; // amp wobble
     } else {
-      // growl: harder drive + faster wobble
+      // growl: same detuned-saw stack, harder drive + faster wobble
       const lfo = wantWobble ? 0.45 + 0.55 * Math.sin(2 * Math.PI * wobbleHz * t) : 0.9;
-      const drive = 2.2 + lfo * 1.4;
-      s = Math.tanh(
-        Math.sin(phase) * drive +
-          Math.sin(phase * 2.03) * (0.4 + lfo * 0.35) +
-          Math.sin(phase * 3.02) * (0.15 + lfo * 0.25) +
-          Math.sin(phase * 5.01) * lfo * 0.12,
-      );
+      const drive = 1.7 + lfo * 1.1;
+      const core =
+        sawFromTime(freq, t) * 0.5 +
+        sawFromTime(freq * 0.99, t) * 0.35 +
+        sawFromTime(freq * 1.01, t) * 0.35 +
+        sawFromTime(freq * 2.003, t) * (0.15 + lfo * 0.2);
+      s = Math.tanh(core * drive);
       s *= 0.5 + 0.5 * lfo;
     }
     const g = envGain(t, 0.008, Math.max(0.05, dur - 0.015)) * vel;
     const body = character === 'sub' ? 0.52 : character === 'reese' ? 0.58 : 0.55;
-    buf[at + i]! += s * g * body;
+    if (scratch) scratch[i] = s * g * body;
+    else buf[at + i]! += s * g * body;
+  }
+  if (scratch) {
+    // Tame the extra sawtooth harmonic energy the tanh drive throws up top
+    // before it hits the mix — without this the reese/growl reads as harsh
+    // buzz rather than a thick wall.
+    lowpassInPlace(scratch, sr, 5600);
+    for (let i = 0; i < len && at + i < buf.length; i++) buf[at + i]! += scratch[i]!;
   }
 }
 
