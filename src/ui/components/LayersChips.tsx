@@ -14,6 +14,18 @@ const SECONDARY = [
 
 type Props = { /** Show vocal-ish / extra drums too */ showSecondary?: boolean };
 
+/**
+ * Layers OfflineStubBackend actually synthesizes on CPU — guitar/solo/extraDrums
+ * are pure Float32Array synthesis (see applyGuitarLayers/extraDrums in
+ * OfflineStubBackend.ts), no GPU involved. Only vocal-ish is ACE-caption-only
+ * (no CPU synthesis exists for it), so that one alone stays Studio-gated.
+ */
+const CPU_CAPABLE = new Set<keyof ReturnType<typeof useStudioStore.getState>['layers']>([
+  'guitar',
+  'solo',
+  'extraDrums',
+]);
+
 /** Simple Mode — generative heat only (never artist-clone). Never claim ACE extract/repaint on Sketch. */
 export function LayersChips({ showSecondary = false }: Props) {
   const layers = useStudioStore((s) => s.layers);
@@ -27,7 +39,7 @@ export function LayersChips({ showSecondary = false }: Props) {
   const defs = showSecondary ? [...PRIMARY, ...SECONDARY] : PRIMARY;
   const anyOn = defs.some((d) => layers[d.key]);
   const pulse = !!(result && (anyOn || paramsDirty));
-  const needsStudio = !aceHasGpu;
+  const anyNeedsStudio = defs.some((d) => !CPU_CAPABLE.has(d.key)) && !aceHasGpu;
 
   return (
     <section className="layers-chips panel" aria-label="Add heat layers">
@@ -37,15 +49,16 @@ export function LayersChips({ showSecondary = false }: Props) {
           <HelpTip text={HELP.layers} ariaLabel="About layers" />
         </h2>
         <p className="hint">Applies on next Generate · original textures only</p>
-        {needsStudio && (
+        {anyNeedsStudio && (
           <p className="layers-needs-studio" role="status">
-            Needs Studio
+            Vocal-ish needs Studio · guitar/solo/extra drums work in Sketch
           </p>
         )}
       </div>
       <div className="layers-row" role="group" aria-label="Texture layers">
         {defs.map((d) => {
           const on = layers[d.key];
+          const needsStudio = !CPU_CAPABLE.has(d.key) && !aceHasGpu;
           const disabled = busy || needsStudio;
           const ariaLabel = needsStudio
             ? `${d.label} — Needs Studio`
@@ -70,7 +83,7 @@ export function LayersChips({ showSecondary = false }: Props) {
           );
         })}
       </div>
-      {pulse && !needsStudio && (
+      {pulse && (
         <div className="layers-actions">
           <button
             type="button"

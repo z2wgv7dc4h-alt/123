@@ -62,13 +62,17 @@ describe('Simple process order (P0.2–P0.3)', () => {
     );
   });
 
-  it('LayersChips: Needs Studio when !aceHasGpu; honesty hint; no-op when disabled', () => {
+  it('LayersChips: Needs Studio only for ACE-only layers (guitar/solo/extraDrums run in Sketch); honesty hint; no-op when disabled', () => {
     expect(layersSrc).toMatch(/aceHasGpu/);
     expect(layersSrc).toMatch(/Needs Studio/);
     expect(layersSrc).toMatch(/Applies on next Generate · original textures only/);
     expect(layersSrc).toMatch(/if \(disabled\) return/);
     // User-facing: never claim ACE extract/repaint / lego on Sketch chips
     expect(layersSrc).not.toMatch(/(?:label|hint|title|aria)[^\n]*lego/i);
-    expect(layersSrc).toMatch(/needsStudio = !aceHasGpu/);
+    // Guitar/solo/extraDrums are pure CPU synthesis (OfflineStubBackend) — must
+    // NOT be blanket-gated behind aceHasGpu. Only the ACE-caption-only layer
+    // (vocal-ish) stays Studio-gated.
+    expect(layersSrc).toMatch(/CPU_CAPABLE/);
+    expect(layersSrc).toMatch(/needsStudio = !CPU_CAPABLE\.has\(d\.key\) && !aceHasGpu/);
   });
 });
