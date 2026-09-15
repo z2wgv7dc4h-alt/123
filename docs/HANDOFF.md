@@ -321,17 +321,33 @@ Concrete, sourced gaps, ranked by leverage-per-effort:
      `File`/`Blob` object from the `vibe` state (it's already held in
      memory client-side for the existing local analysis step — just also
      forward it, don't re-derive it) instead of only its filename/hash.
-2. **`task_type: "lego"`** generates one named stem track (`TRACK_NAMES` in
-   `acestep/constants.py` includes `drums`, `bass`, `guitar`, `synth`,
-   `percussion`, `vocals`, etc.) conditioned on the audio context of the
-   others. This is the real mechanism for actual separated ACE stems —
-   right now all "stems" returned by the bridge mirror the same mix blob
-   (honestly labeled as such in `AceStepBackend.ts`'s warnings/notes, see
-   `stemsShareMixBlob`). Already flagged as "Not shipped" in
-   README.md/ARCHITECTURE.md, but this session traced it to a real,
-   already-installed, working API surface for the first time. Bigger lift
-   than #1 (multiple round-trip generation calls per song, one per track,
-   plus a mixdown step) — do #1 first.
+2. **Real separated ACE stems: use `task_type: "extract"`, not `"lego"`**
+   — this was wrong/imprecise in the first pass of this research and is
+   corrected here after actually reading
+   `docs/en/GRADIO_GUIDE.md` (local, offline) rather than stopping at
+   `constants.py`. Two distinct real task types, easy to conflate:
+   - **`extract`** — "Extract/isolate a specific instrument track from
+     mixed audio": upload the audio (the mix this app already generated),
+     pick a Track Name from `TRACK_NAMES` (`acestep/constants.py` —
+     `drums`, `bass`, `guitar`, `synth`, `percussion`, `vocals`, etc.),
+     generate. **This is the direct fix** for "stems currently mirror the
+     mix blob" (`stemsShareMixBlob` in `AceStepBackend.ts`) — feed back
+     the mix this app already has, once per stem, get the real isolated
+     track back. Uses the same multipart upload mechanism as `cover`/
+     `repaint` (§3.1's `src_audio` field) — implement it as a follow-on
+     to #1 above, it's the same upload plumbing.
+   - **`lego`** — generates a *new* track conditioned on the audio context
+     of others (e.g. "generate a bass line that fits this drum track").
+     Real and useful, but a different feature — adding new instrumentation
+     to something that already exists, not separating what's already
+     there. Don't reach for this when what's wanted is stem separation.
+   Both need `docs/en/GRADIO_GUIDE.md`'s "Extract Mode" / "Complete Mode"
+   sections read directly before implementing (local file, offline-
+   readable) — this handoff's summary is not a substitute for that.
+   Bigger lift than #1 alone (multiple round-trip generation calls per
+   song, one per stem, plus a mixdown/verification step) — do #1 first,
+   #2 (`extract`) is then a natural follow-on since it reuses the same
+   upload plumbing.
 3. **LoRA fine-tuning is a real, present feature of the installed ACE-Step
    repo**, not vaporware — `acestep.api.train_api_service
    .initialize_training_state`, wired into `api_server.py`'s FastAPI
@@ -399,6 +415,34 @@ Concrete, sourced gaps, ranked by leverage-per-effort:
    Verify each pack's actual license text yourself before use — search
    results describe them as CC0/free/royalty-free but don't take that as
    gospel without opening the pack's own license file.
+
+   **A synthesis-technique lead too, not just samples**: real Reese bass
+   detuning is commonly documented around **±30 cents** (±0.3 semitones)
+   per oscillator pair — e.g.
+   [Native Instruments' guide](https://blog.native-instruments.com/reese-bass/).
+   This project's actual current detuning, computed from the real ratios
+   in `writeBass()`'s `reese` branch (`OfflineStubBackend.ts`): the inner
+   pair (`freq*0.993`/`freq*1.007`) is **~±12 cents**, the outer pair
+   (`freq*0.986`/`freq*1.014`) is **~±24 cents** — narrower than the
+   commonly-cited reference. Worth a real A/B render (not a guess-and-ship
+   change): widen toward ±25-30 cents on at least the outer pair and
+   listen for whether it reads as more authentically "reese" or starts
+   sounding out-of-tune/chorus-y — producers vary this deliberately by
+   ear, there's no single correct number, but ours is on the narrow end
+   of what's typically documented.
+
+   **On open-source synth *engines* (Kickmess, Geonkick, WeirdDrums,
+   RipplerX)** found via WebSearch: these are real, GPL/open-source
+   projects with algorithms worth reading for technique, but **none of
+   them are directly integrable** — they're C++/JUCE audio plugins, not JS
+   libraries, and this app is a browser/Node TypeScript codebase with an
+   explicit architectural rule (see the Tone.js discussion in this
+   session's chat log, or ask the user) against pulling in an audio-graph
+   engine for the actual synthesis path. Treat them the same way the
+   `dev.to` sample-free drum synthesis article was used earlier this
+   session (see §2): read the algorithm, port the relevant DSP technique
+   into this project's own Float32Array functions — don't try to `npm
+   install` or vendor any of them.
 5. **`inference_steps` — resolved, not actually a concern.** The bridge
    sends 50 (`AceStepBackend.ts`); flagged earlier this session as
    possibly-wrong since the schema's bare default is 8. Checked against the
@@ -413,9 +457,22 @@ Concrete, sourced gaps, ranked by leverage-per-effort:
    (`use_adg` in the real request schema, base-model-only, per the same
    docs) is described as improving quality at a speed cost — currently
    unset (defaults to off) in `AceStepBackend.ts`. `timesteps` (custom
-   schedule override) and `dcw_enabled`/`dcw_mode` (post-hoc wavelet
-   correction) remain genuinely unexplored — no claim either way on
-   whether tuning them would help; don't touch without real A/B evidence.
+   schedule override) remains genuinely unexplored — no claim either way.
+   **DCW is a concrete, cheap win worth trying, not just a maybe** — read
+   directly from `docs/en/DCW.md` (local, offline-readable): it's a
+   training-free, negligible-compute, sampler-side quality correction
+   (arXiv:2604.16044, validated on FLUX and other flow-matching models
+   ACE-Step shares its formulation with). Per that doc, `dcw_enabled` is
+   **enabled by default for Turbo models but disabled by default for
+   non-Turbo** — and this project always uses `acestep-v15-base`
+   (non-Turbo), so **DCW is currently silently off** on every render. The
+   doc names `dcw_mode: "low"` as "a sensible default, not a canonical
+   one" starting point, with `dcw_scaler` in `0–0.1` (default `0.05`).
+   Since it's opt-in, free, and specifically flagged by the model authors
+   as improving quality, this is a good first experiment before touching
+   anything riskier — set `dcwEnabled: true` in the render request
+   (`AceStepBackend.ts`'s POST body currently has no `dcw*` fields at all)
+   and A/B a render against one without it, real audio, same seed.
 
 ## 4. Licensing — relaxed this session, owner decision
 

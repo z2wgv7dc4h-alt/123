@@ -33,7 +33,26 @@
 
 ## Forbidden
 
-- Tone.js as synth engine — KILLED (preview of WAV only)
+- **Tone.js as synth engine — KILLED (preview of WAV only).** Tone.js is
+  still used, but scoped to live playback (`Tone.Channel` mute/solo/gain
+  while a rendered WAV plays) — never to generate the audio that gets
+  bounced to WAV. That's 100% hand-written Float32Array math
+  (`OfflineStubBackend.ts`). Rationale (reconstructed 2026-09-15, not
+  previously documented — asked about directly by the owner and answered
+  from reading the code, not from a recorded decision): (1) deterministic
+  reproducibility — same seed produces a byte-identical WAV, provable;
+  a real-time audio-graph engine makes that far harder to guarantee;
+  (2) **this is what makes the whole project's Node-based render/test
+  workflow possible** — `scripts/render-styles.mjs`,
+  `scripts/render-compare.mjs`, and most of `src/test/*` run the actual
+  synthesis in plain Node via `vite-node` with zero `AudioContext`,
+  because it's just array math; if Tone.js generated the audio itself,
+  none of that would work outside a real browser tab; (3) exact bit-depth/
+  WAV-encoding control is simpler owning every sample directly. Owner has
+  said they're open to revisiting this if it would genuinely help sound
+  quality, but the recommendation (given as of 2026-09-15) is to keep it —
+  it isn't what's capping sound quality, and abandoning it costs the
+  testability every fix this project has relied on depends on.
 - Artist-clone product / catalog rips / stem RE — FORBIDDEN; style text may keep vibe words (scrubArtistNames no-op)
 - Train on third-party catalogs — FORBIDDEN (ethical/copyright line — unaffected by the licensing note below)
 
