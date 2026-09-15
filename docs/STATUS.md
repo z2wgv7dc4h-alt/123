@@ -1,5 +1,12 @@
 # DnB Studio — Living Status
 
+**New session? Read [docs/HANDOFF.md](HANDOFF.md) first** — it has an
+urgent pending item (git history still exposes the owner's real name
+publicly, fix script ready but not yet run), a prioritized list of what
+this project isn't leveraging yet (sourced from the real installed
+ACE-Step repo), and a full pending-work list. This file is the detailed
+chronological log; HANDOFF.md is the entry point.
+
 Last regenerated: 2026-09-15, by actually reading and running the code (tests,
 `tsc`, and live GPU renders against the real ACE stack on the RTX 5080) —
 not from memory of intent. Update this file in the same change as any fix
@@ -110,6 +117,105 @@ only shifts perc-hit/fill density, not core song shape).
   knob-sensitivity test contract preserved (5/5 passing). **Not yet
   confirmed by ear** — this is the first fix aimed at Studio specifically
   rather than Sketch.
+
+## Fixed 2026-09-15 (later pass): dubstep vs half-time-drop were identical
+
+Found via `scripts/render-styles.mjs` (renders all 4 song-shape presets at
+one seed and prints structural diagnostics): "Dubstep feel" and "Half-time
+drop" produced byte-identical `bassChar`/`kickHits`/`snareBeatPositions` —
+a single `halfTime` boolean in `StructureEngine.ts` drove both, with no
+other distinction anywhere (drums, bass character, energy curve, ACE
+caption). Fixed by keeping the shared half-time snare-on-3 drum grid (that
+similarity is real — both genres are genuinely half-time grooves) but
+splitting everything else: dubstep now biases bass character toward `growl`
+(`pick(rng, ['growl','growl','reese'])` vs half-time-drop's
+`['reese','growl','reese']`), gets a bigger drop/intro energy-curve swing
+(0.5/0.44 vs 0.42/0.38), and a distinct ACE caption phrase ("wobble growl
+bass, dubstep-influenced drop" vs "heavy weighted drop, rolling reese
+movement"). Half-time-drop's structural values are unchanged from before —
+only dubstep moved.
+
+## Licensing relaxed 2026-09-15 (owner decision)
+
+This is a personal, non-commercial project — the owner explicitly relaxed
+the tool/dependency licensing constraint: GPL/AGPL/NC-licensed tools and
+libraries are fine to integrate (sample packs, synth engines, DSP code) as
+long as nothing is sold or redistributed. This does **not** touch the
+separate, still-hard ethical/copyright line against training on or cloning
+third-party artist catalogs — that stays forbidden. README.md and
+ARCHITECTURE.md updated accordingly.
+
+## Not leveraging yet — found by reading the real ACE-Step 1.5 source
+
+2026-09-15, in response to "are we doing this the best possible way? what
+aren't we leveraging?" — instead of guessing, read the actual installed
+ACE-Step-1.5 repo at `~/Documents/ACE-Step-1.5` (`acestep/api/http/
+release_task_models.py`, `acestep/constants.py`) rather than assuming from
+memory of the architecture. Concrete, sourced gaps:
+
+- **The "Optional vibe" / Style Ref upload never reaches ACE as audio.**
+  `StyleDropZone.tsx` lets the user drop a track they own; today that file
+  is analyzed once client-side (`analyzeStyleReferenceFile`) into three
+  scalar numbers (estimated BPM, energy, brightness) that nudge the
+  energy/darkness knobs — the actual audio is discarded. `AceStepBackend.ts`
+  never sends it to the bridge; `job.styleReference` only flips a boolean in
+  the export manifest. This is **deliberate and tested**, not an oversight —
+  `src/test/style-reference.test.ts` and `vibe-mirror.test.ts` explicitly
+  assert `manifest.styleReference?.acePathActive === false`. But the real
+  ACE-Step API (`GenerateMusicRequest` in `release_task_models.py`) has a
+  full audio-conditioning pipeline sitting unused: `task_type: "cover"` +
+  `src_audio_path` + `audio_cover_strength` + `cover_noise_strength` is
+  real audio-to-audio generation (bias the *actual sound*, not three
+  numbers derived from it); `task_type: "repaint"` + `repainting_start/end`
+  + `repaint_mode`/`repaint_strength` can regenerate just a section while
+  preserving the rest. `ace_bridge_server.py` hardcodes
+  `"task_type": "text2music"` and never sets any of these fields — the
+  bridge doesn't even accept an audio file today. This is the highest-
+  leverage gap: the product already collects the exact input (owned
+  reference track, explicit ownership attestation) this feature needs and
+  then throws it away.
+- **`task_type: "lego"` (confirmed in `acestep/constants.py`:
+  `TASK_TYPES_BASE = ["text2music", "repaint", "cover", "cover-nofsq",
+  "extract", "lego", "complete"]`) generates one named track
+  (`TRACK_NAMES` includes `drums`, `bass`, `guitar`, `synth`, `percussion`,
+  etc.) conditioned on the audio context of the others — this is the real
+  mechanism for actual separated ACE stems, not the current "all stems
+  mirror the same mix blob" honesty-labeled placeholder. Already flagged
+  as "Not shipped" in README/ARCHITECTURE, but hadn't traced it to a real,
+  already-installed API surface until now.
+- **LoRA fine-tuning is a real, present feature of the installed repo**
+  (`acestep.api.train_api_service.initialize_training_state`, wired into
+  `api_server.py`'s lifespan) — `LoRAPackManager` in this app is currently
+  "metadata + gates only, stub packs until CUDA train path" per
+  ARCHITECTURE.md. With NC licensing now a non-issue, fine-tuning a LoRA on
+  a small owned/curated DnB reference set is a real option for genre
+  authenticity, not blocked by anything except doing the work (bigger
+  lift than the two items above — needs reference audio data and GPU
+  training time, so treat as a later phase, not the next move).
+- **Sketch has zero real audio samples anywhere** — confirmed via grep,
+  `OfflineStubBackend.ts` is 100% synthetic oscillator math (sine/saw/
+  square/noise + biquad filters), same as every other DSP file in
+  `src/core`. Now that GPL/AGPL/NC sample packs are fine to use personally,
+  a real (even lightly processed) amen/funky-drummer-style breakbeat
+  sample layered under or in place of the synthesized kit would likely
+  beat further synthesis tuning for "sounds like real DnB" — DnB as a
+  genre is historically breakbeat-sample-based, not purely synthesized,
+  and no amount of oscillator tuning fully closes that gap.
+- **`inference_steps` — bridge sends 50 (`AceStepBackend.ts`), the real
+  schema's own default is 8**; not necessarily wrong for the non-turbo
+  base model (more steps can mean higher fidelity at more GPU time), but
+  never verified against real quality-vs-speed data — currently just an
+  inherited guess, not a measured choice.
+- **`timesteps` (custom schedule) and `dcw_enabled`/`dcw_mode` (post-hoc
+  wavelet correction) exist in the real request schema** and are entirely
+  unset (server defaults apply blind) — unexplored, no claim either way on
+  whether tuning them would help.
+
+None of this is implemented yet. Recommended next move given "first i need
+proper genres/styles working": wire real `cover`/`repaint` audio2audio for
+the existing Style Ref upload first (highest leverage, most scoped, reuses
+an input the UI already collects) before touching LoRA training or a
+sample-based Sketch overhaul.
 
 ## Open questions — not yet resolved
 

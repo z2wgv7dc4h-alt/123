@@ -90,7 +90,16 @@ Also: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [LICENSE](LICENSE) (MIT)
 - Structure owns the grid. No artist-clone product / catalog rips; style text may pass vibe words (not scrubbed).
 - Style Ref = **your** file only — no YouTube rips, no third-party catalog train/rip.
 - OfflineStub never claims ACE stems from a reference.
-- Forbidden in binary: ACE-Step-DAW / Strudel (AGPL), MusicGen NC, Matchering GPL, Pedalboard GPL, etc. (see ARCHITECTURE).
+- Train on third-party catalogs — still forbidden. This is an ethical/copyright
+  line, not a tool-licensing one, and is unaffected by the note below.
+
+**Tool/dependency licensing (2026-09-15, owner decision):** this is a personal,
+non-commercial project — GPL/AGPL/NC-licensed tools and libraries are fine to
+integrate (sample packs, synthesis engines, DSP code) as long as nothing is
+sold or redistributed commercially. The older "forbidden in binary"
+AGPL/GPL/NC list (ACE-Step-DAW/Strudel, Matchering, Pedalboard, MusicGen NC)
+was a commercial-product constraint that no longer applies here; see
+ARCHITECTURE for what's actually integrated.
 
 Feature notes: [docs/knowledge/](docs/knowledge/).
 Why tempo: [docs/WHY_174.md](docs/WHY_174.md).

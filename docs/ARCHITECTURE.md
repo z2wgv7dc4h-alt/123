@@ -34,10 +34,16 @@
 ## Forbidden
 
 - Tone.js as synth engine — KILLED (preview of WAV only)
-- ACE-Step-DAW / Strudel — FORBIDDEN (AGPL)
-- MusicGen NC / LeVo2 / Matchering GPL / Pedalboard GPL in binary — FORBIDDEN
 - Artist-clone product / catalog rips / stem RE — FORBIDDEN; style text may keep vibe words (scrubArtistNames no-op)
-- Train on third-party catalogs — FORBIDDEN
+- Train on third-party catalogs — FORBIDDEN (ethical/copyright line — unaffected by the licensing note below)
+
+**Tool/dependency licensing relaxed 2026-09-15** (owner decision — personal,
+non-commercial project): GPL/AGPL/NC-licensed tools and libraries are fine to
+integrate now (sample packs, synth engines, DSP code), as long as nothing is
+sold or redistributed. The prior list (ACE-Step-DAW/Strudel AGPL, MusicGen NC,
+Matchering/Pedalboard GPL "forbidden in binary") was a commercial-distribution
+constraint that no longer applies — see docs/STATUS.md "Not leveraging yet"
+for what this actually unblocks.
 
 ## BPM lock
 

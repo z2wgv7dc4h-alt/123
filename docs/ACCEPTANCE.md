@@ -52,7 +52,7 @@ Style Ref (optional, owner-gated) → Generate → Play → stem tweak (optional
 | A1 | BPM lock measured within 174 +/- 2 | partial — OfflineStub forces structure BPM/samplesPerBar to 174 when far off; no audio onset/BPM meter yet |
 | A2 | Seed identical StructureMap | [x] vitest |
 | A3 | stem-v0 schema | [x] vitest `stem-perc-a3.test.ts` — OfflineStub exports `perc` StemId+WAV **only if perc hits > 0** (no silent `perc.wav`; role may exist empty); elemental mixer/remix; drums bus note in manifest; kick/snare/hats/bass/drums/mix intact (soft-pass forbidden) |
-| A4 | no forbidden GPL/AGPL/NC in binary | policy in THIRD_PARTY; not a license scanner yet |
+| A4 | ~~no forbidden GPL/AGPL/NC in binary~~ — **relaxed 2026-09-15**, owner decision: personal/non-commercial project, GPL/AGPL/NC tools now allowed (see docs/STATUS.md "Licensing relaxed"). Third-party-catalog training / artist-clone still forbidden (A5, unaffected) | n/a |
 | A5 | no artist clone product | [x] pass-through style descriptors (vitest no-scrub); blocklist empty; still forbid catalog rips / stem RE / clone features — soft-pass forbidden on “names scrubbed” UI |
 | A6 | Tone not synth engine | [x] by architecture + PreviewPlayer |
 | A7 | drop energy vs intro | [x] vitest `section-energy.test.ts` — OfflineStub mix+kick drop RMS ≥ intro × 1.25 (energyCurve gains; soft-pass forbidden) |

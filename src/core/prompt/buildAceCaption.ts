@@ -126,8 +126,10 @@ export function buildAceCaption(input: AceCaptionInput): string {
   }
 
   const shape = input.songShape;
-  if (shape === 'dubstep' || shape === 'half-time-drop') {
-    parts.push('half-time snare, heavy drop, wobble reese movement');
+  if (shape === 'dubstep') {
+    parts.push('half-time snare, wobble growl bass, dubstep-influenced drop');
+  } else if (shape === 'half-time-drop') {
+    parts.push('half-time snare, heavy weighted drop, rolling reese movement');
   }
   if (shape === 'trap-bounce') {
     parts.push('fat 808 glide bass, rolling bounce hats, punchy trap-flavored dnb');

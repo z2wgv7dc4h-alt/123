@@ -413,10 +413,17 @@ function planBass(
   return { notes, character };
 }
 
-function energyCurve(sections: Section[], base: number, halfTimeDrop = false): EnergyPoint[] {
+function energyCurve(
+  sections: Section[],
+  base: number,
+  halfTimeDrop = false,
+  dubstepShape = false,
+): EnergyPoint[] {
   const pts: EnergyPoint[] = [];
-  const dropBoost = halfTimeDrop ? 0.42 : 0.3;
-  const introDip = halfTimeDrop ? 0.38 : 0.3;
+  // Dubstep leans harder into the wall-of-bass drop contrast than a generic
+  // half-time drop — bigger boost, deeper intro dip.
+  const dropBoost = dubstepShape ? 0.5 : halfTimeDrop ? 0.42 : 0.3;
+  const introDip = dubstepShape ? 0.44 : halfTimeDrop ? 0.38 : 0.3;
   for (const s of sections) {
     const mid = s.startBar + Math.floor(s.lengthBars / 2);
     const level =
@@ -447,6 +454,12 @@ export class HardGridStructureEngine implements StructureEngine {
     const breakDensity = Math.min(1, Math.max(0, input.breakDensity));
     const shape = input.songShape ?? 'classic';
     const halfTime = shape === 'dubstep' || shape === 'half-time-drop';
+    // "Dubstep feel" and "Half-time drop" share the same half-time snare-on-3
+    // drum grid (both are genuinely half-time grooves in real production) but
+    // must differ in bass timbre and dynamic contrast, or the two presets are
+    // indistinguishable end to end (found via scripts/render-styles.mjs: both
+    // produced byte-identical bassChar/kickHits/snareBeatPositions).
+    const dubstepShape = shape === 'dubstep';
     const trapBounce = shape === 'trap-bounce';
 
     // Song-identity picks (key, groove family, bass timbre) are drawn first,
@@ -461,8 +474,11 @@ export class HardGridStructureEngine implements StructureEngine {
     if (trapBounce) {
       // Trap bounce: lock fat 808 sub
       bassCharacter = 'sub';
+    } else if (dubstepShape) {
+      // Dubstep: growl-biased — heavier wobble body than a generic half-time drop
+      bassCharacter = pick(rng, ['growl', 'growl', 'reese'] as const);
     } else if (halfTime) {
-      // Dubstep / half-time: reese or growl only — wobble body, never thin sub-only
+      // Half-time drop: reese or growl — wobble body, never thin sub-only
       bassCharacter = pick(rng, ['reese', 'growl', 'reese'] as const);
     } else if (darkness > 0.28 && darkness < 0.72) {
       // Mid darkness: seed can flip bass character so Vary changes timbre too
@@ -556,7 +572,7 @@ export class HardGridStructureEngine implements StructureEngine {
       drumRole: kick,
       drums,
       bassRole,
-      energyCurve: energyCurve(sections, energy, halfTime),
+      energyCurve: energyCurve(sections, energy, halfTime, dubstepShape),
       keyRoot,
       seed: input.seed,
       patternFamily,
