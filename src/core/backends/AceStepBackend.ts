@@ -55,7 +55,7 @@ export function getAceSidecarRenderUrl(): string {
 
 function failSoftNotes(extra?: string): string[] {
   const notes = [
-    'GPU required (CUDA). Wyatt path: RTX 5080 via ACE API :8001 + DnB bridge :8766.',
+    'GPU required (CUDA). Local path: RTX 5080 via ACE API :8001 + DnB bridge :8766.',
     'Fail-soft: without probe.hasGpu=true â†’ OfflineStub sketch.',
     'Run scripts/windows/start-ace-stack.ps1 then npm run dev.',
   ];

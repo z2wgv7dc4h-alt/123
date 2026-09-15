@@ -70,7 +70,7 @@ Style Ref (optional, owner-gated) → Generate → Play → stem tweak (optional
 ## ACE vs Sketch (do not soft-pass)
 
 - [x] Sketch (OfflineStub) = default until probe `hasGpu: true` — real elemental stems; guitar/solo/extra-drums layers also work in Sketch (CPU synthesis, no GPU needed) as of 2026-09-15
-- [x] Live CUDA / ACE Generate on Wyatt 5080 — **proven 2026-09-15**. Two bugs fixed the same day: Generate no longer silently falls back to Sketch on a probe hiccup, and ACE now receives real per-section structure instead of a flat `[Instrumental]` placeholder. See docs/STATUS.md for evidence.
+- [x] Live CUDA / ACE Generate on the local 5080 — **proven 2026-09-15**. Two bugs fixed the same day: Generate no longer silently falls back to Sketch on a probe hiccup, and ACE now receives real per-section structure instead of a flat `[Instrumental]` placeholder. See docs/STATUS.md for evidence.
 - [ ] LEGO extract/repaint (true ACE stem isolation)
 - ACE stem-share honesty must stay in UI/docs until LEGO lands
 

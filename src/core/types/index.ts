@@ -297,7 +297,7 @@ export const DEFAULT_BPM = 174;
 export const DEFAULT_PPQ = 480;
 export const DEFAULT_SAMPLE_RATE = 48000 as const;
 export const DEFAULT_BIT_DEPTH = 16 as const; // OfflineAudioContext render; Sketch export may re-encode 24 via encodeWav
-/** Empty: artist names allowed as style descriptors (Wyatt 2026-09-14). */
+/** Empty: artist names allowed as style descriptors (the user 2026-09-14). */
 export const ARTIST_NAME_BLOCKLIST = [] as const;
 
 export const DEFAULT_DESCRIPTORS = [

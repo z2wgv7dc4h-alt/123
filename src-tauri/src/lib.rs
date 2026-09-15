@@ -1,4 +1,4 @@
-//! Optional Tauri 2 desktop shell for Wyatt DnB Studio.
+//! Optional Tauri 2 desktop shell for DnB Studio.
 //! Browser Sketch remains primary on the box. No ACE/GPU in this crate.
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

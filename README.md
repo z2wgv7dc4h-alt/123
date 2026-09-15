@@ -1,4 +1,4 @@
-# Wyatt DnB Studio
+# DnB Studio
 
 Phase 0 local-first studio. **Default: browser Sketch (CPU / OfflineStub).** Windows + RTX 5080 can enable **Studio ACE (GPU)** via one-shot install — only after `hasGpu: true` (prove live on your machine; do not soft-pass ACCEPTANCE).
 
@@ -20,7 +20,7 @@ Listen polish (cycle-9): Play autofocus after Generate; mixerDirty pulses Play (
 
 ## Windows one-shot (ACE)
 
-On Wyatt’s RTX 5080 PC:
+On the RTX 5080 PC:
 
 1. See `INSTALL.txt` or run `scripts\windows\INSTALL-AND-RUN.ps1`
 2. Wait for models + bridge `:8766`
@@ -33,7 +33,7 @@ Full honesty table: [docs/TRY_ACE.md](docs/TRY_ACE.md). ACE stem lanes **share t
 | Path | Status |
 |------|--------|
 | **OfflineStub** (Sketch / CPU) | Default until probe `hasGpu: true` — real separate stems. Guitar/Solo/Extra-drums layers work here too (pure CPU synthesis, no GPU needed) — only Vocal-ish is ACE-only. |
-| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on Wyatt's RTX 5080 (`acestep-v15-base`, cu128) — see [docs/STATUS.md](docs/STATUS.md) for the 2026-09-15 verification. Stem lanes share the ACE mix until LEGO/extract. |
+| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on the RTX 5080 (`acestep-v15-base`, cu128) — see [docs/STATUS.md](docs/STATUS.md) for the 2026-09-15 verification. Stem lanes share the ACE mix until LEGO/extract. |
 
 ACE/CUDA proven live 2026-09-15: real end-to-end GPU render confirmed via the raw ACE model log (not just the probe endpoint). Two bugs fixed the same day — see [docs/STATUS.md](docs/STATUS.md) for details and evidence:
 1. `generate()` could silently fall back to Sketch even with the Studio/GPU badge showing live, due to a redundant internal re-probe in `BackendRegistry.selectBest()` that swallowed errors with no toast. Fixed — Generate now reuses the probe result it already has.

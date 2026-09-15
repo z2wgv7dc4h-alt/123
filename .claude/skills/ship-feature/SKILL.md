@@ -10,4 +10,4 @@ Feature: $ARGUMENTS
 3. Run Critic subagent on the diff
 4. Fix must-fixes
 5. Run npm.cmd test -- --run and npx tsc --noEmit until green
-6. Summarize files changed + how Wyatt verifies (listen steps)
+6. Summarize files changed + how the user verifies (listen steps)

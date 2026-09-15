@@ -1,7 +1,7 @@
 # DnB Studio — Living Status
 
 Last regenerated: 2026-09-15, by actually reading and running the code (tests,
-`tsc`, and live GPU renders against the real ACE stack on Wyatt's RTX 5080) —
+`tsc`, and live GPU renders against the real ACE stack on the RTX 5080) —
 not from memory of intent. Update this file in the same change as any fix
 that alters what it claims; stale docs are worse than no docs.
 
@@ -70,13 +70,13 @@ documentation, all of it is still in git history if ever needed.
 - **Version control exists.** The project had none before 2026-09-15. Now
   git-initialized, pushed to `github.com/z2wgv7dc4h-alt/123`. Going forward,
   commits and doc updates happen contemporaneously with code changes, not
-  batched at session end (standing instruction from Wyatt).
+  batched at session end (standing instruction from the user).
 
 ## Open questions — not yet resolved
 
 - **Does the composition/style actually match the target reference sound**
   (e.g. Pendulum-style big-room DnB)? Three rounds of real listening
-  feedback so far, all from Wyatt on 2026-09-15:
+  feedback so far, all from the user on 2026-09-15:
   1. "sounds like nonsense, not composed at all" → traced to the bass
      leaping up to 19 semitones between consecutive notes with no voice
      leading → fixed (`nearestOctaveTo()`, below).
@@ -102,7 +102,7 @@ documentation, all of it is still in git history if ever needed.
      was a bare 1-pole differencer that just reads as fizzy hiss with
      no resonance — plus a steeper kick pitch-sweep for more attack.
   Sent a fourth comparison render — **not yet confirmed**, same rule as
-  every round before it: don't mark this resolved until Wyatt says so.
+  every round before it: don't mark this resolved until the user says so.
 - **Bass voice leading** (fixed 2026-09-15,
   `src/core/structure/StructureEngine.ts` `nearestOctaveTo()` +
   `src/test/bass-voice-leading.test.ts`): every bass note now re-octaves

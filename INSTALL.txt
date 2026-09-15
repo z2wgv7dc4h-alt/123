@@ -1,4 +1,4 @@
-Wyatt DnB Studio — install in 4 steps (Windows + RTX 5080)
+DnB Studio — install in 4 steps (Windows + RTX 5080)
 
 1. Extract this folder anywhere on your PC.
 2. Right-click scripts\windows\INSTALL-AND-RUN.ps1 → Run with PowerShell

@@ -1,4 +1,4 @@
-# Wyatt DnB Studio - ONE script: install ACE + start stack + launch app
+# DnB Studio - ONE script: install ACE + start stack + launch app
 # Right-click -> Run with PowerShell  OR:
 #   powershell -ExecutionPolicy Bypass -File scripts\windows\INSTALL-AND-RUN.ps1
 $ErrorActionPreference = "Stop"
@@ -41,7 +41,7 @@ function Wait-ProbeGpu($timeoutSec) {
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Wyatt DnB Studio - ACE full stack"
+Write-Host "  DnB Studio - ACE full stack"
 Write-Host "  Rock-DnB vibe on your RTX 5080"
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""

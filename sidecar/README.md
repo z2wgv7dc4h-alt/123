@@ -4,7 +4,7 @@
 
 CUDA stays **off** the browser bundle. The browser talks only to the DnB contract (`/health` · `/probe` · `/render`). The bridge adapts ACE upstream `release_task` / `query_result` / `/v1/audio`.
 
-## Wyatt hardware target
+## Local hardware target
 - GPU: NVIDIA GeForce **RTX 5080**
 - Device hint: `cuda:0`
 - Bind: **`127.0.0.1` only** — never `0.0.0.0`
@@ -26,7 +26,7 @@ CUDA stays **off** the browser bundle. The browser talks only to the DnB contrac
 
 Models auto-download on first ACE run. Do not auto-pull multi-GB weights on shared boxes.
 
-## Wyatt try path (full stack — not Gradio-primary)
+## Local try path (full stack — not Gradio-primary)
 
 ```powershell
 # one-time
@@ -83,4 +83,4 @@ Until `/probe` → `hasGpu: true`, registry keeps **OfflineStubBackend** (CPU sk
 - Forbidden: ACE-Step-DAW / Strudel (AGPL), Matchering / Pedalboard (GPL-3), MusicGen NC, YouTube/catalog rips, artist-clone UI  
 
 ## Status
-Bridge + `AceStepBackend.render` + Windows setup/start scripts + `docs/TRY_ACE.md` landed. Real audio requires Wyatt’s RTX 5080 running the stack locally. Soft-pass forbidden on ACE without live probe.
+Bridge + `AceStepBackend.render` + Windows setup/start scripts + `docs/TRY_ACE.md` landed. Real audio requires the RTX 5080 running the stack locally. Soft-pass forbidden on ACE without live probe.

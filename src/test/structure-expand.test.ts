@@ -1,5 +1,5 @@
 /**
- * Wyatt P0: structure section length drag / expand → persist into next generate.
+ * P0: structure section length drag / expand → persist into next generate.
  * Soft-pass forbidden — red if store actions missing; green only for real wiring.
  */
 import { beforeEach, describe, expect, it } from 'vitest';

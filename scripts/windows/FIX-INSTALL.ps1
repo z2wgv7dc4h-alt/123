@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 $dest = Join-Path $PSScriptRoot "INSTALL-AND-RUN.ps1"
 @'
-# Wyatt DnB Studio - ONE script: install ACE + start stack + launch app
+# DnB Studio - ONE script: install ACE + start stack + launch app
 $ErrorActionPreference = "Stop"
 $Host.UI.RawUI.WindowTitle = "DnB Studio - ACE install and run"
 
@@ -43,7 +43,7 @@ function Wait-ProbeGpu($timeoutSec) {
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Wyatt DnB Studio - ACE full stack"
+Write-Host "  DnB Studio - ACE full stack"
 Write-Host "  Rock-DnB vibe on your RTX 5080"
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""

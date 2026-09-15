@@ -1,8 +1,8 @@
 [package]
 name = "dnb-studio"
 version = "0.1.0"
-description = "Wyatt DnB Studio — optional Tauri 2 desktop shell (browser Sketch remains primary)"
-authors = ["Wyatt La Hogue"]
+description = "DnB Studio — optional Tauri 2 desktop shell (browser Sketch remains primary)"
+authors = ["z2wgv7dc4h-alt"]
 edition = "2021"
 rust-version = "1.88"
 

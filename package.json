@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Wyatt DnB Studio — local-first drum & bass generation (Phase 0+)",
+  "description": "DnB Studio — local-first drum & bass generation (Phase 0+)",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

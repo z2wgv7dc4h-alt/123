@@ -1,6 +1,6 @@
 # Try ACE (Windows one-shot)
 
-GPU Studio path on Wyatt’s RTX 5080. **Not** the default browser sketch.
+GPU Studio path on the RTX 5080. **Not** the default browser sketch.
 
 ## One script
 

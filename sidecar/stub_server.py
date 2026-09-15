@@ -75,7 +75,7 @@ class StubHandler(BaseHTTPRequestHandler):
                     "checkpoint": None,
                     "notes": [
                         "Stub server — no PyTorch/CUDA loaded",
-                        "Wyatt path: RTX 5080 via localhost FastAPI sidecar",
+                        "Local path: RTX 5080 via localhost FastAPI sidecar",
                         "Fail-soft: AceStepBackend keeps hasGpu=false until real worker reports true",
                     ],
                 },

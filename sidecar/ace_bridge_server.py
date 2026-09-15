@@ -493,7 +493,7 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"[ace-bridge] http://{HOST}:{PORT} â†’ {ACE_API}")
-    print("[ace-bridge] Wyatt: run ACE API first, then this bridge, then DnB Studio Generate")
+    print("[ace-bridge] run ACE API first, then this bridge, then DnB Studio Generate")
     httpd.serve_forever()
 
 

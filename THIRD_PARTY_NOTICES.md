@@ -1,4 +1,4 @@
-# Third-party notices — Wyatt DnB Studio
+# Third-party notices — DnB Studio
 
 ## Included in Phase 0 browser app
 

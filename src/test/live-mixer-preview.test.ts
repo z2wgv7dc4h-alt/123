@@ -1,5 +1,5 @@
 /**
- * Wyatt P0: live gain/mute/solo must affect the SAME preview path Play hears.
+ * P0: live gain/mute/solo must affect the SAME preview path Play hears.
  *
  * Product:
  * - Dirty mixer → loadLiveFromStems + applyLiveMixer (Tone.Channel mid-play)

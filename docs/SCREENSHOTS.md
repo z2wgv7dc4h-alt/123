@@ -41,7 +41,7 @@ Use this checklist before calling screenshots “done.” Soft-pass forbidden.
 | S9 | First-run: HelpPanel open once; after dismiss or Generate it stays closed on reload | [ ] |
 | S10 | Power-only: softened “browser sketch” / “song layout ~174” — no OfflineStub / hard-grid-v0 | [ ] |
 
-> **Capture deferred (Wyatt).** S1–S10 stay unchecked until real frames are shot. Soft-pass forbidden — do not invent greens or tick from chrome alone. Not a Builder gate for cycle-9.
+> **Capture deferred .** S1–S10 stay unchecked until real frames are shot. Soft-pass forbidden — do not invent greens or tick from chrome alone. Not a Builder gate for cycle-9.
 
 ### Do not ship shots that show
 
