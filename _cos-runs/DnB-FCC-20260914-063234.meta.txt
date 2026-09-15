@@ -1,0 +1,9 @@
+WHICH=fcc
+NAME=DnB-FCC
+ROUTE=fcc-proxy:8082
+BIN=C:\Users\RIGGUSPIG\.local\bin\fcc-claude.exe
+BASE_URL=http://127.0.0.1:8082
+BRIEF=C:\Users\RIGGUSPIG\Downloads\dnb-studio-app\dnb-studio\BRIEF-3-player-vary.md
+MODE=print
+LOG=C:\Users\RIGGUSPIG\Downloads\dnb-studio-app\dnb-studio\_cos-runs\DnB-FCC-20260914-063234.log
+STARTED=2026-09-14T06:32:34.6832249+08:00

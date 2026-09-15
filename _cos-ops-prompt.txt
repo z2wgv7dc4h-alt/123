@@ -1,0 +1,10 @@
+﻿CoS second brain. No source edits. Max 40 lines markdown only with sections: Roles, Default loop, Triggers, Anti-patterns, Standing checklist.
+
+Optimize operating model:
+- Grok CoS: light only (briefs, operate TUIs, done-gates, terse milestones)
+- FCC (fcc-claude + Nemotron :8082): coding writer
+- Paid Claude: always `claude --model sonnet` (never bare claude — ~/.claude/settings.json defaults to Nemotron). Use -p for second-brain reviews.
+- Monitor via session JSONL + sessions\<pid>.json; capture only for permission menus
+- Writer/reviewer: FCC writes; paid reviews blind vs BRIEF (no writer rationale)
+- One writer at a time; done-gate = npm.cmd test -- --run + tsc green
+- Pause FCC BRIEF watch when BRIEF done

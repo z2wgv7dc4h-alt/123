@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-ssr/
+exports/
+temp_verification/
+src-tauri/target/
+*.local
+*.log
+.DS_Store
+Thumbs.db
+*.bak
+*.bak*

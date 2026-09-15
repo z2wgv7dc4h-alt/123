@@ -1,0 +1,20 @@
+Wyatt DnB Studio — install in 4 steps (Windows + RTX 5080)
+
+1. Extract this folder anywhere on your PC.
+2. Right-click scripts\windows\INSTALL-AND-RUN.ps1 → Run with PowerShell
+   (or: powershell -ExecutionPolicy Bypass -File scripts\windows\INSTALL-AND-RUN.ps1)
+3. Wait for the first-run download (ACE models ~10GB). Keep the window open.
+4. When the browser opens → Generate.
+   - Studio ACE / GPU only when http://127.0.0.1:8766/probe hasGpu:true
+   - Until then Generate works as Sketch (CPU) — fail-soft, not broken
+
+Need before you start: NVIDIA driver, Git, Node.js LTS, internet.
+
+RTX 5080 first boot: script sets ACESTEP_QUANTIZATION=false, ACESTEP_COMPILE=false, ACESTEP_USE_FLASH_ATTENTION=false, ACESTEP_LM_BACKEND=pt, and ACESTEP_CONFIG_PATH=acestep-v15-base.
+
+Honesty
+- Sketch (CPU): real separate stems; mute/solo isolates parts.
+- ACE (GPU): until LEGO/extract, stem lanes share the mix — mute/solo will not isolate kick/snare/bass.
+- Original rock-DnB vibe only — not artist clones; Style Ref = files you own only.
+
+More detail: docs\TRY_ACE.md
