@@ -265,12 +265,18 @@ export function planDrums(
       }
     }
 
-    // Hats — density by family; half-time drops stay roomy; trap = rolling bounce
+    // Hats — density by family; half-time drops stay roomy; trap = rolling bounce.
+    // 16th notes (0.25) are the real DnB hat baseline even in drops/builds —
+    // 32nd-note density is a roll/accent technique, never a sustained whole-
+    // section grid (confirmed against real production references). Sustained
+    // 32nds read as a mechanical "machine gun", not a groove.
     let hatStep = inDrop || inBuild ? 0.25 : 0.5;
-    if (trapBounce && (inDrop || inBuild)) hatStep = 0.125;
-    else if (halfTimeDrop && inDrop) hatStep = 0.5;
+    if (halfTimeDrop && inDrop) hatStep = 0.5;
     else if (family === 'twoStep' && (inDrop || inBuild)) hatStep = 0.5;
-    else if (family === 'syncopated' && (inDrop || inBuild)) hatStep = 0.125;
+    const isFillBar = !!sec.fillHint && bar === sec.startBar + sec.lengthBars - 1;
+    if ((trapBounce || family === 'syncopated') && (inDrop || inBuild) && (isFillBar || chance(rng, 0.15))) {
+      hatStep = 0.125; // occasional roll/accent bar, not the whole section
+    }
     for (let beat = 0; beat < 4; beat += hatStep) {
       const open = Math.abs(beat % 1 - 0.5) < 0.01;
       let vel = open

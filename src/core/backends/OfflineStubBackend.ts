@@ -54,12 +54,46 @@ function envGain(t: number, attack: number, decay: number): number {
   return d >= 1 ? 0 : Math.exp(-4 * d);
 }
 
+/**
+ * Standard RBJ Audio EQ Cookbook bandpass biquad (constant 0dB peak gain),
+ * applied in place to a local scratch buffer. Ported from the well-known
+ * reference formula rather than approximated — a resonant bandpass is what
+ * actually gives synthesized snare "crack" and hat "metal" their character;
+ * a bare 1-pole differencer (the old approach here) just reads as fizzy hiss.
+ */
+function bandpassInPlace(scratch: Float32Array, sr: number, freqHz: number, q: number): void {
+  const w0 = (2 * Math.PI * freqHz) / sr;
+  const alpha = Math.sin(w0) / (2 * q);
+  const cosw0 = Math.cos(w0);
+  const b0 = alpha;
+  const b1 = 0;
+  const b2 = -alpha;
+  const a0 = 1 + alpha;
+  const a1 = -2 * cosw0;
+  const a2 = 1 - alpha;
+  let x1 = 0;
+  let x2 = 0;
+  let y1 = 0;
+  let y2 = 0;
+  for (let i = 0; i < scratch.length; i++) {
+    const x0 = scratch[i]!;
+    const y0 = (b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+    scratch[i] = y0;
+    x2 = x1;
+    x1 = x0;
+    y2 = y1;
+    y1 = y0;
+  }
+}
+
 function writeKick(buf: Float32Array, at: number, vel: number, sr: number) {
-  // Punchy DnB kick: click transient + fast-sweep body + soft saturation (CPU cheap)
+  // Punchy DnB kick: click transient + fast pitch-sweep body + soft saturation.
+  // Sweep shape (high start, fast decay to the fundamental within ~40ms) is
+  // what actually reads as a "click -> boom" kick rather than a dull thud.
   const len = Math.floor(0.28 * sr);
   for (let i = 0; i < len && at + i < buf.length; i++) {
     const t = i / sr;
-    const bodyFreq = 48 * Math.exp(-t * 22) + 28;
+    const bodyFreq = 100 * Math.exp(-t * 45) + 32;
     const body = Math.sin(2 * Math.PI * bodyFreq * t);
     const click =
       Math.sin(2 * Math.PI * 1800 * t) * Math.exp(-t * 180) * 0.62 +
@@ -73,17 +107,20 @@ function writeKick(buf: Float32Array, at: number, vel: number, sr: number) {
 function writeSnare(buf: Float32Array, at: number, vel: number, sr: number) {
   const len = Math.floor(0.2 * sr);
   let n = 0x2f6e3651;
-  let prev = 0;
+  const noiseScratch = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    n = (n * 1103515245 + 12345) >>> 0;
+    noiseScratch[i] = (n / 0xffffffff) * 2 - 1;
+  }
+  // Bandpass around 1.8kHz — the "crack" band; bare noise reads as hiss, not snare.
+  bandpassInPlace(noiseScratch, sr, 1800, 0.7);
   for (let i = 0; i < len && at + i < buf.length; i++) {
     const t = i / sr;
-    n = (n * 1103515245 + 12345) >>> 0;
-    const white = (n / 0xffffffff) * 2 - 1;
-    const hp = white - prev;
-    prev = white * 0.82;
-    const body = Math.sin(2 * Math.PI * 195 * t) * Math.exp(-t * 28);
-    const crack = hp * Math.exp(-t * 18);
+    // Triangle body (richer harmonic content than a bare sine for the shell tone).
+    const body = ((2 / Math.PI) * Math.asin(Math.sin(2 * Math.PI * 195 * t))) * Math.exp(-t * 28);
+    const crack = noiseScratch[i]! * Math.exp(-t * 18);
     const g = envGain(t, 0.0008, 0.16) * vel;
-    const raw = (body * 0.42 + crack * 0.78) * g;
+    const raw = (body * 0.42 + crack * 1.1) * g;
     buf[at + i]! += Math.tanh(raw * 1.35) * 0.88;
   }
 }
@@ -91,15 +128,23 @@ function writeSnare(buf: Float32Array, at: number, vel: number, sr: number) {
 function writeHat(buf: Float32Array, at: number, vel: number, sr: number, open = false) {
   const len = Math.floor((open ? 0.12 : 0.045) * sr);
   let n = 1;
-  let prev = 0;
+  const noiseScratch = new Float32Array(len);
+  const metalScratch = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    n = (n * 1664525 + 1013904223) >>> 0;
+    noiseScratch[i] = (n / 0xffffffff) * 2 - 1;
+    // Two inharmonic square partials (not octave-related) — the classic
+    // 808/909 hat trick for metallic ringing instead of plain filtered hiss.
+    const t = i / sr;
+    metalScratch[i] =
+      Math.sign(Math.sin(2 * Math.PI * 6300 * t)) * 0.5 + Math.sign(Math.sin(2 * Math.PI * 8100 * t)) * 0.5;
+  }
+  bandpassInPlace(noiseScratch, sr, 9000, 0.9);
+  bandpassInPlace(metalScratch, sr, 7500, 9);
   for (let i = 0; i < len && at + i < buf.length; i++) {
     const t = i / sr;
-    n = (n * 1664525 + 1013904223) >>> 0;
-    const noise = (n / 0xffffffff) * 2 - 1;
-    const hp = noise - prev;
-    prev = noise * 0.55;
     const g = envGain(t, 0.0004, open ? 0.1 : 0.032) * vel;
-    buf[at + i]! += hp * g * 0.48;
+    buf[at + i]! += (noiseScratch[i]! * 0.55 + metalScratch[i]! * 0.32) * g;
   }
 }
 
