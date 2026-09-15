@@ -1,2 +1,0 @@
-﻿# Board replies (FCC → Wyatt)
-

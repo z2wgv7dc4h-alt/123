@@ -32,10 +32,14 @@ Full honesty table: [docs/TRY_ACE.md](docs/TRY_ACE.md). ACE stem lanes **share t
 
 | Path | Status |
 |------|--------|
-| **OfflineStub** (Sketch / CPU) | Default until probe `hasGpu: true` — real separate stems |
-| **ACE-Step 1.5** (Studio / GPU) | Windows one-shot can go live when bridge probe `hasGpu: true`; fail-soft otherwise. Stem lanes share the ACE mix until LEGO/extract. |
+| **OfflineStub** (Sketch / CPU) | Default until probe `hasGpu: true` — real separate stems. Guitar/Solo/Extra-drums layers work here too (pure CPU synthesis, no GPU needed) — only Vocal-ish is ACE-only. |
+| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on Wyatt's RTX 5080 (`acestep-v15-base`, cu128) — see [docs/STATUS.md](docs/STATUS.md) for the 2026-09-15 verification. Stem lanes share the ACE mix until LEGO/extract. |
 
-Do **not** tick ACE/CUDA ACCEPTANCE until Wyatt proves live Generate on the 5080. See `INSTALL.txt`, [docs/TRY_ACE.md](docs/TRY_ACE.md), `sidecar/README.md`.
+ACE/CUDA proven live 2026-09-15: real end-to-end GPU render confirmed via the raw ACE model log (not just the probe endpoint). Two bugs fixed the same day — see [docs/STATUS.md](docs/STATUS.md) for details and evidence:
+1. `generate()` could silently fall back to Sketch even with the Studio/GPU badge showing live, due to a redundant internal re-probe in `BackendRegistry.selectBest()` that swallowed errors with no toast. Fixed — Generate now reuses the probe result it already has.
+2. ACE was receiving `lyrics: "[Instrumental]"` unconditionally — zero temporal signal, so drop/build/breakdown never actually corresponded to the arrangement map. Now sends real per-section timing tags (`[Intro]`/`[Build]`/`[Drop]`/`[Breakdown]`/`[Outro]`).
+
+See `INSTALL.txt`, [docs/TRY_ACE.md](docs/TRY_ACE.md), `sidecar/README.md`.
 
 ## Quick start
 
@@ -60,24 +64,26 @@ Do **not** tick ACE/CUDA ACCEPTANCE until Wyatt proves live Generate on the 5080
 
 Also: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [LICENSE](LICENSE) (MIT).
 
-## What works now (CPU)
+## What works now
 
-- Vite + React + TypeScript UI (Simple + Power)
+- Vite + React + TypeScript UI (Simple + Power), listen-first layout: Generate/Play/waveform/arrangement-map/mute stay pinned in one persistent panel while style/shape/layer tweaks scroll below (not a long stacked form)
 - Hard-grid song layout at ~174 BPM (`hard-grid-v0`)
-- OfflineStub: real 48 kHz / 16-bit WAV stems + mix
-- Tone/WebAudio preview of mix WAV only
+- OfflineStub (Sketch/CPU): real 48 kHz / 16-bit WAV stems + mix, drums+bass **plus** guitar/solo/extra-drums texture layers (CPU synthesis, no GPU needed)
+- ACE-Step 1.5 (Studio/GPU): **proven live** on RTX 5080; real per-section structure sent so ACE’s drop/build/breakdown timing corresponds to the arrangement map
+- Tone/WebAudio preview of mix WAV, with live Tone.Channel mute/solo/gain (no remux mid-play)
 - Style reference (Vibe Mirror v0) with ownership gate
 - Stem mute/solo/gain → remixed Play; remixed Export adds `mix_as_heard.wav`
 - Again / Vary; Simple quick-mute strip; Regen when settings change
 - Surprise Me under More (allowlisted templates)
 - Favorites under More (browser-local save/recall)
-- Favorites panel under More (browser-local save/recall)
-- AceStepBackend fail-soft GPU stub
+- Git-versioned as of 2026-09-15 (the project had no version control before that)
 
 ## Not shipped yet
 
-- LEGO stem extract/repaint / LoRA train; ACE live Generate **unproven until Wyatt’s 5080 run** (one-shot install in-tree)
-- Tauri desktop **smoke** (src-tauri scaffold is in-tree; optional shell — browser Sketch still primary; no ACE/CUDA in base; ACCEPTANCE unchecked until desktop smoke)
+- LEGO stem extract/repaint / LoRA train — ACE stems still share the mix until this lands
+- Vocal-ish layer stays Studio-only (no CPU synthesis path exists for it, unlike guitar/solo/extra-drums)
+- Composition/style quality (does it actually sound like the target reference artist) — open question pending listening feedback, tracked in docs/STATUS.md
+- Tauri desktop **smoke** (src-tauri scaffold is in-tree; optional shell — browser Sketch still primary; ACCEPTANCE unchecked until desktop smoke)
 
 ## Legal boundaries (hard)
 

@@ -1,2 +1,0 @@
-﻿# Board replies (paid → Wyatt)
-

@@ -1,4 +1,0 @@
-﻿[2026-09-14 07:42:19] fcc live=False model= brief=- logLen=0 exit= jsonlBytes=398811 tool=Write
-[2026-09-14 07:42:19] paid live=False model= brief=- logLen=0 exit= jsonlBytes=327075 tool=Read
-[2026-09-14 07:43:12] fcc live=False model= brief=- logLen=0 exit= jsonlBytes=398811 tool=Write
-[2026-09-14 07:43:12] paid live=False model= brief=- logLen=0 exit= jsonlBytes=327075 tool=Read

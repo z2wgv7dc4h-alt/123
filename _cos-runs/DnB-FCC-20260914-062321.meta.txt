@@ -1,6 +1,0 @@
-WHICH=fcc
-BIN=C:\Users\RIGGUSPIG\.local\bin\fcc-claude.exe
-BRIEF=C:\Users\RIGGUSPIG\Downloads\dnb-studio-app\dnb-studio\BRIEF-3-player-vary.md
-MODE=print
-LOG=C:\Users\RIGGUSPIG\Downloads\dnb-studio-app\dnb-studio\_cos-runs\DnB-FCC-20260914-062321.log
-STARTED=2026-09-14T06:23:21.6081436+08:00

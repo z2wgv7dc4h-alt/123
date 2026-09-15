@@ -30,9 +30,10 @@ Honest checklist — only [x] what exists and is verified in-tree. Soft-pass for
 - [x] Docs knowledge: `docs/NOOB_GUIDE.md`, `docs/FIRST_RUN.md`, `docs/GLOSSARY.md`, `docs/ux-helptip-copy.md` (mirror)
 - [x] Surprise Me under More (allowlisted templates + HELP.surpriseMe) — not a 4th primary
 - [x] Favorites UI under More (FavoritesPanel + browser-local storage; HELP.favorites*)
-- [ ] Tauri desktop shell smoke (src-tauri scaffold in-tree; keep unchecked until real desktop smoke; browser Sketch still primary; no ACE live; P1 after boot: FS export + Sketch 16|24-bit)
-- [ ] Live CUDA sidecar /health+/probe on RTX 5080
-- [ ] Real ACE-Step inference / LEGO stems
+- [ ] Tauri desktop shell smoke (src-tauri scaffold in-tree; keep unchecked until real desktop smoke; browser Sketch still primary; P1 after boot: FS export + Sketch 16|24-bit)
+- [x] Live CUDA sidecar /health+/probe on RTX 5080 — proven 2026-09-15: `/probe` returns `hasGpu:true, device:"cuda:0"` against the real ACE API; two full end-to-end renders verified via raw ACE model log, not just the probe endpoint. See docs/STATUS.md.
+- [x] Real ACE-Step inference — proven 2026-09-15, same evidence as above (`acestep-v15-base`, thinking=true, steps=50)
+- [ ] LEGO extract/repaint (true ACE stem isolation) — not built; stems still share the mix
 - [ ] Real LoRA train with passed memorization review
 - [x] Manual browser Generate→Play→Export click-through (QA P0 on :5173 ALL GREEN 2026-09-06 PT; artifact: `~/Downloads/offline_stub_sketch_17400_export*.zip` with mix_as_heard + `offline_stub_heard_17400.wav`; offline-stub · 174 BPM · gpuUsed false — not the vitest_sample ZIP)
 
@@ -68,8 +69,8 @@ Style Ref (optional, owner-gated) → Generate → Play → stem tweak (optional
 
 ## ACE vs Sketch (do not soft-pass)
 
-- [x] Sketch (OfflineStub) = default until probe `hasGpu: true` — real elemental stems
-- [ ] Live CUDA / ACE Generate on Wyatt 5080 — **unchecked until Wyatt proves** via `INSTALL-AND-RUN.ps1`
+- [x] Sketch (OfflineStub) = default until probe `hasGpu: true` — real elemental stems; guitar/solo/extra-drums layers also work in Sketch (CPU synthesis, no GPU needed) as of 2026-09-15
+- [x] Live CUDA / ACE Generate on Wyatt 5080 — **proven 2026-09-15**. Two bugs fixed the same day: Generate no longer silently falls back to Sketch on a probe hiccup, and ACE now receives real per-section structure instead of a flat `[Instrumental]` placeholder. See docs/STATUS.md for evidence.
 - [ ] LEGO extract/repaint (true ACE stem isolation)
 - ACE stem-share honesty must stay in UI/docs until LEGO lands
 

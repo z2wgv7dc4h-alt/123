@@ -1,8 +1,8 @@
 # Wyatt DnB Studio — Architecture (Phase 0/1)
 
-**Date:** 2026-09-06 (PT / Australia·Perth)
+**Date:** 2026-09-06, updated 2026-09-15 (PT / Australia·Perth)
 **Product:** Local-first hybrid studio for original energetic rock-DnB / dancefloor DnB (~174 BPM).
-**Phase 0 ship:** Vite + React + TS browser app with HardGridStructureEngine + OfflineStubBackend (CPU). ACE-Step GPU sidecar is fail-soft / gated.
+**Phase 0 ship:** Vite + React + TS browser app with HardGridStructureEngine + OfflineStubBackend (CPU). ACE-Step GPU sidecar is fail-soft / gated, and as of 2026-09-15 is proven live on Wyatt's RTX 5080 — see docs/STATUS.md.
 
 ## Hard role split
 
@@ -47,10 +47,21 @@
 
 ## Backend registry
 
-1. offline-stub — CPU Float32 sketch → real WAV blobs (legoStems false)
-2. ace-step-1.5 — stub; render throws GPU required; caps aspirational until sidecar live
+1. offline-stub — CPU Float32 sketch → real WAV blobs (legoStems false). As of
+   2026-09-15, also synthesizes guitar/solo/extra-drums texture layers
+   (pure CPU, no GPU) — only vocal-ish has no CPU path and stays Studio-only.
+2. ace-step-1.5 — **live** on Wyatt's RTX 5080 (`acestep-v15-base`, cu128) when
+   `scripts/windows/start-ace-stack.ps1` is running; fail-soft to offline-stub
+   otherwise. Proven end-to-end 2026-09-15 (see docs/STATUS.md).
 
-BackendRegistry.selectBest keeps OfflineStub until AceStep probe reports hasGpu.
+`BackendRegistry.selectBest()` re-probes ACE internally and keeps OfflineStub
+until that probe reports `hasGpu`. `useStudioStore.generate()` does **not**
+call `selectBest()` — it re-probes once itself at the top of `generate()` and
+reuses that result directly. Calling `selectBest()` from inside `generate()`
+was a real bug (fixed 2026-09-15): it re-probed a *second* time and any
+hiccup on that second probe silently returned OfflineStub with no error or
+toast, even right after the first probe had just succeeded. If you touch
+backend selection, probe exactly once per Generate.
 
 ## LoRA / provenance
 
