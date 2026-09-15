@@ -18,7 +18,7 @@ export function SimpleWant() {
           What do you want?
           <HelpTip text={HELP.styleText} ariaLabel="About style text" />
         </h2>
-        <p className="hint">Mood words · optional. Drop a vibe MP3 below if you have one.</p>
+        <p className="hint">Mood words · optional. Style-ref file drop lives in More.</p>
       </div>
       <label className="simple-want-label">
         <span className="sr-only">Style prompt</span>

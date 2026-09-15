@@ -29,15 +29,13 @@ describe('App process order (one layout)', () => {
     expect(at('more-toggle-row')).toBeGreaterThan(at('<SectionTimeline'));
   });
 
-  it('style text, style ref, shape, layers, mixer and panels mount only behind More', () => {
+  it('style ref, layers, mixer and panels mount only behind More', () => {
     const moreStart = appSrc.indexOf('{moreOpen && (');
     expect(moreStart).toBeGreaterThan(appSrc.indexOf('more-toggle-row'));
     const beforeMore = appSrc.slice(0, moreStart);
     const insideMore = appSrc.slice(moreStart);
     for (const tag of [
-      '<SimpleWant',
       '<StyleDropZone',
-      '<SongShapePicker',
       '<LayersChips',
       '<StemMixer',
       '<ParamPanel',
@@ -50,6 +48,17 @@ describe('App process order (one layout)', () => {
       expect(beforeMore, tag).not.toContain(tag);
       expect(insideMore, tag).toContain(tag);
     }
+  });
+
+  it('UI-6: style text + song shape sit above Generate, before the More toggle', () => {
+    const at = (s: string) => appSrc.indexOf(s);
+    expect(at('<SimpleWant')).toBeGreaterThan(-1);
+    expect(at('<SongShapePicker')).toBeGreaterThan(at('<SimpleWant'));
+    expect(at('<TransportBar')).toBeGreaterThan(at('<SongShapePicker'));
+    expect(at('more-toggle-row')).toBeGreaterThan(at('<TransportBar'));
+    // Intent mounts once each — no duplicate behind More
+    expect([...appSrc.matchAll(/<SimpleWant \/>/g)]).toHaveLength(1);
+    expect([...appSrc.matchAll(/<SongShapePicker \/>/g)]).toHaveLength(1);
   });
 
   it('gates waveform, song map, layers and compact mixer on result (+ liveMixerOk)', () => {

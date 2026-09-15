@@ -3191,8 +3191,16 @@ details summary:hover { color: var(--text); }
 }
 
 
+/* —— Intent above Generate (UI-6) —— */
+.intent-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 /* —— Song shape chips (Simple) —— */
-.song-shape-picker { margin-top: 0.75rem; }
+.song-shape-picker { margin-top: 0; }
 .song-shape-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 1rem; }
 .song-shape-head h2 { margin: 0; font-size: 1rem; }
 .song-shape-chips {

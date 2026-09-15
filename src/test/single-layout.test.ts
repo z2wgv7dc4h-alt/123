@@ -35,6 +35,12 @@ describe('UI-2 single layout', () => {
     }
   });
 
+  it('no numbered wizard bubbles (UI-6: step-num)', () => {
+    for (const [path, src] of Object.entries(uiSources)) {
+      expect(src, path).not.toMatch(/step-num/);
+    }
+  });
+
   it('saved state carrying `mode` is ignored on restore', () => {
     expect(storeSrc).not.toMatch(/saved\.mode/);
     expect(storeSrc).not.toMatch(/\bmode: s\.mode\b/);

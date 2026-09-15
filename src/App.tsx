@@ -69,9 +69,15 @@ export default function App() {
         </div>
       </header>
 
-      {/* ========== ONE LAYOUT ==========
-          Listen first: transport cluster, then waveform + song map.
+      {/* ========== ONE LAYOUT (UI-6) ==========
+          Intent first: style text + song shape sit above Generate.
+          Listen: transport cluster, then waveform + song map.
           Everything else lives behind the single More toggle. */}
+      <section className="intent-panel" aria-label="Intent" id="intent">
+        <SimpleWant />
+        <SongShapePicker />
+      </section>
+
       <div className="listen-first-panel" id="generate-hero">
         <TransportBar />
         {result && <Waveform />}
@@ -107,9 +113,7 @@ export default function App() {
 
       {moreOpen && (
         <>
-          <SimpleWant />
           <StyleDropZone />
-          <SongShapePicker />
           {result && <StemMixerCompact />}
           {result && liveMixerOk && <LayersChips showSecondary />}
           <ProductTierPanel />

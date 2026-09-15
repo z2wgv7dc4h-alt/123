@@ -24,7 +24,7 @@ export function SongShapePicker() {
     <section className="song-shape-picker panel" aria-label="Song shape">
       <div className="song-shape-head">
         <h2>
-          <span className="step-num" aria-hidden>2</span> Song shape
+          Song shape
           <HelpTip text={HELP.songShape} ariaLabel="About song shape" />
         </h2>
         <p className="hint">Pick the arc. Then Generate.</p>
