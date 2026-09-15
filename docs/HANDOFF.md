@@ -1,88 +1,92 @@
-# Handoff — read this first
+# Handoff — Opus pickup
 
-**Studio (ACE-Step 1.5, real GPU on the user's RTX 5080) is the real
-generation path. Sketch (OfflineStubBackend, pure CPU Float32Array
-synthesis) is a CPU fallback, not a creative sandbox that feeds into
-Studio.** They share only the deterministic arrangement skeleton
-(`structureEngine.plan()` — same seed+knobs gives the same song shape on
-either backend); nothing composed or synthesized in one transfers to the
-other. If you're deciding where to spend effort and it's ambiguous, Studio
-wins unless the ticket says otherwise.
+**Last commit**: `b4d3ac5` — "handoff: full session dump + tickets".
+Working tree clean at time of writing. `git log --oneline -3` to confirm.
 
-**Last commit as of this handoff: `f9c6176`** —
-"Layer real Amen/Funky Drummer break loops under Sketch drops
-(amen/twoStep families)". `git log --oneline -5` to confirm you're
-looking at the same state; if not, something moved since this was
-written — reconcile before trusting anything below.
+**Orientation**: Studio (ACE-Step 1.5, real GPU on an RTX 5080) is the
+real generation path. Sketch (`OfflineStubBackend`, pure CPU
+Float32Array synthesis) is a fallback — the two share only the
+deterministic arrangement skeleton (`structureEngine.plan()`), nothing
+else transfers between them.
 
-**Full session history**: `docs/SESSION-DUMP.md` — chronological, per-
-workstream, cites what landed, what was discussed but not built, and
-exact test coverage gaps. Read it before re-deriving anything; this file
-is deliberately short, that one is deliberately complete.
+**Deep history**: `docs/SESSION-DUMP.md` (chronological, per workstream,
+with evidence). This file is the short pickup + the gap list being
+worked next. `TICKETS/01.md`–`08.md` hold longer-form specs; the gap
+list below supersedes their ordering.
 
-**Next work**: `TICKETS/01.md` through `08.md`, in that numeric order
-(open test/coverage gaps first, then Studio audio2audio → extract → DCW,
-then Sketch leftovers). One ticket, one session, one PR-sized change.
-Each has File / Change / Do not / Done when / Verify — don't start work
-that isn't in a ticket without adding a ticket for it first (see
-`AGENTS.md`: lead writes tickets).
+## Landed (on disk, verified)
 
-## Files that matter
+- Silent ACE→Sketch fallback bug fixed (`useStudioStore.ts` no longer
+  double-probes via `selectBest()`).
+- Section structure now reaches ACE (`AceStepBackend.ts` sends
+  `structureRef.sections`; `ace_bridge_server.py` maps to lyric tags).
+- ACE caption rewritten with real DnB vocabulary + duplicate-tag dedup
+  bug fixed (`buildAceCaption.ts`).
+- Sketch composition/synthesis: bass voice leading (`nearestOctaveTo`),
+  guitar/lead/rock-mid key-following (`midiForRoot`), hi-hat density
+  (16ths baseline, 32nds only on fills), kick/snare/hat rebuilt on RBJ
+  bandpass biquads, reese/growl as detuned saw stacks, reese detune
+  widened to ~±17/±31 cents.
+- Dubstep vs half-time-drop differentiated (was byte-identical), then a
+  second RNG-correlation bug in that same fix found and fixed.
+- Real breakbeat loops layered under drop bars for `amen`/`twoStep`
+  families: `wavDecode.ts`, `loadBreakLoop.ts`, `node-fs-shim.d.ts`,
+  `buildRealBreakBus()` in `OfflineStubBackend.ts`, assets in
+  `src/assets/samples/breaks/`. User confirmed by ear.
+- Git history name scrub completed and force-pushed (closed, done).
+- UI: Club/Rave palette, sticky listen-first panel, CPU-capable layer
+  gating.
 
-**Shared arrangement (both backends)**
-- `src/core/structure/StructureEngine.ts` — `HardGridStructureEngine`,
-  the deterministic planner. `sectionAt`, `midiForRoot` exported for
-  reuse elsewhere.
-- `src/core/structure/index.ts` — barrel export, keep in sync when
-  adding exports to `StructureEngine.ts`.
+## Discussed, NOT built
 
-**Studio (ACE)**
-- `src/core/backends/AceStepBackend.ts` — talks to the local bridge.
-- `sidecar/ace_bridge_server.py` — local bridge (`:8766`) → real ACE API
-  (`:8001`, from `acestep-api`, cloned by `scripts/windows/*.ps1`).
-- `C:\Users\RIGGUSPIG\Documents\ACE-Step-1.5` — the real, installed
-  ACE-Step-1.5 repo, **not part of this repo, not vendored**. Ground
-  truth for the real API surface: `acestep/api/http/
-  release_task_models.py`, `acestep/constants.py`, and `docs/en/*.md`
-  (`API.md`, `DCW.md`, `LoRA_Training_Tutorial.md`, `GRADIO_GUIDE.md`,
-  more — see that repo's `docs/en/index.md`). Fully offline-readable —
-  prefer these over a web search if a future session has no internet.
-- `src/core/prompt/buildAceCaption.ts` — ACE caption/tag builder.
+- ACE audio2audio (`task_type: "cover"`) for the Style Ref upload — the
+  upload is still reduced to 3 scalar knob nudges, real audio discarded.
+  Full API spec (multipart field names, `audio_cover_strength` ≈0.2) in
+  `docs/SESSION-DUMP.md` and `TICKETS/04.md`.
+- ACE `extract` for real separated stems — stems still mirror the mix
+  blob (honestly labeled). `TICKETS/05.md`.
+- DCW — silently off on the non-Turbo base model this project uses.
+- LoRA training — researched, specs known, not started.
+- `use_adg`, custom `timesteps` — unexplored.
+- Raw non-pre-cut sample files (175/105 BPM) — need real tempo work.
 
-**Sketch (OfflineStub)**
-- `src/core/backends/OfflineStubBackend.ts` — all CPU synthesis;
-  `buildRealBreakBus` is the newest addition (real sample loop mixing).
-- `src/core/audio/wavDecode.ts`, `loadBreakLoop.ts`, `node-fs-shim.d.ts`
-  — dependency-free WAV decode/load, dual Node+browser.
-- `src/assets/samples/breaks/*.wav` + `LICENSE_*.txt` — the real KAN
-  Samples break loops and their actual license terms (read the `.txt`
-  files directly, don't trust a landing page's blurb — see
-  `docs/SESSION-DUMP.md` §6 for why that distinction mattered).
+## Legal
 
-**UI**
-- `src/ui/hooks/useStudioStore.ts` — Zustand store, `generate()`
-  orchestrates both backends.
-- `src/ui/components/StyleDropZone.tsx` — "Optional vibe" upload;
-  ticket 04 will need its copy rewritten once audio2audio lands.
-- `src/ui/components/LayersChips.tsx` — `CPU_CAPABLE` set; the pattern
-  ticket 08 should follow for a real-break toggle.
+Personal, non-commercial project. The sample packs and breaks already
+committed to this repo are fine to use and ship in-repo. Forbidden,
+unchanged: an artist-clone product (impersonating a specific named
+artist), and presenting fake ACE stems as real isolated stems — if
+stems share the mix blob, say so (that honesty label must stay accurate
+until `extract` actually lands).
 
-**Docs**
-- `docs/SESSION-DUMP.md` — full session inventory (read first).
-- `docs/STATUS.md` — older chronological log, still has evidence
-  citations worth keeping; `SESSION-DUMP.md` is now the primary summary.
-- `docs/ARCHITECTURE.md` — includes the Tone.js-not-as-synth-engine
-  rationale (asked about directly this session, documented there).
-- `README.md`, `docs/ACCEPTANCE.md` — licensing relaxation reflected.
-- `AGENTS.md` / `CLAUDE.md` — the law. Read `AGENTS.md`.
+## Don't-do (technical)
 
-## Don't do
+- **No git history rewriting.** That thread is closed and verified. Do
+  not run `filter-branch`, rebase-rewrites, or force-push over history.
+- **No `@types/node`.** This tsconfig has no `types` array, so it would
+  auto-leak Node globals into every browser-side file. Use a narrow local
+  ambient `.d.ts` — see `src/core/audio/node-fs-shim.d.ts`.
+- **No song renders to "verify".** Verification is a targeted test or
+  `tsc`. Render audio only when a gap's Verify line explicitly names a
+  file as the deliverable.
+- Don't run `git filter-branch`/`git remote add` from the agent shell —
+  hard-blocked by the tool classifier regardless.
 
-Full list with the *why* for each: `docs/SESSION-DUMP.md` §6. The two
-most likely to bite you immediately:
-- **Don't install `@types/node`** — this tsconfig has no `types` array,
-  so it would auto-leak Node globals project-wide. Use a narrow local
-  ambient `.d.ts` (see `src/core/audio/node-fs-shim.d.ts`).
-- **Don't run `git filter-branch`/`git remote add` from Claude Code's own
-  shell tool** — both are hard-blocked by the auto-mode classifier. Write
-  the script, have the user run it.
+## GAP LIST — next 10, in order
+
+| # | Gap | File(s) | Verify |
+|---|---|---|---|
+| 1 | `prove-gpu.test.ts` fails whenever the ACE stack is down, so the suite is never green offline. Skip those cases unless a live probe answers. | `src/test/prove-gpu.test.ts` | `npx vitest run src/test/prove-gpu.test.ts` |
+| 2 | No test asserts dubstep ≠ half-time-drop; the bug shipped twice and was caught only by manual render. | new `src/test/song-shape-divergence.test.ts` | `npx vitest run src/test/song-shape-divergence.test.ts` |
+| 3 | `buildRealBreakBus` is module-private and untested at the integration point — nothing catches its call site being removed. Export it, assert drop bars gain energy and non-drop bars don't. | `src/core/backends/OfflineStubBackend.ts`, new `src/test/real-break-mix.test.ts` | `npx vitest run src/test/real-break-mix.test.ts` |
+| 4 | Real sample content has no manifest honesty label, unlike every other special-case source (styleRef, perc, guitar). | `src/core/export/manifest.ts`, `src/core/backends/OfflineStubBackend.ts`, test | `npx vitest run src/test/real-break-mix.test.ts` |
+| 5 | `REAL_BREAK_GAIN` is a hardcoded always-on `0.32` with no way to disable/adjust; also blocks a clean A/B in gap 3. | `src/core/backends/OfflineStubBackend.ts`, `src/core/types/index.ts`, `src/ui/hooks/useStudioStore.ts`, `src/ui/components/LayersChips.tsx` | `npx vitest run src/test/simple-process-order.test.ts` |
+| 6 | `AceStepBackend.ts:167` hardcodes `breakDensity: 0.55` while `OfflineStubBackend` derives it from chaos — the "shared" arrangement isn't actually identical across backends for one seed. | `src/core/backends/AceStepBackend.ts`, test | `npx vitest run src/test/ace-backend-render.test.ts` |
+| 7 | DCW is off by default on `acestep-v15-base` and never sent. Wire `dcwEnabled`/`dcwMode` through backend → bridge as named params. | `src/core/backends/AceStepBackend.ts`, `sidecar/ace_bridge_server.py` | `npx tsc --noEmit && npx vitest run src/test/ace-backend-render.test.ts` |
+| 8 | ACE inference params (`inferenceSteps: 50`, `guidanceScale: 7.0`, `shift: 3.0`) are bare literals at the call site with no named constants or test coverage. | `src/core/backends/AceStepBackend.ts`, test | `npx vitest run src/test/ace-backend-render.test.ts` |
+| 9 | Audio2audio plumbing: backend sends the Style Ref `File` and `task_type: "cover"` + `audio_cover_strength`; bridge accepts multipart and forwards as `src_audio`. Payload shape testable without a GPU. | `src/core/backends/AceStepBackend.ts`, `sidecar/ace_bridge_server.py`, `src/ui/hooks/useStudioStore.ts` | `npx vitest run src/test/ace-backend-render.test.ts` |
+| 10 | `StyleDropZone.tsx` still promises "Not a clone / we bias mood and energy" — dishonest once gap 9 lands. Copy must change in the same pass. | `src/ui/components/StyleDropZone.tsx`, `src/ui/lib/helpCopy.ts` | `npx vitest run src/test/style-reference.test.ts` |
+
+Research-only, therefore tickets not gaps: `extract` stems
+(`TICKETS/05.md`), LoRA training, raw-sample tempo work
+(`TICKETS/07.md`).
