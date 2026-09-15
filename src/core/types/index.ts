@@ -225,6 +225,17 @@ export interface StemFile {
   durationSec: number;
 }
 
+/**
+ * Honest snapshot of the ACE payload Studio actually sent — recorded by
+ * AceStepBackend so Status chrome can report reality, not a stale claim.
+ */
+export interface AcePayloadSnapshot {
+  thinking: boolean;
+  captionFamily: string;
+  steps: number;
+  model: string;
+}
+
 export interface RenderResult {
   jobId: string;
   seed: number;
@@ -236,6 +247,8 @@ export interface RenderResult {
   warnings: string[];
   backendId: string;
   checkpointId: string;
+  /** Present on Studio ACE renders — what was actually posted. */
+  acePayload?: AcePayloadSnapshot;
   structure?: StructureMap;
   midiBlob?: Blob;
   manifest: ExportManifest;

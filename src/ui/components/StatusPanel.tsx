@@ -3,7 +3,7 @@ import { HELP } from '../lib/helpCopy';
 import { HelpTip } from './HelpTip';
 import { dismissToastsByKind } from '../lib/toasts';
 import type { RenderResult } from '@/core/types';
-import { retailBackendLabel, retailStructureLabel } from '../lib/retailLabels';
+import { retailAcePayloadLabel, retailBackendLabel, retailStructureLabel } from '../lib/retailLabels';
 
 export function StatusPanel() {
   const error = useStudioStore((s) => s.error);
@@ -84,6 +84,9 @@ function JobMeta({ result }: { result: RenderResult }) {
       <li>
         Backend · {retailBackendLabel(result.backendId)}
       </li>
+      {result.acePayload && (
+        <li>ACE payload · {retailAcePayloadLabel(result.acePayload)}</li>
+      )}
       <li>BPM measured · {result.bpmMeasured}</li>
       <li>Seed · {result.seed}</li>
       <li>Structure · {retailStructureLabel(result.manifest.structureVersion)}</li>

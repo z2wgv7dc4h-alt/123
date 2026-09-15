@@ -75,6 +75,12 @@ export const ACE_SHIFT = 3.0;
 export const ACE_DCW_ENABLED = true;
 export const ACE_DCW_MODE = 'low' as const;
 /**
+ * LM off: thinking/CoT rewrote the caption into generic prose. The bridge
+ * also forces use_cot_caption/use_cot_language false, so Status reporting
+ * `thinking: false` matches the bytes actually sent.
+ */
+export const ACE_THINKING = false;
+/**
  * Cover strength for real audio2audio. ACE-Step's own API doc recommends
  * low values (~0.2) for style transfer; the schema default of 1.0 is
  * closer to literal reconstruction of the source.
@@ -241,6 +247,23 @@ export class AceStepBackend implements AudioBackend {
     // bridge uses ACE's loaded model. Hardcoding base here overrode SFT.
     const checkpoint = this.loadedCheckpoint;
     const sampler = aceSamplerFor(checkpoint ?? ACE_DEFAULT_CHECKPOINT);
+    const caption = buildAceCaption({
+      energy: job.prompt.energy,
+      darkness: job.prompt.darkness,
+      chaos: job.prompt.chaos,
+      layers: job.layers,
+      userText: job.prompt.text,
+      descriptors: job.prompt.descriptors,
+      songShape: job.songShape,
+      seed: job.seed,
+    });
+    // Snapshot for Status chrome — the payload actually posted, not a claim.
+    const acePayload = {
+      thinking: ACE_THINKING,
+      captionFamily: /drum and bass|dnb/i.test(caption) ? 'DnB' : 'other',
+      steps: sampler.inferenceSteps,
+      model: checkpoint ?? ACE_DEFAULT_CHECKPOINT,
+    };
 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ACE_RENDER_TIMEOUT_MS);
@@ -261,7 +284,7 @@ export class AceStepBackend implements AudioBackend {
           channels: job.channels,
           // LM off: thinking/CoT rewrote the caption into generic prose.
           // The bridge also forces use_cot_caption/use_cot_language false.
-          thinking: false,
+          thinking: ACE_THINKING,
           inferenceSteps: sampler.inferenceSteps,
           useAdg: sampler.useAdg,
           guidanceScale: ACE_GUIDANCE_SCALE,
@@ -276,16 +299,7 @@ export class AceStepBackend implements AudioBackend {
               }
             : {}),
           prompt: {
-            text: buildAceCaption({
-              energy: job.prompt.energy,
-              darkness: job.prompt.darkness,
-              chaos: job.prompt.chaos,
-              layers: job.layers,
-              userText: job.prompt.text,
-              descriptors: job.prompt.descriptors,
-              songShape: job.songShape,
-              seed: job.seed,
-            }),
+            text: caption,
             tags: buildAceTags({
               energy: job.prompt.energy,
               darkness: job.prompt.darkness,
@@ -432,6 +446,7 @@ export class AceStepBackend implements AudioBackend {
       warnings,
       backendId: this.id,
       checkpointId: heardCheckpoint,
+      acePayload,
       structure,
       midiBlob,
       manifest,

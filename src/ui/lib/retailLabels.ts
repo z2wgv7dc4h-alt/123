@@ -1,5 +1,7 @@
 /** Plain-English labels for user-visible chrome — never leak OfflineStub / hard-grid-v0. */
 
+import type { AcePayloadSnapshot } from '@/core/types';
+
 export function retailBackendLabel(backendId: string): string {
   if (backendId === 'offline-stub' || backendId.startsWith('offline')) return 'browser sketch';
   if (backendId.startsWith('ace-step')) return 'Studio GPU';
@@ -26,6 +28,23 @@ export function retailStructureLabel(version: string | undefined | null): string
   if (!version) return 'song layout ~174';
   if (/hard-grid/i.test(version)) return 'song layout ~174';
   return version;
+}
+
+/** ACE DiT checkpoint → retail model name (no engine IDs in chrome). */
+export function retailModelLabel(checkpoint: string | undefined | null): string {
+  const id = String(checkpoint ?? '').toLowerCase();
+  if (id.includes('turbo')) return 'turbo';
+  if (id.includes('sft')) return 'SFT';
+  if (id.includes('xl')) return 'XL';
+  return 'base';
+}
+
+/** One honest line describing the Studio payload actually sent. */
+export function retailAcePayloadLabel(payload: AcePayloadSnapshot): string {
+  return (
+    `thinking ${payload.thinking} · caption family ${payload.captionFamily} · ` +
+    `${payload.steps} steps · model ${retailModelLabel(payload.model)}`
+  );
 }
 
 /** Capability chip keys → retail English (PowerExtras caps-list). */

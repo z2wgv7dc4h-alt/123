@@ -138,6 +138,12 @@ describe('ACE payload quality pack', () => {
     expect(text).not.toMatch(/guitar/i);
     expect(text).not.toMatch(/dubstep/i);
     expect(result.checkpointId).toBe('acestep-v15-base');
+    expect(result.acePayload).toEqual({
+      thinking: false,
+      captionFamily: 'DnB',
+      steps: 64,
+      model: 'acestep-v15-base',
+    });
   });
 
   it('SFT on disk: same 64-step ADG path, SFT named (never overridden to base)', async () => {
@@ -148,11 +154,17 @@ describe('ACE payload quality pack', () => {
   });
 
   it('turbo only when the server loaded turbo: 8 steps, ADG off', async () => {
-    const { body } = await renderAfterProbe('acestep-v15-turbo');
+    const { body, result } = await renderAfterProbe('acestep-v15-turbo');
     expect(body.checkpointId).toBe('acestep-v15-turbo');
     expect(body.inferenceSteps).toBe(8);
     expect(body.useAdg).toBe(false);
     expect(body.thinking).toBe(false);
+    expect(result.acePayload).toEqual({
+      thinking: false,
+      captionFamily: 'DnB',
+      steps: 8,
+      model: 'acestep-v15-turbo',
+    });
   });
 
   it('unknown checkpoint: no checkpointId sent, base sampler', async () => {
@@ -160,6 +172,7 @@ describe('ACE payload quality pack', () => {
     expect(body.checkpointId).toBeUndefined();
     expect(body.inferenceSteps).toBe(64);
     expect(result.checkpointId).toBe('unknown');
+    expect(result.acePayload?.model).toBe('acestep-v15-base');
     expect(aceSamplerFor('ACE-Step/Ace-Step1.5:acestep-v15-turbo').inferenceSteps).toBe(8);
   });
 });
