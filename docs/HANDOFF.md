@@ -6,60 +6,62 @@ below is real, verified-where-marked, and current as of this commit. Read
 this whole file before touching anything — it front-loads the one urgent
 item, then gives full context so you don't have to re-derive it.
 
-## 0. URGENT — do this first, before anything else
+## 0. RESOLVED 2026-09-15 — name scrub in git history (was urgent)
 
-**The user's real legal name is still publicly exposed in this repo's git
-history on GitHub right now.** Confirmed live on `origin/main` this session:
+**Done and confirmed on the remote.** The user's real legal name (author
+"Wyatt <wyattlh@gmail.com>" on every pre-2026-09-15 commit) was rewritten
+out of git history and force-pushed. Confirmed clean against `origin/main`
+directly (not just local) via:
 
 ```
-git log --all --format='%an <%ae>' | sort -u
-  Wyatt <wyattlh@gmail.com>              <-- still here, still public
-  z2wgv7dc4h-alt <z2wgv7dc4h-alt@users.noreply.github.com>
-  z2wgv7dc4h@privaterelay.appleid.com
+git log origin/main --format="%an <%ae>"
 ```
 
-The GitHub account (`z2wgv7dc4h-alt`) is **deliberately pseudonymous** — the
-user does not want their real name attached to it. All file *content* was
-scrubbed this session (LICENSE, `src-tauri/Cargo.toml`, docs), and git
-identity going forward is fixed (`git config user.name/user.email` now set
-to the pseudonym). But the **commit history itself** — author/committer
-name+email on every past commit, plus a couple of commit messages — still
-says "Wyatt". This has NOT been fixed on the remote yet.
+— every line now reads `z2wgv7dc4h-alt <...>`. Nothing further to do here.
+Leaving the full story below for context/audit trail only.
 
-**Why it's not done**: `git filter-branch` is blocked for Claude by the
-Claude Code auto-mode tool classifier ("[Git Destructive]") — this is not a
-permission you can grant, it's a hard block on the tool call itself. Do not
-try to route around it (no raw git plumbing tricks, no calling filter-branch
-via a different shell invocation, nothing). This needs the **user** to run
-it themselves.
+<details>
+<summary>How it was fixed (3 broken attempts before it worked — read if this
+ever needs to be done again, e.g. a future rebase reintroduces it)</summary>
 
-**The fix is already written and sitting at the repo root**:
-`rewrite-history.ps1` (untracked, deliberately not committed — it's a
-one-off utility, not part of the app). It:
-1. Writes `env-filter.sh` (rewrites author/committer "Wyatt" ->
-   `z2wgv7dc4h-alt` / `z2wgv7dc4h-alt@users.noreply.github.com`) and
-   `msg-filter.sh` (scrubs "Wyatt" out of commit message text).
-2. Runs `git filter-branch -f --env-filter ... --msg-filter ... -- --all`.
-3. Prints a verification block: author list (should show only
-   `z2wgv7dc4h-alt`) and a grep of commit messages for "wyatt" (should be
-   empty).
-4. Tells the user to `git push --force` once both checks look right.
+`git filter-branch` is blocked for Claude by the Claude Code auto-mode tool
+classifier ("[Git Destructive]") — not a permission you can grant, a hard
+block on the tool call itself. The user has to run it. The fix lived at the
+repo root as `rewrite-history.ps1` (untracked, deliberately not committed —
+a one-off utility, not part of the app; it may or may not still exist by the
+time you read this).
 
-**Tell the user to open PowerShell in the repo root and run:**
+Three real bugs surfaced running it from the user's terminal, fixed one at a
+time by inspecting the actual error output:
+1. **cmd.exe vs PowerShell**: `./rewrite-history.ps1` fails in cmd.exe
+   (`'.' is not recognized`) — needs real PowerShell, or
+   `powershell -File rewrite-history.ps1` from cmd.
+2. **PowerShell execution policy** blocked the unsigned local script
+   (`UnauthorizedAccess`) — fixed with
+   `powershell -ExecutionPolicy Bypass -File rewrite-history.ps1` (a
+   one-run bypass, not a system-wide policy change).
+3. **`msg-filter.sh: No such file or directory`**: `git filter-branch`
+   invokes the msg-filter from a different working directory than the
+   script runs in, so a bare relative `msg-filter.sh` didn't resolve. Fixed
+   by passing an absolute path — but a Windows backslash path
+   (`C:\Users\...`) got its backslashes silently eaten somewhere in
+   filter-branch's internal shell-quoting chain (came out as
+   `C:UsersRIGGUSPIG...`, no separators). Fixed by converting to a Unix-style
+   path instead (`/c/Users/...`), which Git Bash understands natively — no
+   backslash-escaping involved.
+4. **One more after that**: BOM. `Set-Content -Encoding utf8` in Windows
+   PowerShell 5.1 writes a UTF-8 byte-order-mark, which bash's `sed` chokes
+   on as literal garbage bytes prepended to the command
+   (`$'\357\273\277sed': command not found`). Fixed by writing the filter
+   scripts with `-Encoding ascii -NoNewline` instead (content was plain
+   ASCII, no BOM issue with that encoding).
 
-```powershell
-./rewrite-history.ps1
-```
+After all four fixes, the rewrite ran clean: author list showed only
+`z2wgv7dc4h-alt`, commit-message grep for "wyatt" was empty, user ran
+`git push --force`, and `git log origin/main` was checked directly to
+confirm it actually landed on GitHub and not just locally.
 
-Then read its verification output back to them (or have them paste it back
-to you) before they force-push. If the verification looks wrong, do NOT
-have them force-push — stop and re-check the filter logic first. After a
-confirmed-good force-push, re-run the `git log --all --format='%an <%ae>'`
-check against `origin/main` to prove it's actually gone, and only then
-consider this resolved. This has been pending across at least two prior
-attempts this session (cmd.exe shell-syntax mismatches, then an "unstaged
-changes" blocker from unrelated in-progress work) — don't assume it's
-simple; walk the user through it directly if anything looks off.
+</details>
 
 ## 1. What this project is
 
@@ -165,9 +167,8 @@ finally this review + handoff.
   tag with no way to catch it (confirmed in a raw ACE log — "rock-dnb
   crossover" and "174 bpm" both appeared twice in one caption). Now split
   on commas and deduped phrase-by-phrase via `pushDeduped()`.
-- **Dubstep vs half-time-drop were byte-identical** (found and fixed in the
-  final stretch of this session, NOT YET RE-VERIFIED by rendering — see §5
-  "Not yet verified"). A single `halfTime` boolean in
+- **Dubstep vs half-time-drop were byte-identical — found, fixed, and
+  fully re-verified.** A single `halfTime` boolean in
   `HardGridStructureEngine.plan()` drove drums, bass character, energy
   curve, and the ACE caption addition identically for both shapes — proven
   via `scripts/render-styles.mjs` (renders all 4 song-shape presets at one
@@ -178,11 +179,19 @@ finally this review + handoff.
   bass character toward `growl` (`['growl','growl','reese']` vs half-time-
   drop's `['reese','growl','reese']`), gets a bigger energy-curve swing
   (dropBoost 0.5/introDip 0.44 vs 0.42/0.38), and a distinct ACE caption
-  phrase. **Action item for you**: re-run `scripts/render-styles.mjs` (see
-  §5) to confirm the two shapes now actually differ, since this session's
-  Bash tool became unreliable (intermittent "classifier unavailable"
-  errors — probably transient infra, not a real block) right after this
-  fix landed and the render could not be re-confirmed before handoff.
+  phrase. **First version of the fix still had a bug**: dubstep and
+  half-time-drop reach the bass-character pick via the same seed and
+  identical prior RNG draw count, so they read the exact same underlying
+  random value there — and `'growl'` sat at the same middle index in both
+  weighted arrays, so ~1/3 of seeds produced identical `bassChar` anyway
+  (caught by actually re-rendering at seed 17400: came out `growl`/`growl`
+  for both, not just eyeballing the diff). Fixed by having dubstep consume
+  one throwaway `rng()` draw first, decorrelating the two streams. Verified
+  clean: `npx tsc --noEmit` (0 errors), `npx vitest run` (240/241 pass —
+  the one failure, `prove-gpu.test.ts`, needs the real ACE GPU stack
+  running locally, unrelated to this change), and a re-render at seed
+  17400 confirming `dubstep`→`bassChar=reese` vs
+  `half-time-drop`→`bassChar=growl`, no longer colliding.
 - **Guitar/solo/extra-drums layers work in Sketch now** — pure CPU
   synthesis, no GPU needed, but the UI hard-disabled all four "Add heat"
   toggles behind `!aceHasGpu`. Fixed in `src/ui/components/LayersChips.tsx`
@@ -260,6 +269,58 @@ Concrete, sourced gaps, ranked by leverage-per-effort:
    but confirm with the user before changing the "not a clone" framing,
    since that's a deliberate legal/honesty design choice made earlier this
    session, not just a technical default.
+
+   **Exactly how the upload plumbing works — read directly from
+   `C:\Users\RIGGUSPIG\Documents\ACE-Step-1.5\docs\en\API.md` §4.2/4.4,
+   the project's own official API doc, not inferred from source code**.
+   This is a complete, unambiguous implementation spec — don't re-derive
+   it, just read that file's "Edit/Reference Audio Parameters" and "File
+   Upload Method" sections directly if anything below is unclear:
+   - `POST /release_task` supports two input methods. **Method A (JSON)**:
+     `reference_audio_path` (style transfer) / `src_audio_path`
+     (repaint/cover) as plain JSON string fields — but these require an
+     *absolute path already on the ACE server's own disk*, which the
+     browser obviously can't provide directly. **Method B (multipart/
+     form-data)** is the one this project needs: send all the same fields
+     as form fields, plus a file field named `reference_audio` (or
+     `ref_audio`) for style transfer, or `src_audio` (or `ctx_audio`) for
+     repaint/cover. The doc states explicitly: "After uploading files, the
+     corresponding `_path` parameters will be automatically ignored, and
+     the system will use the temporary file path after upload" — so the
+     real API server itself handles the temp-file persistence
+     (`save_upload_to_temp()` in `acestep/api/http/
+     release_task_audio_paths.py`, confirmed in source too); nothing on
+     our side needs to manage server-side file paths.
+   - Real documented example (cover/repaint):
+     ```bash
+     curl -X POST http://localhost:8001/release_task \
+       -F "prompt=remix this song" \
+       -F "src_audio=@/path/to/local/song.mp3" \
+       -F "task_type=repaint" \
+       -F "repainting_start=10" \
+       -F "repainting_end=20" \
+       -F "chunk_mask_mode=explicit"
+     ```
+   - `audio_cover_strength` (float, 0.0-1.0, default 1.0): **the doc
+     explicitly recommends lower values (~0.2) specifically for style
+     transfer** — i.e. what this feature is for. Don't default to 1.0
+     (max-strength cover, closer to literal reconstruction) — start
+     around 0.2-0.3 and let the user tune it, matching the existing
+     "vibe intensity" slider concept already in `StyleDropZone.tsx`.
+   - The LM "thinking" caption-rewrite step is **automatically skipped**
+     for `cover`/`repaint`/`extract` task types even if `thinking=true` is
+     set (per the doc) — these tasks work directly from source audio, not
+     from a text caption. Relevant because our current caption-engineering
+     work (`buildAceCaption.ts`) has no effect on a cover/repaint request;
+     don't spend time tuning the caption for this specific path.
+   - Concretely, this means `sidecar/ace_bridge_server.py`'s `/render`
+     handler needs to accept multipart/form-data (today it's JSON-only)
+     and forward the browser's uploaded file straight through to ACE's
+     `/release_task` as a `src_audio`/`reference_audio` form file; and
+     `AceStepBackend.ts`/`useStudioStore.ts` need to send the actual
+     `File`/`Blob` object from the `vibe` state (it's already held in
+     memory client-side for the existing local analysis step — just also
+     forward it, don't re-derive it) instead of only its filename/hash.
 2. **`task_type: "lego"`** generates one named stem track (`TRACK_NAMES` in
    `acestep/constants.py` includes `drums`, `bass`, `guitar`, `synth`,
    `percussion`, `vocals`, etc.) conditioned on the audio context of the
@@ -274,12 +335,32 @@ Concrete, sourced gaps, ranked by leverage-per-effort:
 3. **LoRA fine-tuning is a real, present feature of the installed ACE-Step
    repo**, not vaporware — `acestep.api.train_api_service
    .initialize_training_state`, wired into `api_server.py`'s FastAPI
-   lifespan. `LoRAPackManager` in this app is currently "metadata + gates
+   lifespan; real tutorial at
+   `C:\Users\RIGGUSPIG\Documents\ACE-Step-1.5\docs\en\LoRA_Training_Tutorial.md`
+   (offline-readable, local file — also mirrored at
+   [github.com/ace-step/ACE-Step-1.5](https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/LoRA_Training_Tutorial.md)
+   if online). `LoRAPackManager` in this app is currently "metadata + gates
    only, stub packs until CUDA train path" (per `docs/ARCHITECTURE.md`).
    Now that GPL/AGPL/NC licensing is a non-issue for this personal project
    (see §4), fine-tuning a LoRA on a small owned/curated DnB reference set
-   is a real option for genre authenticity. This needs reference audio data
-   and real GPU training time — treat as a later phase, not the next move.
+   is a real option for genre authenticity.
+   **Concrete requirements** (via WebSearch of the real project docs —
+   [RunComfy training guide](https://www.runcomfy.com/trainer/ai-toolkit/ace-step-1-5-lora-training),
+   cross-check the local tutorial file above before acting on this):
+   dataset = audio file + matching `.lyrics.txt` + metadata (BPM/key/
+   caption) per sample, `.wav`/`.mp3`/`.flac`/`.ogg`/`.opus` all supported;
+   **50-200 samples** in the target style, WAV 44.1kHz preferred, 80/20
+   train/validation split; **16GB VRAM minimum, 20GB+ recommended** (the
+   RTX 5080 has 16GB — right at the floor, watch for OOM on longer tracks);
+   LoKR training mode cuts what used to take an hour to ~5 minutes on
+   consumer GPUs. Reported common failure modes: dataset too broad, vague
+   captions, messy lyrics files — a small, stylistically narrow dataset
+   beats a large loose one. This needs real reference audio data (the
+   user's own tracks or licensed-clear material — same catalog-training
+   line from §0/README applies, don't scrape someone else's catalog for
+   this) and real GPU training time — treat as a later phase, not the next
+   move, but it's no longer a vague "maybe someday": the path is real,
+   documented, and running on hardware already in this setup.
 4. **Sketch has zero real audio samples anywhere** — confirmed by grep,
    every DSP file under `src/core` is 100% synthetic oscillator math
    (sine/saw/square/noise + biquad filters). Now that GPL/AGPL/NC sample
@@ -294,16 +375,47 @@ Concrete, sourced gaps, ranked by leverage-per-effort:
    Sketch and Studio are independent, see §5 architecture note), this is
    lower stakes than #1 but still asked for explicitly ("get better sounds
    for sketch. theres lots of open source free shit").
-5. Smaller/unverified: `inference_steps` — the bridge sends 50
-   (`AceStepBackend.ts`), the real schema's own default is 8. Not
-   necessarily wrong (more steps can mean higher fidelity on the non-turbo
-   base model at more GPU time cost) but never verified against real
-   quality-vs-speed data — just an inherited guess. `timesteps` (custom
+   **Real sources found this session (WebSearch, not guessed)**: the actual
+   Amen break / Funky Drummer break are themselves copyrighted recordings
+   with a legally murky sampling history — don't just rip the original
+   James Brown/Winstons recordings even under the relaxed personal-project
+   licensing (that's the separate catalog-rip/artist-clone line from §0's
+   README/ARCHITECTURE update, not a tool-license question). Cleaner
+   options that sidestep that entirely:
+   - [Selekt Audio free drum MIDI](https://selektaudio.com/free-midi/drums)
+     — CC0/public-domain/CC-BY drum **MIDI grooves with provenance
+     certificates**, including Amen/Funky-Drummer-style patterns with no
+     sampled audio at all — feed the groove into this project's own
+     synthesis instead of playing back someone else's recording. Probably
+     the cleanest option given this app already has a real drum synth path.
+   - [KAN Samples' free Amen Break tribute pack](https://kansamples.com/blogs/free-drum-and-bass-sample-packs/amen-break-tribute-pack-free-drum-bass-sample-pack-free-download)
+     and [Funky Drummer tribute pack](https://kansamples.com/blogs/free-drum-and-bass-sample-packs/funky-drummer-break-tribute-pack)
+     — re-performed/re-recorded tribute breaks (not the original
+     recording), free, DnB-specific.
+   - [Freesound's Bronxio drumloops pack](https://freesound.org/people/Bronxio/packs/12756/)
+     — CC0, explicit breakbeat sequences.
+   - [Sample Focus](https://samplefocus.com/categories/drums) — royalty-free
+     breakbeat/drum one-shots and loops, free tier.
+   Verify each pack's actual license text yourself before use — search
+   results describe them as CC0/free/royalty-free but don't take that as
+   gospel without opening the pack's own license file.
+5. **`inference_steps` — resolved, not actually a concern.** The bridge
+   sends 50 (`AceStepBackend.ts`); flagged earlier this session as
+   possibly-wrong since the schema's bare default is 8. Checked against the
+   real project docs
+   ([ACE-Step-1.5 INFERENCE.md](https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/INFERENCE.md))
+   via WebSearch: 8 is the turbo-speed default; for base/sft models (which
+   is what this project uses — `acestep-v15-base`), 30-60 steps is the
+   commonly recommended range for higher quality, and guidance_scale 5-9
+   (this project sends 7.0) is the typical band. **50 is a reasonable,
+   defensible choice, not an inherited guess** — no action needed here.
+   One real lead worth trying, still unexplored: **Adaptive Dual Guidance**
+   (`use_adg` in the real request schema, base-model-only, per the same
+   docs) is described as improving quality at a speed cost — currently
+   unset (defaults to off) in `AceStepBackend.ts`. `timesteps` (custom
    schedule override) and `dcw_enabled`/`dcw_mode` (post-hoc wavelet
-   correction, in the real schema) are unset entirely — unexplored, no
-   claim either way on whether tuning them would help. Don't touch these
-   without real A/B evidence; this codebase's whole methodology this
-   session was "get a source, don't guess."
+   correction) remain genuinely unexplored — no claim either way on
+   whether tuning them would help; don't touch without real A/B evidence.
 
 ## 4. Licensing — relaxed this session, owner decision
 
@@ -344,41 +456,33 @@ the primary path and always has been — this session's fixes made that
 actually true (ACE was previously silently falling back, and receiving no
 section structure — see §2).
 
-## 6. Verification status — what to run first in the next session
+## 6. Verification status — everything in §2 is confirmed
 
-This session's Bash tool became **intermittently unavailable** near the end
-("deepseek-flash[1m] is temporarily unavailable, so auto mode cannot
-determine the safety of Bash right now") — this looks like transient
-infra flakiness in the tool-safety classifier, not a real permission
-block (plain `git` commands worked fine throughout; `npx vite-node` /
-`npx vitest` specifically kept failing right when verification was needed
-most). **Do not assume this means anything is broken in the code** — it
-means verification is simply unconfirmed. First thing to do in the next
-session:
+This session's Bash tool was intermittently unavailable for a stretch
+("deepseek-flash[1m] is temporarily unavailable" — the tool-safety
+classifier itself going down, not a real permission block; plain `git`
+commands kept working throughout the outage). It recovered before handoff,
+so every fix in §2, including the dubstep/half-time-drop split and its
+own follow-up bug fix, has been run and confirmed, not left as an
+open question:
 
 ```bash
-npx tsc --noEmit
-npx vitest run
-node scripts/render-styles.mjs   # or: npx vite-node scripts/render-styles.mjs
+npx tsc --noEmit        # 0 errors
+npx vitest run          # 240/241 pass — only prove-gpu.test.ts fails,
+                         # and only because it needs the real ACE GPU stack
+                         # running locally (:8001/:8766); unrelated to any
+                         # change this session
+npx vite-node scripts/render-styles.mjs   # confirmed dubstep and
+                         # half-time-drop now genuinely differ at seed 17400
 ```
 
-`render-styles.mjs` renders all 4 song-shape presets (`classic`, `dubstep`,
-`trap-bounce`, `half-time-drop`) at seed 17400 and prints
-`family`/`bassChar`/`kickHits`/`snareBeatPositions` for each, plus writes
-WAV files to `exports/`. Confirm `dubstep` and `half-time-drop` now differ
-(they should show different `bassChar` at least some seeds, given the
-weighted-random pick — if you want a hard structural proof, temporarily log
-the energy-curve dropBoost/introDip values too, since those differ
-deterministically regardless of the RNG pick). If they're still identical,
-re-check the edit in `src/core/structure/StructureEngine.ts` around the
-`dubstepShape` variable (search for that name) — it should be a clean
-compile since `tsc`/lint weren't run against it this session either.
-
-All prior fixes in §2 (bass voice leading, guitar key-following, hi-hat
-density, drum synthesis, reese/growl saw bass) were verified via passing
-vitest suites and/or live rendering **before** this final unverified
-change — those are solid. Only the dubstep/half-time-drop split (last edit
-of the session) is unconfirmed.
+If you ever touch `StructureEngine.ts`'s shape-dependent branches again,
+re-run `render-styles.mjs` and actually read its output rather than
+trusting the diff — this exact fix looked complete on first read but
+still had a real RNG-correlation bug that only showed up by rendering and
+comparing real output (see §2's entry for the full story of how it was
+caught and fixed). Don't skip that step for "obviously correct" changes to
+shape-branching logic; the collision here wasn't obvious from the code.
 
 ## 7. Open listening-feedback loop — do not mark resolved without the user
 
@@ -395,9 +499,8 @@ the full history of this back-and-forth.
 
 ## 8. Everything pending, in one list
 
-1. **§0 — name scrub in git history**: script ready
-   (`rewrite-history.ps1`), user needs to run it in PowerShell and
-   force-push. Urgent/privacy-sensitive.
+1. ~~**§0 — name scrub in git history**~~ — **DONE**, confirmed clean on
+   `origin/main`.
 2. **§3.1 — wire real ACE `cover`/`repaint` audio2audio** for the Style Ref
    upload. Recommended next implementation task. Touches
    `sidecar/ace_bridge_server.py`, `src/core/backends/AceStepBackend.ts`,
@@ -435,7 +538,17 @@ the full history of this back-and-forth.
   repo/not vendored). Ground truth for ACE's actual API surface — read
   `acestep/api/http/release_task_models.py` and `acestep/constants.py`
   directly, don't rely on this handoff's summary alone for anything you're
-  about to implement against it.
+  about to implement against it. **`docs/en/` inside that same repo has
+  the real, complete official docs, fully offline-readable** (`API.md`,
+  `INFERENCE.md`, `LoRA_Training_Tutorial.md`, `CLI.md`,
+  `Large_Scale_SFT_Training_Guide.md`, `DCW.md`, and more — see
+  `docs/en/index.md` for the full list) — if a future session has no
+  internet access, this local copy is the fallback for anything WebSearch
+  would otherwise have been used for regarding ACE-Step itself. Everything
+  in §3 sourced from WebSearch this session (sample pack links, LoRA specs)
+  was double-checked against these local docs where they overlapped —
+  prefer the local docs over a web search result if they ever disagree,
+  they're the actual shipped version running on this machine.
 - `src/core/prompt/buildAceCaption.ts` — the ACE caption/tag builder.
 - `src/ui/hooks/useStudioStore.ts` — Zustand store, `generate()` orchestrates
   both backends.

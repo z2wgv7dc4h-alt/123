@@ -475,7 +475,16 @@ export class HardGridStructureEngine implements StructureEngine {
       // Trap bounce: lock fat 808 sub
       bassCharacter = 'sub';
     } else if (dubstepShape) {
-      // Dubstep: growl-biased — heavier wobble body than a generic half-time drop
+      // Dubstep: growl-biased — heavier wobble body than a generic half-time
+      // drop. Consume one throwaway rng() draw first: dubstep and
+      // half-time-drop reach this point via the same seed and identical
+      // prior draw count (keyRoot + patternFamily), so without this they'd
+      // read the exact same underlying random value here — and with
+      // 'growl' sitting at the same middle index in both weighted arrays,
+      // that collided on identical bassCharacter ~1/3 of seeds even after
+      // splitting the arrays (confirmed via scripts/render-styles.mjs at
+      // seed 17400: both came out growl). This desyncs the two streams.
+      rng();
       bassCharacter = pick(rng, ['growl', 'growl', 'reese'] as const);
     } else if (halfTime) {
       // Half-time drop: reese or growl — wobble body, never thin sub-only

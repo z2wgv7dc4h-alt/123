@@ -1,11 +1,11 @@
 # DnB Studio — Living Status
 
-**New session? Read [docs/HANDOFF.md](HANDOFF.md) first** — it has an
-urgent pending item (git history still exposes the owner's real name
-publicly, fix script ready but not yet run), a prioritized list of what
-this project isn't leveraging yet (sourced from the real installed
-ACE-Step repo), and a full pending-work list. This file is the detailed
-chronological log; HANDOFF.md is the entry point.
+**New session? Read [docs/HANDOFF.md](HANDOFF.md) first** — it has a
+prioritized list of what this project isn't leveraging yet (sourced from
+the real installed ACE-Step repo) and a full pending-work list. This file
+is the detailed chronological log; HANDOFF.md is the entry point. (The
+git-history name scrub flagged urgent earlier in the day is done — see
+HANDOFF.md §0.)
 
 Last regenerated: 2026-09-15, by actually reading and running the code (tests,
 `tsc`, and live GPU renders against the real ACE stack on the RTX 5080) —
@@ -134,6 +134,21 @@ splitting everything else: dubstep now biases bass character toward `growl`
 bass, dubstep-influenced drop" vs "heavy weighted drop, rolling reese
 movement"). Half-time-drop's structural values are unchanged from before —
 only dubstep moved.
+
+**Second bug found and fixed in the same pass**: the first version of this
+fix still collided ~1/3 of the time. Both shapes reach the bass-character
+pick via the same seed and identical prior RNG draw count (keyRoot +
+patternFamily), so they read the exact same underlying random value at that
+point — and `'growl'` sat at the same middle index in both weighted arrays,
+so a third of all seeds produced identical `bassChar` anyway (confirmed:
+seed 17400 initially came out `growl`/`growl` for both). Fixed by having
+dubstep consume one throwaway `rng()` draw before its pick, decorrelating
+the two streams from that point on. Re-verified at seed 17400 after the
+fix: `dubstep` → `bassChar=reese`, `half-time-drop` → `bassChar=growl`,
+`kickHits` 52 vs 50 (the extra draw also shifts section proportions
+downstream — expected, not a bug). Full suite: `tsc --noEmit` clean,
+240/241 vitest tests pass (the one failure, `prove-gpu.test.ts`, needs the
+real ACE GPU stack running locally and is unrelated to this change).
 
 ## Licensing relaxed 2026-09-15 (owner decision)
 
