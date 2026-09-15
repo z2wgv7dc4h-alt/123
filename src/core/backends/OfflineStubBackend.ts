@@ -20,7 +20,7 @@ import {
   type StemId,
   type StructureMap,
 } from '../types';
-import { structureEngine } from '../structure/StructureEngine';
+import { structureEngine, midiForRoot } from '../structure/StructureEngine';
 import { encodeWav } from '../export/wav';
 import { buildExportManifest } from '../export/manifest';
 import { structureToMidiBlob } from '../midi/exportMidi';
@@ -116,44 +116,80 @@ function writePerc(buf: Float32Array, at: number, vel: number, sr: number) {
 }
 
 /**
- * Rock-DnB mid grit — short distorted pulse on kick hits in drop/build only.
- * Synthetic original (no catalog samples). Mixed into snare bus for mid presence.
+ * One-pole lowpass, applied to a local scratch buffer before it's mixed in.
+ * Tanh distortion on a bare sine throws off harsh, buzzy high harmonics —
+ * this tames them into something closer to an amp/cab tone instead of a
+ * raw chiptune square wave. Never filter `buf` directly: it already holds
+ * other hits from earlier in the pass, and in-place filtering would smear
+ * them.
  */
-function writeRockMid(buf: Float32Array, at: number, vel: number, sr: number, amount = 0.35) {
-  const len = Math.floor(0.09 * sr);
-  for (let i = 0; i < len && at + i < buf.length; i++) {
-    const t = i / sr;
-    const phase = 2 * Math.PI * 520 * t;
-    // Soft square-ish + octave for guitar-adjacent mid without cloning anyone
-    const sq = Math.tanh(Math.sin(phase) * 3.2) + Math.sin(phase * 2.01) * 0.35;
-    const g = envGain(t, 0.001, 0.07) * vel * amount;
-    buf[at + i]! += sq * g * 0.22;
+function lowpassInPlace(scratch: Float32Array, sr: number, cutoffHz: number): void {
+  const rc = 1 / (2 * Math.PI * cutoffHz);
+  const dt = 1 / sr;
+  const alpha = dt / (rc + dt);
+  let prev = 0;
+  for (let i = 0; i < scratch.length; i++) {
+    prev += alpha * (scratch[i]! - prev);
+    scratch[i] = prev;
   }
 }
 
 /**
- * Generative guitar / lead texture into `other` stem — original synth, not a rip.
- * Rhythm guitar: mid distorted pulses on drop/build. Solo: longer lead tones.
+ * Rock-DnB mid grit — short distorted pulse on kick hits in drop/build only.
+ * Synthetic original (no catalog samples). Mixed into snare bus for mid presence.
+ * Follows the song's actual key (was hardcoded to a fixed 520 Hz regardless
+ * of keyRoot — could clash with the bass in any other key).
  */
-function writeGuitarChord(buf: Float32Array, at: number, vel: number, sr: number, amount: number) {
-  const len = Math.floor(0.18 * sr);
-  for (let i = 0; i < len && at + i < buf.length; i++) {
+function writeRockMid(buf: Float32Array, at: number, vel: number, sr: number, rootMidi: number, amount = 0.35) {
+  const len = Math.floor(0.09 * sr);
+  const freq = 440 * Math.pow(2, (rootMidi + 24 - 69) / 12); // two octaves up from the bass root
+  const scratch = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
     const t = i / sr;
-    const phase = 2 * Math.PI * 196 * t; // G3-ish
-    const grit =
-      Math.tanh(Math.sin(phase) * 4.5) * 0.55 +
-      Math.tanh(Math.sin(phase * 1.5) * 3.2) * 0.35 +
-      Math.sin(phase * 2.01) * 0.2;
-    const g = envGain(t, 0.002, 0.14) * vel * amount;
-    buf[at + i]! += grit * g * 0.28;
+    const phase = 2 * Math.PI * freq * t;
+    const sq = Math.tanh(Math.sin(phase) * 3.2) + Math.sin(phase * 2.01) * 0.35;
+    const g = envGain(t, 0.001, 0.07) * vel * amount;
+    scratch[i] = sq * g * 0.22;
   }
+  lowpassInPlace(scratch, sr, 3800);
+  for (let i = 0; i < len && at + i < buf.length; i++) buf[at + i]! += scratch[i]!;
+}
+
+/**
+ * Generative guitar / lead texture into `other` stem — original synth, not a
+ * rip. Rhythm guitar: mid distorted pulses on drop/build, voiced as a real
+ * power chord (root + fifth + octave, detuned pair per voice for width) in
+ * the song's actual key — was hardcoded to a fixed G3 regardless of keyRoot,
+ * which could clash outright with the bass in any other key.
+ */
+function writeGuitarChord(buf: Float32Array, at: number, vel: number, sr: number, rootMidi: number, amount: number) {
+  const len = Math.floor(0.18 * sr);
+  // Power chord one octave below guitar register (root, fifth, octave) — root sits an
+  // octave above the bass so it reads as a chord stab, not a bass double.
+  const chordMidis = [rootMidi + 12, rootMidi + 19, rootMidi + 24];
+  const scratch = new Float32Array(len);
+  for (const chordMidi of chordMidis) {
+    const freq = 440 * Math.pow(2, (chordMidi - 69) / 12);
+    for (let i = 0; i < len; i++) {
+      const t = i / sr;
+      // Two slightly-detuned saws per voice (unison width) through tanh grit.
+      const p1 = 2 * Math.PI * freq * 1.003 * t;
+      const p2 = 2 * Math.PI * freq * 0.997 * t;
+      const grit = Math.tanh((Math.sin(p1) + Math.sin(p2)) * 2.6) * 0.5;
+      const g = envGain(t, 0.002, 0.14) * vel * amount;
+      scratch[i]! += grit * g * 0.22;
+    }
+  }
+  lowpassInPlace(scratch, sr, 4200);
+  for (let i = 0; i < len && at + i < buf.length; i++) buf[at + i]! += scratch[i]!;
 }
 
 function writeLeadSolo(buf: Float32Array, at: number, midi: number, durBeats: number, vel: number, bpm: number, sr: number) {
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
   const dur = (durBeats * 60) / bpm;
   const len = Math.floor(dur * sr);
-  for (let i = 0; i < len && at + i < buf.length; i++) {
+  const scratch = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
     const t = i / sr;
     const phase = 2 * Math.PI * freq * t;
     const vibr = 1 + 0.012 * Math.sin(2 * Math.PI * 5.5 * t);
@@ -162,8 +198,10 @@ function writeLeadSolo(buf: Float32Array, at: number, midi: number, durBeats: nu
       Math.sin(phase * 2 * vibr) * 0.25 +
       Math.sin(phase * 3.01) * 0.12;
     const g = envGain(t, 0.01, Math.max(0.08, dur - 0.02)) * vel;
-    buf[at + i]! += wave * g * 0.22;
+    scratch[i] = wave * g * 0.22;
   }
+  lowpassInPlace(scratch, sr, 5200);
+  for (let i = 0; i < len && at + i < buf.length; i++) buf[at + i]! += scratch[i]!;
 }
 
 export function applyGuitarLayers(
@@ -175,6 +213,7 @@ export function applyGuitarLayers(
 ) {
   if (!layers.guitar && !layers.solo) return;
   const amount = 0.35 + energy * 0.45;
+  const rootMidi = midiForRoot(structure.keyRoot);
   if (layers.guitar) {
     for (const plan of structure.drums) {
       if (plan.role !== 'kick') continue;
@@ -184,12 +223,12 @@ export function applyGuitarLayers(
         );
         if (!sec || (sec.name !== 'drop' && sec.name !== 'build')) continue;
         const at = beatToSample(h.bar, h.beat, structure.bpm, sr);
-        writeGuitarChord(other, at, h.velocity, sr, amount);
+        writeGuitarChord(other, at, h.velocity, sr, rootMidi, amount);
       }
     }
   }
   if (layers.solo) {
-    const root = 57; // A3
+    const root = rootMidi + 24; // two octaves above the bass root — lead register, in key
     for (const sec of structure.sections) {
       if (sec.name !== 'drop' && sec.name !== 'outro') continue;
       for (let bar = sec.startBar; bar < sec.startBar + sec.lengthBars; bar += 2) {
@@ -209,6 +248,7 @@ export function applyRockMidGrit(
   energy: number,
 ) {
   const amount = 0.22 + energy * 0.35;
+  const rootMidi = midiForRoot(structure.keyRoot);
   for (const plan of structure.drums) {
     if (plan.role !== 'kick') continue;
     for (const h of plan.hits) {
@@ -217,7 +257,7 @@ export function applyRockMidGrit(
       );
       if (!sec || (sec.name !== 'drop' && sec.name !== 'build')) continue;
       const at = beatToSample(h.bar, h.beat, structure.bpm, sr);
-      writeRockMid(snare, at, h.velocity, sr, amount);
+      writeRockMid(snare, at, h.velocity, sr, rootMidi, amount);
     }
   }
 }

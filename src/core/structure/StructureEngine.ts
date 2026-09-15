@@ -15,7 +15,7 @@ import { chance, lerp, mulberry32, pick, sectionSeed } from './rng';
 
 const KEY_ROOTS = ['A', 'Am', 'F', 'Dm', 'E', 'Em', 'G', 'C'] as const;
 
-function midiForRoot(root: string): number {
+export function midiForRoot(root: string): number {
   const map: Record<string, number> = {
     C: 36, D: 38, E: 40, F: 41, G: 43, A: 45, B: 47,
     Am: 45, Dm: 38, Em: 40,
