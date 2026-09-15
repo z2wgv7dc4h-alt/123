@@ -102,6 +102,25 @@ export function planSections(
   return sections;
 }
 
+/**
+ * Re-octave `target` to whichever octave sits closest to `prevMidi`, keeping
+ * the same pitch class (i.e. the harmonic color from the interval tables).
+ * Without this, two harmonically "valid" intervals picked independently
+ * relative to a fixed root can still be 15+ semitones apart from EACH OTHER —
+ * audibly a random pitch generator, not a bassline. `null` prevMidi (first
+ * note of a section) returns target unchanged.
+ */
+function nearestOctaveTo(target: number, prevMidi: number | null): number {
+  if (prevMidi == null) return target;
+  // Shift target by whole octaves so it lands as close as possible to
+  // prevMidi. Rounding to the nearest multiple of 12 guarantees the result
+  // is always within 6 semitones of prevMidi, regardless of how far apart
+  // target and prevMidi started — a fixed candidate list doesn't have that
+  // guarantee once the gap exceeds its search range.
+  const octaveShift = Math.round((target - prevMidi) / 12);
+  return target - octaveShift * 12;
+}
+
 function sectionAt(sections: Section[], bar: number): Section {
   for (let i = sections.length - 1; i >= 0; i--) {
     const s = sections[i]!;
@@ -329,6 +348,11 @@ function planBass(
     darkness > 0.65 ? 'growl' : darkness > 0.35 ? 'reese' : 'sub';
   // Trap bounce: fat 808 body = sub character (glide rendered in OfflineStub)
   if (trapBounce) character = 'sub';
+  // Voice-leading state: each note re-octaves toward the previous one instead
+  // of landing wherever (root + interval) happens to fall. Resets per section
+  // (planBass is called fresh per section) — deliberate, keeps per-section
+  // determinism/independence intact.
+  let prevMidi: number | null = null;
 
   for (let bar = 0; bar < bars; bar++) {
     const sec = sectionAt(sections, bar);
@@ -359,7 +383,7 @@ function planBass(
     if (chance(rng, chaos * 0.25) && sec.name === 'drop') beats.push(0.5);
     if (family === 'syncopated' && chance(rng, 0.35 + chaos * 0.2)) beats.push(3.75);
 
-    for (const beat of [...new Set(beats)]) {
+    for (const beat of [...new Set(beats)].sort((a, b) => a - b)) {
       const interval = pick(rng, intervals);
       const dur = trapBounce
         ? (chance(rng, 0.55) ? 3 : 2) // fat held 808s
@@ -368,10 +392,12 @@ function planBass(
           : family === 'syncopated'
             ? (chance(rng, 0.4) ? 0.75 : 1)
             : (chance(rng, 0.3) ? 1.5 : 1);
+      const midi = nearestOctaveTo(root + interval, prevMidi);
+      prevMidi = midi;
       notes.push({
         bar,
         beat,
-        midi: root + interval,
+        midi,
         durationBeats: dur,
         velocity: lerp(0.55, 0.95, energy),
       });
