@@ -377,7 +377,23 @@ Concrete, sourced gaps, ranked by leverage-per-effort:
    this) and real GPU training time — treat as a later phase, not the next
    move, but it's no longer a vague "maybe someday": the path is real,
    documented, and running on hardware already in this setup.
-4. **Sketch has zero real audio samples anywhere** — confirmed by grep,
+4. **DONE 2026-09-16** — real Amen/Funky Drummer break loops (KAN Samples
+   tribute packs, pre-cut to exactly one bar at 174 BPM) are now layered
+   under drop bars for `amen`/`twoStep` pattern families, additive on top
+   of the existing synth kit. `src/core/audio/wavDecode.ts` +
+   `loadBreakLoop.ts` (dependency-free WAV parser, dual Node/browser I/O),
+   wired into `OfflineStubBackend.ts`'s `buildRealBreakBus`. Tests:
+   `src/test/break-loop.test.ts` (9 passing). User confirmed by ear: "it
+   sounds a little better." Assets + their licenses live in
+   `src/assets/samples/breaks/` (owner explicitly OK'd the Funky Drummer
+   pack despite its license admitting the audio is lifted from the
+   original recording, not a re-performance — see that file's
+   `LICENSE_funky_drummer.txt`). Leftover unused: the two originally
+   fetched non-pre-cut files (`funky-amen_175bpm.wav`,
+   `funky-drummer-drums_105bpm_E_minor.wav`, still in the user's Downloads,
+   not copied into the repo) would need real time-stretching to use —
+   skipped as the pre-cut zip versions needed none.
+   Previously: **Sketch has zero real audio samples anywhere** — confirmed by grep,
    every DSP file under `src/core` is 100% synthetic oscillator math
    (sine/saw/square/noise + biquad filters). Now that GPL/AGPL/NC sample
    packs are fine to use personally (see §4), a real (even lightly

@@ -121,7 +121,7 @@ function nearestOctaveTo(target: number, prevMidi: number | null): number {
   return target - octaveShift * 12;
 }
 
-function sectionAt(sections: Section[], bar: number): Section {
+export function sectionAt(sections: Section[], bar: number): Section {
   for (let i = sections.length - 1; i >= 0; i--) {
     const s = sections[i]!;
     if (bar >= s.startBar) return s;

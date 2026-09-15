@@ -20,7 +20,8 @@ import {
   type StemId,
   type StructureMap,
 } from '../types';
-import { structureEngine, midiForRoot } from '../structure/StructureEngine';
+import { structureEngine, midiForRoot, sectionAt } from '../structure/StructureEngine';
+import { loadBreakLoopMono, type BreakLoopName } from '../audio/loadBreakLoop';
 import { encodeWav } from '../export/wav';
 import { buildExportManifest } from '../export/manifest';
 import { structureToMidiBlob } from '../midi/exportMidi';
@@ -315,6 +316,60 @@ function sawFromTime(freqHz: number, t: number): number {
   return 2 * cyclePos - 1;
 }
 
+/**
+ * Textural bed of a real breakbeat loop under drop-section bars — added
+ * 2026-09-15, per the owner's explicit direction: DnB is historically a
+ * breakbeat-sample-based genre and no amount of oscillator tuning fully
+ * closes that gap (see docs/HANDOFF.md's Sketch findings). Loops are real
+ * KAN Samples "tribute" breaks (see src/assets/samples/breaks/LICENSE_*.txt
+ * for terms), pre-cut to exactly one bar at 174 BPM — this project's own
+ * locked tempo (docs/WHY_174.md) — so no time-stretch/pitch-shift is
+ * needed, only a straight per-bar tile. Kept deliberately additive: mixed
+ * in on top of the existing synthesized kick/snare/hats after mixdown, at
+ * low blend gain, so it colors the sound without replacing or disturbing
+ * anything the existing per-stem tests assert on.
+ */
+const REAL_BREAK_GAIN = 0.32;
+
+function breakLoopNameForFamily(family: string): BreakLoopName | null {
+  if (family === 'amen') return 'amen_174bpm_1bar';
+  if (family === 'twoStep') return 'funky_drummer_174bpm_1bar';
+  return null; // syncopated: no strong genre-authentic break match, stays pure synth
+}
+
+async function buildRealBreakBus(
+  family: string,
+  sections: StructureMap['sections'],
+  bars: number,
+  samplesPerBar: number,
+): Promise<Float32Array | null> {
+  const loopName = breakLoopNameForFamily(family);
+  if (!loopName) return null;
+
+  let loop: Float32Array;
+  try {
+    loop = await loadBreakLoopMono(loopName, samplesPerBar);
+  } catch {
+    // Missing/corrupt asset must never break a render — Sketch stays
+    // synth-only for this bar range rather than throwing.
+    return null;
+  }
+
+  const out = new Float32Array(bars * samplesPerBar);
+  const fadeSamples = Math.min(200, Math.floor(samplesPerBar * 0.01)); // ~4ms tile-boundary click guard
+  for (let bar = 0; bar < bars; bar++) {
+    if (sectionAt(sections, bar).name !== 'drop') continue;
+    const barStart = bar * samplesPerBar;
+    for (let i = 0; i < samplesPerBar; i++) {
+      let g = REAL_BREAK_GAIN;
+      if (i < fadeSamples) g *= i / fadeSamples;
+      else if (i >= samplesPerBar - fadeSamples) g *= (samplesPerBar - i) / fadeSamples;
+      out[barStart + i] = loop[i]! * g;
+    }
+  }
+  return out;
+}
+
 function writeBass(
   buf: Float32Array,
   at: number,
@@ -347,12 +402,17 @@ function writeBass(
       // sine stack can't produce (it only chorus-beats faintly).
       const lfo = wantWobble ? 0.5 + 0.5 * Math.sin(2 * Math.PI * wobbleHz * t) : 0.85;
       const bright = 0.35 + 0.65 * lfo;
+      // Detune widened 2026-09-15 from the original ~±12/±24 cents toward
+      // real Reese bass practice, commonly documented around ±30 cents per
+      // oscillator pair (e.g. blog.native-instruments.com/reese-bass) — the
+      // narrower spread was under-pronouncing the signature "beating" wobble
+      // this bass character is named for.
       const core =
         sawFromTime(freq, t) * 0.5 +
-        sawFromTime(freq * 0.993, t) * (0.32 + bright * 0.18) +
-        sawFromTime(freq * 1.007, t) * (0.32 + bright * 0.18) +
-        sawFromTime(freq * 1.014, t) * (0.18 + bright * 0.14) +
-        sawFromTime(freq * 0.986, t) * (0.18 + bright * 0.14);
+        sawFromTime(freq * 0.99, t) * (0.32 + bright * 0.18) +
+        sawFromTime(freq * 1.01, t) * (0.32 + bright * 0.18) +
+        sawFromTime(freq * 1.018, t) * (0.18 + bright * 0.14) +
+        sawFromTime(freq * 0.982, t) * (0.18 + bright * 0.14);
       s = Math.tanh(core * (1.15 + bright * 0.45));
       s *= 0.55 + 0.45 * lfo; // amp wobble
     } else {
@@ -916,6 +976,13 @@ export class OfflineStubBackend implements AudioBackend {
         : { kick: kickOut, snare: snareOut, hats: hatsOut, bass: bassOut, perc: percOut },
       totalSamples,
     );
+    // Real breakbeat loop, additive under drop bars — mix-only (not a
+    // separate stem, doesn't touch any tested per-stem bus). See
+    // buildRealBreakBus for rationale/sourcing.
+    const realBreak = await buildRealBreakBus(family, structure.sections, structure.bars, structure.samplesPerBar);
+    if (realBreak) {
+      for (let i = 0; i < totalSamples; i++) mix[i]! += realBreak[i]!;
+    }
     // P0: mix bus glue + soft ceiling (master only)
     applyMixBusGlue(mix, sr, { hot: dubMode || trapMode || energy > 0.72 });
 
