@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { useStudioStore } from '../ui/hooks/useStudioStore';
 import { structureEngine } from '../core/structure';
 import { totalBarsOf } from '../ui/lib/structureEdit';
+import { sectionClickRatio } from '../ui/lib/barPosition';
 import type { Section, StructureMap } from '../core/types';
 
 /** Extract a section's drum hits + bass notes, normalized to bar-relative-to-section-start. */
@@ -34,7 +35,14 @@ describe('BRIEF-1 listen-first wiring', () => {
   it('SectionTimeline click seeks via seekPreview(targetRatio)', () => {
     expect(timelineSrc).toMatch(/seekPreview\(targetRatio\)/);
     expect(timelineSrc).toMatch(/onClick=\{\(e\)\s*=>/);
-    expect(timelineSrc).toMatch(/sectionStartRatio/);
+    expect(timelineSrc).toMatch(/sectionClickRatio/);
+  });
+
+  it('sectionClickRatio (shared with SectionJumpChips) maps a click inside a section proportionally', () => {
+    // 32-bar map, section is bars 8..16 → ratios 0.25..0.5. Click at the section's own midpoint.
+    expect(sectionClickRatio(8, 8, 32, 0)).toBeCloseTo(0.25, 5);
+    expect(sectionClickRatio(8, 8, 32, 0.5)).toBeCloseTo(0.375, 5);
+    expect(sectionClickRatio(8, 8, 32, 1)).toBeCloseTo(0.5, 5);
   });
 });
 

@@ -1,5 +1,5 @@
 import { useStudioStore } from '../hooks/useStudioStore';
-import { sectionLoopRatios } from '../lib/barPosition';
+import { sectionLoopRatios, sectionStartRatio } from '../lib/barPosition';
 import { HELP } from '../lib/helpCopy';
 import { HelpTip } from './HelpTip';
 
@@ -32,7 +32,7 @@ export function SectionJumpChips() {
       </span>
       <div className="section-jump-chips">
         {chips.map((s) => {
-          const ratio = Math.min(1, Math.max(0, s.startBar / bars));
+          const ratio = sectionStartRatio(s.startBar, bars);
           const label = s.name.charAt(0).toUpperCase() + s.name.slice(1);
           return (
             <button

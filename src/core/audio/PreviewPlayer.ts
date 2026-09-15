@@ -503,6 +503,7 @@ export class PreviewPlayer {
       solo?: Partial<Record<string, boolean>>;
       gainDb?: Partial<Record<string, number>>;
     },
+    duckShape?: { energy: number; hyped: boolean },
   ): Promise<void> {
     const usable = stems.filter((s) => s.blob || s.url);
     if (!usable.length) throw new Error('No stem blobs for live preview');
@@ -588,7 +589,7 @@ export class PreviewPlayer {
     if (kickLane && bassLane?.duckGain) {
       this.liveKickAnalyser = new Tone.Analyser('waveform', 256);
       kickLane.channel.connect(this.liveKickAnalyser);
-      this.startDuckLoop(bassLane);
+      this.startDuckLoop(bassLane, duckShape);
     }
 
     if (mixer) this.applyLiveMixer(mixer);
@@ -601,25 +602,25 @@ export class PreviewPlayer {
   /**
    * rAF envelope follower: reads the live kick channel level each frame and
    * ducks the bass lane's pre-Channel gain stage, so mute/solo/gain tweaks
-   * keep the same punch as the flat/export mix (which ducks via
-   * OfflineStubBackend.sidechainDuckBass at render time). Not scheduled
-   * against Tone.Transport because live playback doesn't use one — see
-   * PreviewPlayer's live graph notes in loadLiveFromStems.
+   * keep the same punch as the flat/export mix. Shape (depth/attack/release)
+   * comes from computeDuckShapeParams — the same function the offline render
+   * path (OfflineStubBackend.sidechainDuckBass) uses — so live preview cannot
+   * silently drift from what export actually renders. Not scheduled against
+   * Tone.Transport because live playback doesn't use one — see PreviewPlayer's
+   * live graph notes in loadLiveFromStems.
    */
-  private startDuckLoop(bassLane: StemLane): void {
+  private startDuckLoop(bassLane: StemLane, duckShape?: { energy: number; hyped: boolean }): void {
     const duckGain = bassLane.duckGain;
     const analyser = this.liveKickAnalyser;
     if (!duckGain || !analyser || typeof requestAnimationFrame !== 'function') return;
     // Estimate effective frame rate for RAF (60fps typical when visible)
     const frameRateHz = 60;
-    // Target time constants: attack ~3-8ms, release ~40-80ms
-    // Using values consistent with OfflineStubBackend.sidechainDuckBass defaults
-    const attackMs = 5;
-    const releaseMs = 55;
-    // Use same formula as OfflineStubBackend.sidechainDuckBass but with frame rate instead of audio sample rate
+    const { duckDb, attackMs, releaseMs } = computeDuckShapeParams(
+      duckShape?.energy ?? 0.5,
+      duckShape?.hyped ?? false,
+    );
     const atkCoef = Math.exp(-1 / Math.max(1, (attackMs / 1000) * frameRateHz));
     const relCoef = Math.exp(-1 / Math.max(1, (releaseMs / 1000) * frameRateHz));
-    const duckDb = 3.2;
     this.duckEnv = 0;
     const tick = (): void => {
       if (!this.liveMode || this.liveLanes.get('bass') !== bassLane) return;
@@ -892,7 +893,6 @@ export async function renderRemixedWavBlob(
     const sr = decoded[0]!.sampleRate;
     const len = Math.max(...decoded.map((d) => d.length));
     const chCount = Math.max(...decoded.map((d) => d.numberOfChannels));
-    const channels: Float32Array[] = Array.from({ length: chCount }, () => new Float32Array(len));
 
     // Find kick and bass stems for ducking BEFORE summing
     let kickMono: Float32Array | null = null;
@@ -914,50 +914,27 @@ export async function renderRemixedWavBlob(
     }
 
     // Apply kick→bass sidechain ducking if we have both stems
-    let duckAppliedBass: Float32Array | null = null;
-    if (kickMono !== null && bassMono !== null && kickIndex !== -1 && bassIndex !== -1) {
-      duckAppliedBass = applyKickBassDuck(kickMono, bassMono, sr);
-    }
+    const duckAppliedBass: Float32Array | null =
+      kickMono !== null && bassMono !== null && kickIndex !== -1 && bassIndex !== -1
+        ? applyKickBassDuck(kickMono, bassMono, sr)
+        : null;
 
-    for (let bi = 0; bi < decoded.length; bi++) {
-      const buf = decoded[bi]!;
-      const g = gainsLin[bi]!;
-      for (let c = 0; c < chCount; c++) {
-        const dst = channels[c]!;
-        // Use duck-applied bass for bass stem (first channel) if available
-        const useDuckedBass = duckAppliedBass !== null && bi === bassIndex && c === 0;
-
-        const srcCh = buf.getChannelData(Math.min(c, buf.numberOfChannels - 1));
-        for (let i = 0; i < srcCh.length; i++) {
-          if (useDuckedBass) {
-            // For bass stem first channel, use duck-applied signal
-            dst[i]! += duckAppliedBass[i] * g;
-          } else {
-            // Normal processing
-            dst[i]! += srcCh[i]! * g;
-          }
-        }
-      }
-    }
-
-    // Mix all channels together
     const mixedChannels: Float32Array[] = Array.from({ length: chCount }, () => new Float32Array(len));
     for (let c = 0; c < chCount; c++) {
       for (let bi = 0; bi < decoded.length; bi++) {
         const buf = decoded[bi]!;
         const g = gainsLin[bi]!;
         const dst = mixedChannels[c]!;
+        const srcCh = buf.getChannelData(Math.min(c, buf.numberOfChannels - 1));
 
         // Use duck-applied bass for bass stem (first channel) if available
-        const useDuckedBass = duckAppliedBass !== null && bi === bassIndex && c === 0;
-
-        const srcCh = buf.getChannelData(Math.min(c, buf.numberOfChannels - 1));
-        for (let i = 0; i < srcCh.length; i++) {
-          if (useDuckedBass) {
-            // For bass stem first channel, use duck-applied signal
-            dst[i]! += duckAppliedBass[i] * g;
-          } else {
-            // Normal processing
+        if (duckAppliedBass !== null && bi === bassIndex && c === 0) {
+          const ducked = duckAppliedBass;
+          for (let i = 0; i < srcCh.length; i++) {
+            dst[i]! += ducked[i]! * g;
+          }
+        } else {
+          for (let i = 0; i < srcCh.length; i++) {
             dst[i]! += srcCh[i]! * g;
           }
         }

@@ -67,6 +67,25 @@ export function formatMmSs(progress01: number, durationSec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** Ratio at the start of a section — shared by section-jump chips and timeline click (#40/#41). */
+export function sectionStartRatio(startBar: number, totalBars: number): number {
+  if (totalBars <= 0) return 0;
+  return clamp01(startBar / totalBars);
+}
+
+/** Ratio for a click at `withinRatio01` (0..1) across one section's own width. */
+export function sectionClickRatio(
+  startBar: number,
+  lengthBars: number,
+  totalBars: number,
+  withinRatio01: number,
+): number {
+  if (totalBars <= 0) return 0;
+  const start = sectionStartRatio(startBar, totalBars);
+  const end = sectionStartRatio(startBar + lengthBars, totalBars);
+  return clamp01(start + clamp01(withinRatio01) * (end - start));
+}
+
 /** Section → loop region ratios (#59). */
 export function sectionLoopRatios(
   startBar: number,

@@ -378,7 +378,13 @@ async function loadPreviewFromMixer(result: RenderResult, mixer: MixerState): Pr
       return;
     }
     const graphStems = result.stems.filter((s) => graphIds.includes(s.id));
-    await previewPlayer.loadLiveFromStems(graphStems, mixer);
+    // Live duck shape must match export — same energy/songShape this result was rendered with.
+    const hypedShapes: SongShapeId[] = ['dubstep', 'half-time-drop', 'trap-bounce'];
+    const duckShape = {
+      energy: result.manifest.prompt.energy,
+      hyped: !!result.manifest.songShape && hypedShapes.includes(result.manifest.songShape),
+    };
+    await previewPlayer.loadLiveFromStems(graphStems, mixer, duckShape);
     previewPlayer.applyLiveMixer(mixer);
     return;
   }
@@ -957,7 +963,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // Anti-samey: plain Generate rolls a new seed unless Keep-seed is on.
     // Again keeps seed; Vary already set a fresh seed (+ chaos nudge).
     // Also preserve seed when sections are edited (Expand/Repeat/etc) for same-song behavior
-    if (!opts?.variation && !s0.keepSeed && !(s0.editedSections && !opts?.variation)) {
+    if (!opts?.variation && !s0.keepSeed && !s0.editedSections) {
       const buf = new Uint32Array(1);
       if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
         crypto.getRandomValues(buf);
@@ -966,7 +972,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       }
       set({ seed: buf[0]! >>> 0 });
     }
-    const sPre = get();
     // Phone/LAN: re-probe ACE every Generate so a failed init probe doesn't stick on Sketch.
     try {
       const aceBe = backendRegistry.get('ace-step-1.5');

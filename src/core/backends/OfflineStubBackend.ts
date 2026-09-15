@@ -25,6 +25,7 @@ import { encodeWav } from '../export/wav';
 import { buildExportManifest } from '../export/manifest';
 import { structureToMidiBlob } from '../midi/exportMidi';
 import { computeWaveformPeaks } from '../audio/waveformPeaks';
+import { computeDuckShapeParams } from '../audio/ducking';
 
 const CAPS: BackendCaps = {
   fullSong: true,
@@ -776,11 +777,7 @@ export class OfflineStubBackend implements AudioBackend {
 
     // P0: kick→bass sidechain for mix only (keep bass stem dry)
     const bassForMix = bass.slice();
-    sidechainDuckBass(bassForMix, kick, sr, {
-      duckDb: (dubMode || trapMode ? 3.2 : 2.4) + energy * (dubMode || trapMode ? 2.6 : 2.2),
-      attackMs: 3 + (1 - energy) * 5,
-      releaseMs: (dubMode || trapMode ? 55 : 40) + (1 - energy) * 40,
-    });
+    sidechainDuckBass(bassForMix, kick, sr, computeDuckShapeParams(energy, dubMode || trapMode));
 
     if (this.cancelled.has(job.jobId)) {
       this.cancelled.delete(job.jobId);

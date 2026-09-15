@@ -3,7 +3,7 @@ import { previewPlayer } from '@/core/audio';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { HELP } from '../lib/helpCopy';
 import { pushToast } from '../lib/toasts';
-import { barsToDurationSec, formatDurationMmSs } from '../lib/barPosition';
+import { barsToDurationSec, formatDurationMmSs, sectionClickRatio } from '../lib/barPosition';
 import { DEFAULT_BPM } from '@/core/types';
 import { HelpTip } from './HelpTip';
 import { retailStructureLabel } from '../lib/retailLabels';
@@ -218,12 +218,13 @@ export function SectionTimeline() {
                 const section = result.structure.sections[index];
                 const totalBars = result.structure.bars;
                 const clickPosition = e.currentTarget.getBoundingClientRect();
-                const clickOffset = e.clientX - clickPosition.left;
-                const sectionWidth = clickPosition.width;
-                const ratioInSection = clickOffset / sectionWidth;
-                const sectionStartRatio = section.startBar / totalBars;
-                const sectionEndRatio = (section.startBar + section.lengthBars) / totalBars;
-                const targetRatio = sectionStartRatio + (ratioInSection * (sectionEndRatio - sectionStartRatio));
+                const ratioInSection = (e.clientX - clickPosition.left) / clickPosition.width;
+                const targetRatio = sectionClickRatio(
+                  section.startBar,
+                  section.lengthBars,
+                  totalBars,
+                  ratioInSection,
+                );
                 seekPreview(targetRatio);
               }}
             >
