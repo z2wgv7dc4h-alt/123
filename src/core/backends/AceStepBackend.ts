@@ -75,6 +75,14 @@ export const ACE_SHIFT = 3.0;
 export const ACE_DCW_ENABLED = true;
 export const ACE_DCW_MODE = 'low' as const;
 /**
+ * DCW off on non-turbo text2music: ACE issue #1259 — forcing DCW on
+ * base/SFT distorts audio. Turbo and cover keep ACE_DCW_ENABLED.
+ */
+export function aceDcwEnabled(checkpoint: string | null | undefined, isCover: boolean): boolean {
+  if (isTurboCheckpoint(checkpoint) || isCover) return ACE_DCW_ENABLED;
+  return false;
+}
+/**
  * LM on for text2music: the 5Hz LM plans the track (audio codes). The bridge
  * keeps use_cot_caption/use_cot_language false so the LM cannot rewrite our
  * concrete DnB caption or invent sung words; its only vocal-free structure
@@ -303,7 +311,7 @@ export class AceStepBackend implements AudioBackend {
           useAdg: sampler.useAdg,
           guidanceScale: ACE_GUIDANCE_SCALE,
           shift: ACE_SHIFT,
-          dcwEnabled: ACE_DCW_ENABLED,
+          dcwEnabled: aceDcwEnabled(checkpoint ?? ACE_DEFAULT_CHECKPOINT, Boolean(srcAudioBase64)),
           dcwMode: ACE_DCW_MODE,
           ...(srcAudioBase64
             ? {

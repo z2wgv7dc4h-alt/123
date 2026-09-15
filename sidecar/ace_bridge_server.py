@@ -187,7 +187,8 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
         "use_adg": (not turbo) if use_adg is None else (bool(use_adg) and not turbo),
         # DCW: ACE leaves it off for non-turbo unless asked. Wired as "low";
         # scaler defaults deliberately untouched.
-        "dcw_enabled": bool(req.get("dcwEnabled", True)),
+        # DCW off by default on non-turbo (ACE #1259); browser sends it explicitly.
+        "dcw_enabled": bool(req.get("dcwEnabled", turbo)),
         "dcw_mode": str(req.get("dcwMode") or "low"),
         "task_type": "text2music",
         "model": model,

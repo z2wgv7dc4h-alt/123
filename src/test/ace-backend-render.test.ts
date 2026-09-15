@@ -8,6 +8,7 @@ import {
   ACE_SHIFT,
   ACE_DCW_ENABLED,
   ACE_DCW_MODE,
+  aceDcwEnabled,
   ACE_COVER_STRENGTH,
   ACE_COVER_STRENGTH_MIN,
   ACE_COVER_STRENGTH_MAX,
@@ -91,7 +92,7 @@ describe('AceStepBackend full GPU path', () => {
     expect(mix?.blob).toBeTruthy();
   });
 
-  it('sends named inference params and enables DCW (off by default on base models)', async () => {
+  it('sends named inference params; DCW off on base text2music', async () => {
     const fakeWav = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]);
     let binary = '';
     fakeWav.forEach((b) => {
@@ -132,10 +133,13 @@ describe('AceStepBackend full GPU path', () => {
     expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);
     expect(body.shift).toBe(ACE_SHIFT);
-    // DCW ships off for non-Turbo models unless we ask for it.
-    expect(body.dcwEnabled).toBe(ACE_DCW_ENABLED);
-    expect(body.dcwEnabled).toBe(true);
+    // DCW off for base/SFT text2music (ACE #1259); turbo and cover keep it on.
+    expect(body.dcwEnabled).toBe(false);
     expect(body.dcwMode).toBe(ACE_DCW_MODE);
+    expect(aceDcwEnabled('acestep-v15-turbo', false)).toBe(ACE_DCW_ENABLED);
+    expect(aceDcwEnabled('acestep-v15-base', true)).toBe(ACE_DCW_ENABLED);
+    expect(aceDcwEnabled('acestep-v15-base', false)).toBe(false);
+    expect(aceDcwEnabled('acestep-v15-sft', false)).toBe(false);
   });
 
   it('plans breakDensity from chaos like Sketch does, not a hardcoded 0.55', async () => {
@@ -235,6 +239,8 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(sentBody?.srcAudioBase64).toBeTruthy();
     expect(sentBody?.srcAudioFileName).toBe('mine.wav');
     expect(sentBody?.audioCoverStrength).toBe(ACE_COVER_STRENGTH);
+    // Cover keeps DCW on (non-turbo text2music is the only path that turns it off).
+    expect(sentBody?.dcwEnabled).toBe(ACE_DCW_ENABLED);
     // Cover plans from the source audio; the LM thinking step must stay off.
     expect(result.acePayload?.thinking).toBe(false);
     // Honesty: only now may the manifest claim ACE consumed the reference.
