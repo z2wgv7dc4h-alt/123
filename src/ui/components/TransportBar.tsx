@@ -230,104 +230,107 @@ export function TransportBar() {
   return (
     <>
       <div id="transport" className="transport" role="toolbar" aria-label="Transport">
-        <span className="transport-btn-wrap">
-          <button
-            type="button"
-            className={`btn primary btn-generate ${busy ? 'pulse' : ''}`}
-            disabled={!canGenerate}
-            aria-busy={busy}
-            aria-keyshortcuts="g"
-            title={
-              sketchHonesty
-                ? 'Studio GPU not live — Generate still makes Sketch (CPU 16-bit) near 174 BPM (G)'
-                : studioLive
-                  ? 'Creates original Studio ACE rock-DnB near 174 BPM (G)'
-                  : 'Creates an original Sketch near 174 BPM (G)'
-            }
-            onClick={() => void generate()}
-          >
-            {busy
-              ? 'Generating…'
-              : mode === 'simple'
-                ? sketchHonesty
-                  ? 'Generate · Sketch'
-                  : studioLive
-                    ? 'Generate'
-                    : 'Generate'
-                : sketchHonesty
-                  ? '1 · Generate (Sketch)'
-                  : studioLive
-                    ? '1 · Generate'
-                    : '1 · Generate'}
-          </button>
-          <HelpTip text={HELP.generate} ariaLabel="What Generate does" />
-        </span>
-        <span className="transport-btn-wrap">
-          <button
-            ref={playBtnRef}
-            type="button"
-            className={`btn btn-play ${playPulse ? 'accent pulse' : ''}${playGlowOnce ? ' glow-once' : ''}`}
-            disabled={!canPlay}
-            aria-keyshortcuts="Space"
-            title={
-              rehearPulse
-                ? 'Tweaks ready — hit Play to rehear (Space)'
-                : canPlay
-                  ? 'Play mix preview — replay OK after end (Space)'
-                  : HELP.playDisabled
-            }
-            aria-describedby={!canPlay ? 'help-play-disabled' : undefined}
-            onClick={() => void play()}
-          >
-            {mode === 'simple' ? 'Play' : '2 · Play'}
-          </button>
-          <HelpTip
-            text={canPlay ? HELP.play : HELP.playDisabled}
-            ariaLabel={canPlay ? 'What Play does' : 'Why Play is disabled'}
-          />
-          {mode !== 'simple' && (
-            <HelpTip text={HELP.playAutofocus} ariaLabel="About Play autofocus" />
-          )}
-          {mode !== 'simple' && rehearPulse ? (
-            <HelpTip text={HELP.rehearPulse} ariaLabel="About rehear pulse on Play" />
-          ) : null}
-          {!canPlay ? (
-            <span id="help-play-disabled" className="sr-only">
-              {HELP.playDisabled}
-            </span>
-          ) : null}
-          {mixerDirty && result ? (
-            <span className="heard-remix-badge" role="status">
-              Heard remix
-              <HelpTip text={HELP.heardBadge} ariaLabel="About heard remix badge" />
-            </span>
-          ) : null}
-        </span>
-        {postHear ? (
+        {/* UI-1: Play · Stop · Generate · Vary in one cluster — same handlers, nothing between them. */}
+        <span className="transport-cluster" role="group" aria-label="Play, Stop, Generate, Vary">
+          <span className="transport-btn-wrap">
+            <button
+              ref={playBtnRef}
+              type="button"
+              className={`btn btn-play ${playPulse ? 'accent pulse' : ''}${playGlowOnce ? ' glow-once' : ''}`}
+              disabled={!canPlay}
+              aria-keyshortcuts="Space"
+              title={
+                rehearPulse
+                  ? 'Tweaks ready — hit Play to rehear (Space)'
+                  : canPlay
+                    ? 'Play mix preview — replay OK after end (Space)'
+                    : HELP.playDisabled
+              }
+              aria-describedby={!canPlay ? 'help-play-disabled' : undefined}
+              onClick={() => void play()}
+            >
+              {mode === 'simple' ? 'Play' : '2 · Play'}
+            </button>
+            <HelpTip
+              text={canPlay ? HELP.play : HELP.playDisabled}
+              ariaLabel={canPlay ? 'What Play does' : 'Why Play is disabled'}
+            />
+            {mode !== 'simple' && (
+              <HelpTip text={HELP.playAutofocus} ariaLabel="About Play autofocus" />
+            )}
+            {mode !== 'simple' && rehearPulse ? (
+              <HelpTip text={HELP.rehearPulse} ariaLabel="About rehear pulse on Play" />
+            ) : null}
+            {!canPlay ? (
+              <span id="help-play-disabled" className="sr-only">
+                {HELP.playDisabled}
+              </span>
+            ) : null}
+            {mixerDirty && result ? (
+              <span className="heard-remix-badge" role="status">
+                Heard remix
+                <HelpTip text={HELP.heardBadge} ariaLabel="About heard remix badge" />
+              </span>
+            ) : null}
+          </span>
           <span className="transport-btn-wrap">
             <button
               type="button"
-              className="btn accent btn-vary-primary"
-              disabled={!canGenerate}
-              title="New seed + chaos nudge — fresh arrangement (V)"
-              onClick={() => void vary()}
+              className={`btn btn-stop ${previewState === 'playing' ? 'on' : ''}`}
+              disabled={previewState !== 'playing'}
+              title="Stop mix preview (Space)"
+              onClick={() => stop()}
             >
-              Vary
+              Stop
             </button>
-            <HelpTip text={HELP.vary} ariaLabel="What Vary does" />
+            <HelpTip text={HELP.stop} ariaLabel="What Stop does" />
           </span>
-        ) : null}
-        <span className="transport-btn-wrap">
-          <button
-            type="button"
-            className={`btn btn-stop ${previewState === 'playing' ? 'on' : ''}`}
-            disabled={previewState !== 'playing'}
-            title="Stop mix preview (Space)"
-            onClick={() => stop()}
-          >
-            Stop
-          </button>
-          <HelpTip text={HELP.stop} ariaLabel="What Stop does" />
+          <span className="transport-btn-wrap">
+            <button
+              type="button"
+              className={`btn primary btn-generate ${busy ? 'pulse' : ''}`}
+              disabled={!canGenerate}
+              aria-busy={busy}
+              aria-keyshortcuts="g"
+              title={
+                sketchHonesty
+                  ? 'Studio GPU not live — Generate still makes Sketch (CPU 16-bit) near 174 BPM (G)'
+                  : studioLive
+                    ? 'Creates original Studio ACE rock-DnB near 174 BPM (G)'
+                    : 'Creates an original Sketch near 174 BPM (G)'
+              }
+              onClick={() => void generate()}
+            >
+              {busy
+                ? 'Generating…'
+                : mode === 'simple'
+                  ? sketchHonesty
+                    ? 'Generate · Sketch'
+                    : studioLive
+                      ? 'Generate'
+                      : 'Generate'
+                  : sketchHonesty
+                    ? '1 · Generate (Sketch)'
+                    : studioLive
+                      ? '1 · Generate'
+                      : '1 · Generate'}
+            </button>
+            <HelpTip text={HELP.generate} ariaLabel="What Generate does" />
+          </span>
+          {postHear ? (
+            <span className="transport-btn-wrap">
+              <button
+                type="button"
+                className="btn accent btn-vary-primary"
+                disabled={!canGenerate}
+                title="New seed + chaos nudge — fresh arrangement (V)"
+                onClick={() => void vary()}
+              >
+                Vary
+              </button>
+              <HelpTip text={HELP.vary} ariaLabel="What Vary does" />
+            </span>
+          ) : null}
         </span>
         <span className="transport-btn-wrap">
           <button

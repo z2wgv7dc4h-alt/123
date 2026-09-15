@@ -1484,6 +1484,13 @@ details summary:hover { color: var(--text); }
 .transport-btn-wrap {
   gap: 0.22rem;
 }
+/* UI-1: Play · Stop · Generate · Vary group keeps the toolbar's own spacing/wrap */
+.transport-cluster {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
 .transport .pill {
   font-variant-numeric: tabular-nums;
   max-width: 16rem;
