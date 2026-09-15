@@ -104,6 +104,17 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertNotIn("guitar", p["prompt"].lower())
         self.assertNotIn("rock", p["prompt"].lower())
 
+    def test_bridge_server_refuses_port_sharing(self):
+        self.assertIs(bridge.ExclusiveBridgeServer.allow_reuse_address, False)
+        self.assertTrue(bridge.BRIDGE_BUILD)
+
+    def test_explicit_model_default_wins_when_checkpoint_cleared(self):
+        p = bridge.build_render_payload({"checkpointId": None}, "acestep-v15-turbo")
+        self.assertEqual(p["model"], "acestep-v15-turbo")
+        self.assertEqual(p["inference_steps"], 8)
+        self.assertEqual(p["lyrics"], "[Instrumental]")
+        self.assertIs(p["use_cot_caption"], False)
+
 
 if __name__ == "__main__":
     unittest.main()

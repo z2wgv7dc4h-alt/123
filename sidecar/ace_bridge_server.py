@@ -19,6 +19,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
+BRIDGE_BUILD = "2026-09-16-turbo-instrumental"
+
+
+class ExclusiveBridgeServer(ThreadingHTTPServer):
+    # Windows SO_REUSEADDR let 3 bridges bind 8766 at once and a stale one answered.
+    # A second bridge must fail with "address in use" instead.
+    allow_reuse_address = False
+    daemon_threads = True
+
+
 ACE_API = "http://127.0.0.1:8001"
 CORS_ORIGINS = (
     "http://127.0.0.1:5173",
@@ -387,6 +397,7 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "service": "dnb-studio-ace-sidecar",
                     "version": "1.0.0-bridge",
+                    "bridgeBuild": BRIDGE_BUILD,
                     "bind": f"{HOST}:{PORT}",
                     "cudaLazy": True,
                     "cudaInitialized": up,
@@ -427,6 +438,7 @@ class Handler(BaseHTTPRequestHandler):
                     "hasGpu": has_gpu,
                     "vramGb": None,
                     "backend": "ace-step-1.5",
+                    "bridgeBuild": BRIDGE_BUILD,
                     "device": "cuda:0" if has_gpu else None,
                     "checkpoint": ckpt if has_gpu else None,
                     "upstreamUp": up,
@@ -476,9 +488,8 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         job_id = str(req.get("jobId") or f"bridge-{int(time.time())}")
-        payload = build_render_payload(
-            req, None if req.get("checkpointId") else loaded_dit_model()
-        )
+        # ACE serves only its loaded DiT; the browser's checkpointId can be stale.
+        payload = build_render_payload({**req, "checkpointId": None}, loaded_dit_model())
         seed = payload["seed"]
         bpm = payload["bpm"]
         duration_sec = payload["audio_duration"]
@@ -651,8 +662,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    httpd = ThreadingHTTPServer((HOST, PORT), Handler)
+    httpd = ExclusiveBridgeServer((HOST, PORT), Handler)
     print(f"[ace-bridge] http://{HOST}:{PORT} â†’ {ACE_API}")
+    print(f"[ace-bridge] build {BRIDGE_BUILD}")
     print("[ace-bridge] run ACE API first, then this bridge, then DnB Studio Generate")
     httpd.serve_forever()
 

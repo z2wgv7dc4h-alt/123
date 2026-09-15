@@ -1,6 +1,11 @@
 # Start ACE API (:8001) + DnB bridge (:8766)
 # Keep this window open while using DnB Studio.
 $ErrorActionPreference = "Stop"
+# Kill stale ACE API / bridge processes first. Duplicates on 8766 answered with old code.
+$stale = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -match 'ace_bridge_server|acestep' }
+foreach ($p in $stale) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
+Write-Host "Stopped $(@($stale).Count) stale ACE/bridge process(es)" -ForegroundColor Yellow
+Start-Sleep -Seconds 2
 $aceRoot = Join-Path $env:USERPROFILE "Documents\ACE-Step-1.5"
 if (-not (Test-Path $aceRoot)) {
   Write-Error "ACE not found at $aceRoot - run setup-ace-full.ps1 first"
