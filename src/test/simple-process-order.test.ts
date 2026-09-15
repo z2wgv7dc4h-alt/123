@@ -35,6 +35,7 @@ describe('App process order (one layout)', () => {
     const beforeMore = appSrc.slice(0, moreStart);
     const insideMore = appSrc.slice(moreStart);
     for (const tag of [
+      '<ExportControls',
       '<StyleDropZone',
       '<LayersChips',
       '<StemMixer',

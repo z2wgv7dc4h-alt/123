@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { useStudioStore, computeMixerDirty, canPlayPreview } from '../ui/hooks/useStudioStore';
 import { PreviewPlayer } from '../core/audio/PreviewPlayer';
 import type { VibeProfile } from '../core/types';
@@ -122,5 +125,31 @@ describe('Style Ref undo + replace keep', () => {
     expect(s.darkness).toBe(0.5);
     expect(s.vibeKnobUndo).toBeNull();
     expect(s.vibe?.fileName).toBe('mine.wav');
+  });
+});
+
+describe('UI-3 primary row + More-only export', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const read = (rel: string) => readFileSync(resolve(here, rel), 'utf8');
+  const varyTargets = (src: string) =>
+    [...src.matchAll(/onClick=\{\(\) => void vary\(\)\}/g)].length;
+
+  it('counts the vary() click targets outside More as 1', () => {
+    expect(varyTargets(read('../ui/components/TransportBar.tsx'))).toBe(1);
+    expect(varyTargets(read('../ui/components/RegenAffordance.tsx'))).toBe(0);
+    expect(varyTargets(read('../ui/components/PostExportStrip.tsx'))).toBe(0);
+    expect(varyTargets(read('../ui/components/LayersChips.tsx'))).toBe(0);
+  });
+
+  it('mounts Export ZIP exactly once, and only behind More', () => {
+    const app = read('../App.tsx');
+    const transport = read('../ui/components/TransportBar.tsx');
+    expect([...app.matchAll(/<ExportControls \/>/g)]).toHaveLength(1);
+    const moreStart = app.indexOf('{moreOpen && (');
+    expect(moreStart).toBeGreaterThan(-1);
+    expect(app.slice(0, moreStart)).not.toContain('<ExportControls');
+    expect(app.slice(moreStart)).toContain('<ExportControls');
+    // Exactly one export button is defined in the UI, and it lives in ExportControls.
+    expect([...transport.matchAll(/className="btn accent btn-export"/g)]).toHaveLength(1);
   });
 });

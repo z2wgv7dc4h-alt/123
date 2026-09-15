@@ -58,9 +58,10 @@ function transportButtons(html: string): string[] {
 function clusterHtml(html: string): string {
   const start = html.indexOf('class="transport-cluster"');
   expect(start, 'transport-cluster group must exist').toBeGreaterThan(-1);
-  // Everything up to the first control that is not part of the cluster.
-  const exportAt = html.indexOf('btn-export', start);
-  return html.slice(start, exportAt === -1 ? undefined : exportAt);
+  // UI-3: Export ZIP moved behind More, so the status pill is the first
+  // control after the Generate/Vary cluster.
+  const pillAt = html.indexOf('class="pill', start);
+  return html.slice(start, pillAt === -1 ? undefined : pillAt);
 }
 
 describe('UI-5 top bar: Generate/Vary only, Play/Stop moved to the waveform card', () => {

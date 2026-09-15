@@ -57,8 +57,6 @@ export function TransportBar() {
   const generate = useStudioStore((s) => s.generate);
   const generateAgain = useStudioStore((s) => s.generateAgain);
   const vary = useStudioStore((s) => s.vary);
-  const exportStems = useStudioStore((s) => s.exportStems);
-  const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
   const previousResult = useStudioStore((s) => s.previousResult);
   const abFlashback = useStudioStore((s) => s.abFlashback);
   const restorePrevious = useStudioStore((s) => s.restorePrevious);
@@ -69,7 +67,6 @@ export function TransportBar() {
   const canGenerate = !busy;
   const pill = previewPillLabel(previewState, mixerDirty, !!result, abFlashback);
   const [coachOpen, setCoachOpen] = useState(false);
-  const [exportCoachOpen, setExportCoachOpen] = useState(false);
 
   // #43 soft first-play coach — once per browser, after first Generate until Play/dismiss
   // (Play itself now lives on the waveform card — this banner just watches previewState.)
@@ -101,42 +98,6 @@ export function TransportBar() {
   const dismissCoach = () => {
     dismissFirstPlayCoach();
     setCoachOpen(false);
-  };
-
-  // #67 first-export coach — Export-adjacent; never stacks with first-play
-  useEffect(() => {
-    if (coachOpen) {
-      setExportCoachOpen(false);
-      return;
-    }
-    if (
-      result &&
-      (flowStep === 'played' || flowStep === 'exported') &&
-      shouldShowFirstExportCoach()
-    ) {
-      setExportCoachOpen(true);
-    }
-  }, [result, flowStep, coachOpen]);
-
-  useEffect(() => {
-    if (!exportCoachOpen) return;
-    const t = window.setTimeout(() => {
-      dismissFirstExportCoach();
-      setExportCoachOpen(false);
-    }, 8000);
-    return () => window.clearTimeout(t);
-  }, [exportCoachOpen]);
-
-  useEffect(() => {
-    if (flowStep === 'exported' && exportCoachOpen) {
-      dismissFirstExportCoach();
-      setExportCoachOpen(false);
-    }
-  }, [flowStep, exportCoachOpen]);
-
-  const dismissExportCoach = () => {
-    dismissFirstExportCoach();
-    setExportCoachOpen(false);
   };
 
   const postHear = !!result && (flowStep === 'played' || flowStep === 'exported' || previewState === 'playing' || previewState === 'stopped' || previewState === 'ready');
@@ -181,55 +142,6 @@ export function TransportBar() {
             </span>
           ) : null}
         </span>
-        <span className="transport-btn-wrap">
-          <button
-            type="button"
-            className="btn accent btn-export"
-            disabled={!result}
-            aria-keyshortcuts="e"
-            onClick={() => exportStems()}
-            title={
-              result
-                ? studioLive
-                  ? `Downloads Studio ZIP · ${exportBitDepth}-bit + MIDI (E)`
-                  : `Downloads Sketch ZIP · ${exportBitDepth}-bit stems + MIDI (E)`
-                : HELP.exportDisabled
-            }
-            aria-describedby={!result ? 'help-export-disabled' : undefined}
-          >
-            Export ZIP
-          </button>
-          <HelpTip
-            text={
-              !result
-                ? HELP.exportDisabled
-                : flowStep === 'exported'
-                  ? HELP.exportDone
-                  : HELP.exportZip
-            }
-            ariaLabel={
-              !result
-                ? 'Why Export is disabled'
-                : flowStep === 'exported'
-                  ? 'What landed in the ZIP'
-                  : 'What Export ZIP does'
-            }
-          />
-          {!result ? (
-            <span id="help-export-disabled" className="sr-only">
-              {HELP.exportDisabled}
-            </span>
-          ) : null}
-          {exportCoachOpen && result && !coachOpen ? (
-            <span className="first-export-coach" role="status">
-              Ready to Export ZIP?
-              <HelpTip text={HELP.firstExportCoach} ariaLabel="About first Export tip" />
-              <button type="button" className="btn tiny ghost" onClick={dismissExportCoach}>
-                Got it
-              </button>
-            </span>
-          ) : null}
-        </span>
         <span
           className={`pill${!result ? ' pill-pre' : ''}${mixerDirty && result ? ' remix-live' : ''}${abFlashback ? ' ab-flashback' : ''}`}
           aria-live="polite"
@@ -254,8 +166,8 @@ export function TransportBar() {
           </button>
         </div>
       )}
-      {/* One transient coach max — never stack with play/export coaches */}
-      {!coachOpen && !exportCoachOpen ? <FavoritesNudge /> : null}
+      {/* One transient coach max — never stack with the play coach */}
+      {!coachOpen ? <FavoritesNudge /> : null}
       {result && (
         <div className="vary-row" role="group" aria-label="Regenerate options">
           <span className="transport-btn-wrap">
@@ -269,18 +181,6 @@ export function TransportBar() {
               Again
             </button>
             <HelpTip text={HELP.again} ariaLabel="What Again does" />
-          </span>
-          <span className="transport-btn-wrap">
-            <button
-              type="button"
-              className="btn ghost tiny"
-              disabled={!canGenerate}
-              title="New seed — fresh arrangement, same vibe settings (V)"
-              onClick={() => void vary()}
-            >
-              Vary
-            </button>
-            <HelpTip text={HELP.vary} ariaLabel="What Vary does" />
           </span>
           {abFlashback ? (
             <span className="ab-flashback-pill" role="status" aria-live="polite">
@@ -309,5 +209,96 @@ export function TransportBar() {
         </p>
       ) : null}
     </>
+  );
+}
+
+/**
+ * UI-3: Export ZIP is a More-only control — one export target, no
+ * primary-row clutter. Same `exportStems` handler as before.
+ */
+export function ExportControls() {
+  const result = useStudioStore((s) => s.result);
+  const flowStep = useStudioStore((s) => s.flowStep);
+  const exportStems = useStudioStore((s) => s.exportStems);
+  const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
+  const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
+  const productTier = useStudioStore((s) => s.productTier);
+  const studioLive = productTier === 'studio' && aceHasGpu;
+  const [exportCoachOpen, setExportCoachOpen] = useState(false);
+
+  // #67 first-export coach — Export-adjacent
+  useEffect(() => {
+    if (result && (flowStep === 'played' || flowStep === 'exported') && shouldShowFirstExportCoach()) {
+      setExportCoachOpen(true);
+    }
+  }, [result, flowStep]);
+
+  useEffect(() => {
+    if (!exportCoachOpen) return;
+    const t = window.setTimeout(() => {
+      dismissFirstExportCoach();
+      setExportCoachOpen(false);
+    }, 8000);
+    return () => window.clearTimeout(t);
+  }, [exportCoachOpen]);
+
+  useEffect(() => {
+    if (flowStep === 'exported' && exportCoachOpen) {
+      dismissFirstExportCoach();
+      setExportCoachOpen(false);
+    }
+  }, [flowStep, exportCoachOpen]);
+
+  const dismissExportCoach = () => {
+    dismissFirstExportCoach();
+    setExportCoachOpen(false);
+  };
+
+  return (
+    <span className="transport-btn-wrap export-controls">
+      <button
+        type="button"
+        className="btn accent btn-export"
+        disabled={!result}
+        aria-keyshortcuts="e"
+        onClick={() => exportStems()}
+        title={
+          result
+            ? studioLive
+              ? `Downloads Studio ZIP · ${exportBitDepth}-bit + MIDI (E)`
+              : `Downloads Sketch ZIP · ${exportBitDepth}-bit stems + MIDI (E)`
+            : HELP.exportDisabled
+        }
+        aria-describedby={!result ? 'help-export-disabled' : undefined}
+      >
+        Export ZIP
+      </button>
+      <HelpTip
+        text={
+          !result ? HELP.exportDisabled : flowStep === 'exported' ? HELP.exportDone : HELP.exportZip
+        }
+        ariaLabel={
+          !result
+            ? 'Why Export is disabled'
+            : flowStep === 'exported'
+              ? 'What landed in the ZIP'
+              : 'What Export ZIP does'
+        }
+      />
+      {!result ? (
+        <span id="help-export-disabled" className="sr-only">
+          {HELP.exportDisabled}
+        </span>
+      ) : null}
+      {exportCoachOpen && result ? (
+        <span className="first-export-coach" role="status">
+          Ready to Export ZIP?
+          <HelpTip text={HELP.firstExportCoach} ariaLabel="About first Export tip" />
+          <button type="button" className="btn tiny ghost" onClick={dismissExportCoach}>
+            Got it
+          </button>
+        </span>
+      ) : null}
+    </span>
   );
 }

@@ -172,51 +172,58 @@ export function PowerExtras() {
         ))}
       </div>
 
-      <label>
-        <span className="label-with-tip">
-          <span className="label-with-tip-text">Style pack</span>
-          <HelpTip text={HELP.loraPack} ariaLabel="About style packs" />
-        </span>
-        <select
-          value={loraPackId ?? ''}
-          onChange={(e) => setLoraPackId(e.target.value || null)}
-          title="Early style packs — full training when Studio GPU training exists"
-        >
-          <option value="">None</option>
-          {packs.map((p) => (
-            <option key={p.packId} value={p.packId}>
-              {p.name} [{p.status}]
-            </option>
-          ))}
-        </select>
-      </label>
+      <details className="style-pack-train">
+        <summary>Style packs · preview stub</summary>
 
-      <span className="label-with-tip" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-        <button
-          type="button"
-          className="btn ghost"
-          disabled={!loraPackId}
-          title="Training needs Studio GPU later — you’ll get a clear message until then"
-          onClick={() => {
-            if (!loraPackId) return;
-            setTrainMsg(null);
-            void loraPackManager.requestTrain(loraPackId).catch((e: Error) => setTrainMsg(e.message));
-          }}
+        <label>
+          <span className="label-with-tip">
+            <span className="label-with-tip-text">Style pack</span>
+            <HelpTip text={HELP.loraPack} ariaLabel="About style packs" />
+          </span>
+          <select
+            value={loraPackId ?? ''}
+            onChange={(e) => setLoraPackId(e.target.value || null)}
+            title="Early style packs — full training when Studio GPU training exists"
+          >
+            <option value="">None</option>
+            {packs.map((p) => (
+              <option key={p.packId} value={p.packId}>
+                {p.name} [{p.status}]
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <span
+          className="label-with-tip"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
         >
-          Request style-pack train (GPU)
-        </button>
-        <HelpTip text={HELP.loraPack} ariaLabel="About style-pack training" />
-      </span>
-      {trainMsg && (
-        <p className="warn" role="status">
-          Not available yet: {trainMsg}
-        </p>
-      )}
-      {!trainMsg && (
-        <p className="hint">
-          Training needs Studio GPU later — you’ll get a clear message until then.
-        </p>
-      )}
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={!loraPackId}
+            title="Training needs Studio GPU later — you’ll get a clear message until then"
+            onClick={() => {
+              if (!loraPackId) return;
+              setTrainMsg(null);
+              void loraPackManager.requestTrain(loraPackId).catch((e: Error) => setTrainMsg(e.message));
+            }}
+          >
+            Request style-pack train (GPU)
+          </button>
+          <HelpTip text={HELP.loraPack} ariaLabel="About style-pack training" />
+        </span>
+        {trainMsg && (
+          <p className="warn" role="status">
+            Not available yet: {trainMsg}
+          </p>
+        )}
+        {!trainMsg && (
+          <p className="hint">
+            Training needs Studio GPU later — you’ll get a clear message until then.
+          </p>
+        )}
+      </details>
 
       <details>
         <summary>Provenance details</summary>

@@ -8,7 +8,6 @@ import {
   slightVariationSeed,
   type FavoriteSnapshot,
 } from '../lib/favorites';
-import { buildSurpriseParams } from '../lib/genreTemplates';
 import { HELP } from '../lib/helpCopy';
 import { pushToast } from '../lib/toasts';
 import { HelpTip } from './HelpTip';
@@ -108,34 +107,7 @@ export function FavoritesPanel() {
         <HelpTip text={HELP.favorites} ariaLabel="What Save favorite does" />
       </span>
 
-      {items.length === 0 ? (
-        <div className="empty-favorites" role="status">
-          <p>No favorites yet — save after a sketch you like</p>
-          <span className="transport-btn-wrap">
-            <button
-              type="button"
-              className="btn ghost tiny"
-              disabled={busy}
-              title="Roll a fresh sketch (Surprise Me)"
-              onClick={() => {
-                const p = buildSurpriseParams();
-                const st = useStudioStore.getState();
-                st.setSeed(p.seed);
-                st.setBpm(DEFAULT_BPM);
-                st.setEnergy(p.energy);
-                st.setDarkness(p.darkness);
-                st.setChaos(p.chaos);
-                st.setPromptText(p.promptText);
-                void st.generate({ variation: 'vary' });
-              }}
-            >
-              Surprise me
-            </button>
-            <HelpTip text={HELP.favoritesEmpty} ariaLabel="About empty Favorites tip" />
-          </span>
-        </div>
-      ) : (
-        <ul className="favorites-list">
+      <ul className="favorites-list">
           {items.map((fav) => (
             <li key={fav.id} className="favorites-item">
               <div className="favorites-meta">
@@ -181,8 +153,7 @@ export function FavoritesPanel() {
               </div>
             </li>
           ))}
-        </ul>
-      )}
+      </ul>
     </section>
   );
 }

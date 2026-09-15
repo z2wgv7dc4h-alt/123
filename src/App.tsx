@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { TransportBar } from './ui/components/TransportBar';
+import { ExportControls, TransportBar } from './ui/components/TransportBar';
 import { RegenAffordance } from './ui/components/RegenAffordance';
 import { ParamPanel } from './ui/components/ParamPanel';
 import { StemMixer, StemMixerCompact } from './ui/components/StemMixer';
@@ -93,7 +93,7 @@ export default function App() {
 
       {result && (
         <p className="export-nudge hint" role="status">
-          Like it? Use <strong>Export ZIP</strong> above — stems stay on this machine.
+          Like it? Use <strong>Export ZIP</strong> in More — stems stay on this machine.
         </p>
       )}
 
@@ -116,6 +116,7 @@ export default function App() {
 
       {moreOpen && (
         <>
+          <ExportControls />
           <StyleDropZone />
           {result && <StemMixerCompact />}
           {result && liveMixerOk && <LayersChips showSecondary />}
