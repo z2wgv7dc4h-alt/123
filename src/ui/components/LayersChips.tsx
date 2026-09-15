@@ -10,6 +10,7 @@ const PRIMARY = [
 const SECONDARY = [
   { key: 'vocalish' as const, label: 'Vocal-ish', blurb: 'Synth vocal texture · no lyrics' },
   { key: 'extraDrums' as const, label: 'Extra drums', blurb: 'Denser breaks & fills' },
+  { key: 'realBreak' as const, label: 'Real break', blurb: 'Real breakbeat loop under drops · on by default' },
 ];
 
 type Props = { /** Show vocal-ish / extra drums too */ showSecondary?: boolean };
@@ -24,6 +25,7 @@ const CPU_CAPABLE = new Set<keyof ReturnType<typeof useStudioStore.getState>['la
   'guitar',
   'solo',
   'extraDrums',
+  'realBreak',
 ]);
 
 /** Simple Mode — generative heat only (never artist-clone). Never claim ACE extract/repaint on Sketch. */

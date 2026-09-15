@@ -169,6 +169,12 @@ export interface RenderJob {
     solo?: boolean;
     vocalish?: boolean;
     extraDrums?: boolean;
+    /**
+     * Real breakbeat loop under drop bars (Sketch only, amen/twoStep
+     * families). Defaults ON — `false` disables it. Unlike the other
+     * layers this is opt-OUT, because it already shipped as always-on.
+     */
+    realBreak?: boolean;
   };
   /** Optional user-owned style reference bias (browser upload only). */
   styleReference?: {

@@ -343,6 +343,18 @@ class Handler(BaseHTTPRequestHandler):
             "batch_size": 1,
             "inference_steps": int(req.get("inferenceSteps") or 32),
             "guidance_scale": float(req.get("guidanceScale") or 7.0),
+            # Timestep shift: base-model-only per ACE-Step's own docs. The
+            # bridge used to drop this on the floor even though the backend
+            # sent it.
+            "shift": float(req.get("shift") or 3.0),
+            # DCW is a training-free sampler-side quality correction that
+            # ACE-Step enables by default for Turbo models and DISABLES by
+            # default for non-Turbo. This project always runs
+            # acestep-v15-base (non-Turbo), so it was silently off on every
+            # render. docs/en/DCW.md names "low" as the sensible starting
+            # mode; scaler defaults are left untouched deliberately.
+            "dcw_enabled": bool(req.get("dcwEnabled", True)),
+            "dcw_mode": str(req.get("dcwMode") or "low"),
             "task_type": "text2music",
             "model": req.get("checkpointId")
             or os.environ.get("ACESTEP_CONFIG_PATH", "acestep-v15-base"),

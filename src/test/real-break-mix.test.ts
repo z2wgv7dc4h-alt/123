@@ -136,3 +136,20 @@ describe('real break reaches the rendered mix + manifest', () => {
     expect(result.manifest.realBreakLoop).toBeUndefined();
   }, 20000);
 });
+
+describe('real break layer toggle (opt-out)', () => {
+  it('layers.realBreak === false disables the blend and drops the manifest label', async () => {
+    const seed = await findSeedForFamily('amen');
+    const off = await offlineStubBackend.render({
+      ...renderJob(seed),
+      layers: { realBreak: false },
+    });
+    expect(off.manifest.realBreakLoop).toBeUndefined();
+  }, 20000);
+
+  it('omitting layers keeps the blend on — it shipped always-on, absence must not disable it', async () => {
+    const seed = await findSeedForFamily('amen');
+    const on = await offlineStubBackend.render(renderJob(seed));
+    expect(on.manifest.realBreakLoop?.used).toBe(true);
+  }, 20000);
+});

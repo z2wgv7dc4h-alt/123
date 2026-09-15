@@ -14,7 +14,7 @@ import type {
   StemId,
 } from '../types';
 import { buildExportManifest } from '../export/manifest.ts';
-import { structureEngine } from '../structure/StructureEngine.ts';
+import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
 import { structureToMidiBlob } from '../midi/exportMidi.ts';
 import { buildAceCaption, buildAceTags } from '../prompt';
 
@@ -37,6 +37,27 @@ function aceSidecarBase(): string {
   }
   return 'http://127.0.0.1:8766';
 }
+/**
+ * ACE-Step inference parameters. These were bare literals at the call site
+ * with no names and no coverage. Values checked against ACE-Step 1.5's own
+ * docs (docs/en/INFERENCE.md in the installed repo): the schema's bare
+ * default of 8 steps is the Turbo speed default; 30-60 is the documented
+ * range for the non-Turbo base model this project runs, and 5-9 is the
+ * usual guidance band.
+ */
+export const ACE_INFERENCE_STEPS = 50;
+export const ACE_GUIDANCE_SCALE = 7.0;
+/** Timestep shift — base-model-only per ACE-Step docs. */
+export const ACE_SHIFT = 3.0;
+/**
+ * DCW: training-free, negligible-compute quality correction. ACE-Step
+ * enables it by default for Turbo and disables it for non-Turbo — this
+ * project always uses acestep-v15-base, so it was off on every render
+ * until this was wired. "low" is the starting mode DCW.md recommends.
+ */
+export const ACE_DCW_ENABLED = true;
+export const ACE_DCW_MODE = 'low' as const;
+
 export const ACE_PROBE_TIMEOUT_MS = 12000;
 export const ACE_RENDER_TIMEOUT_MS = 240_000;
 export function getAceSidecarBase(): string {
@@ -164,7 +185,7 @@ export class AceStepBackend implements AudioBackend {
       energy: job.prompt.energy,
       darkness: job.prompt.darkness,
       chaos: job.prompt.chaos,
-      breakDensity: 0.55,
+      breakDensity: deriveBreakDensity({ chaos: job.prompt.chaos ?? 0.25 }),
       sampleRateHz: job.sampleRateHz,
       songShape: job.songShape,
       sectionsOverride: job.sectionsOverride,
@@ -187,9 +208,11 @@ export class AceStepBackend implements AudioBackend {
           sampleRateHz: job.sampleRateHz,
           bitDepth: job.bitDepth,
           channels: job.channels,
-          inferenceSteps: 50,
-          guidanceScale: 7.0,
-          shift: 3.0,
+          inferenceSteps: ACE_INFERENCE_STEPS,
+          guidanceScale: ACE_GUIDANCE_SCALE,
+          shift: ACE_SHIFT,
+          dcwEnabled: ACE_DCW_ENABLED,
+          dcwMode: ACE_DCW_MODE,
           prompt: {
             text: buildAceCaption({
               energy: job.prompt.energy,

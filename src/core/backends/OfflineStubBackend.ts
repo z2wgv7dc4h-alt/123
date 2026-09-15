@@ -20,7 +20,7 @@ import {
   type StemId,
   type StructureMap,
 } from '../types';
-import { structureEngine, midiForRoot, sectionAt } from '../structure/StructureEngine';
+import { structureEngine, midiForRoot, sectionAt, deriveBreakDensity } from '../structure/StructureEngine';
 import { loadBreakLoopMono, type BreakLoopName } from '../audio/loadBreakLoop';
 import { encodeWav } from '../export/wav';
 import { buildExportManifest } from '../export/manifest';
@@ -763,11 +763,11 @@ export class OfflineStubBackend implements AudioBackend {
     const chaos = job.prompt.chaos ?? 0.25;
 
     // P1: styleRef.intensity maps into arrangement density (original notes only)
-    const breakDensity =
-      0.4 +
-      chaos * 0.4 +
-      styleIntensity * 0.08 +
-      (styleRef && styleIntensity > 0 ? styleRef.energy * styleIntensity * 0.12 : 0);
+    const breakDensity = deriveBreakDensity({
+      chaos,
+      styleIntensity,
+      styleRefEnergy: styleRef && styleIntensity > 0 ? styleRef.energy : 0,
+    });
     const planChaos = Math.min(1, chaos + styleIntensity * (styleRef?.energy ?? 0) * 0.25);
 
     let structure: StructureMap =
@@ -986,11 +986,14 @@ export class OfflineStubBackend implements AudioBackend {
     // Real breakbeat loop, additive under drop bars — mix-only (not a
     // separate stem, doesn't touch any tested per-stem bus). See
     // buildRealBreakBus for rationale/sourcing.
+    // Opt-OUT layer: absent means on, since this shipped as always-on.
+    const realBreakGain = job.layers?.realBreak === false ? 0 : REAL_BREAK_GAIN;
     const realBreak = await buildRealBreakBus(
       family,
       structure.sections,
       structure.bars,
       structure.samplesPerBar,
+      realBreakGain,
     );
     if (realBreak) {
       const bus = realBreak.bus;

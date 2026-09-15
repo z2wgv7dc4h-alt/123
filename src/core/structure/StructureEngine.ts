@@ -15,6 +15,24 @@ import { chance, lerp, mulberry32, pick, sectionSeed } from './rng';
 
 const KEY_ROOTS = ['A', 'Am', 'F', 'Dm', 'E', 'Em', 'G', 'C'] as const;
 
+/**
+ * Single source of truth for breakDensity. Both backends plan the SAME
+ * arrangement for a given seed, so both must derive this identically —
+ * `AceStepBackend` used to hardcode 0.55 while `OfflineStubBackend`
+ * derived it from chaos, which quietly desynced the "shared" skeleton
+ * (different perc/fill density for the same seed across backends).
+ */
+export function deriveBreakDensity(opts: {
+  chaos: number;
+  styleIntensity?: number;
+  styleRefEnergy?: number;
+}): number {
+  const chaos = Math.min(1, Math.max(0, opts.chaos));
+  const intensity = Math.min(1, Math.max(0, opts.styleIntensity ?? 0));
+  const refEnergy = opts.styleRefEnergy ?? 0;
+  return Math.min(1, 0.4 + chaos * 0.4 + intensity * 0.08 + refEnergy * intensity * 0.12);
+}
+
 export function midiForRoot(root: string): number {
   const map: Record<string, number> = {
     C: 36, D: 38, E: 40, F: 41, G: 43, A: 45, B: 47,

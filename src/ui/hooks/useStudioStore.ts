@@ -266,6 +266,8 @@ export interface StudioState {
     solo: boolean;
     vocalish: boolean;
     extraDrums: boolean;
+    /** Real breakbeat loop under drops (Sketch). Opt-OUT: defaults on. */
+    realBreak: boolean;
   };
   setMode: (m: AppMode) => void;
   setProductTier: (t: ProductTier) => void;
@@ -504,7 +506,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   mixerAnnounce: '',
   songShape: 'classic',
   editedSections: null,
-  layers: { guitar: false, solo: false, vocalish: false, extraDrums: false },
+  layers: { guitar: false, solo: false, vocalish: false, extraDrums: false, realBreak: true },
 
   setMode: (m) => {
     const st = get();
