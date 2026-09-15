@@ -75,10 +75,30 @@ documentation, all of it is still in git history if ever needed.
 ## Open questions — not yet resolved
 
 - **Does the composition/style actually match the target reference sound**
-  (e.g. Pendulum-style big-room DnB)? Not yet judged — three comparison
-  renders (Sketch drums+bass-only, Sketch with guitar+solo, Studio/ACE with
-  the structure fix) were sent to Wyatt on 2026-09-15 for a real listen;
-  next concrete step depends on that feedback, not further blind guessing.
+  (e.g. Pendulum-style big-room DnB)? First listen (2026-09-15) came back
+  "sounds like nonsense, not composed at all." Traced to real data (not
+  vibes): dumped the actual bass note sequence and found consecutive notes
+  leaping up to 19 semitones apart — `planBass()` picked every note's
+  interval independently from a table relative to a fixed root, no relation
+  to the previous note. Fixed with `nearestOctaveTo()` (see below);
+  worst-case within-section step is now mathematically bounded to <=6
+  semitones. New comparison renders sent for a second listen — **not yet
+  confirmed this actually sounds right**, only that the specific measured
+  defect (random-leap bass) is gone. Don't treat this as closed until Wyatt
+  confirms.
+- **Bass voice leading** (fixed 2026-09-15,
+  `src/core/structure/StructureEngine.ts` `nearestOctaveTo()` +
+  `src/test/bass-voice-leading.test.ts`): every bass note now re-octaves
+  toward the previous note instead of landing wherever `root + interval`
+  happens to fall. Deliberately resets at section boundaries (each section
+  plans from an independent RNG stream for the Expand/Repeat
+  byte-identical guarantee), so one register jump can still land exactly
+  at a section transition — that's intentional, not a bug.
+- **Guitar solo lead line** (`applyGuitarLayers` in `OfflineStubBackend.ts`)
+  was not audited for the same class of bug — it cycles through only 3
+  fixed notes in a repeating 4-bar pattern regardless of section harmony,
+  which is mechanical but not wildly leaping. Worth a closer look if the
+  lead still sounds off after the bass fix.
 - **`PreviewPlayer.ts` duck-shape drift risk**: live-preview ducking and
   offline-render ducking both now call the shared `computeDuckShapeParams`
   (fixed 2026-09-15), but they're still two independent implementations
