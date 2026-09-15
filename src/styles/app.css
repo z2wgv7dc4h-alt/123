@@ -3323,6 +3323,28 @@ details summary:hover { color: var(--text); }
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
+
+/* Listen-first persistent panel: Generate/Play + waveform + section map + mute
+   stay pinned at top while style/shape/layer tweaks scroll underneath. */
+.listen-first-panel {
+  position: sticky; top: 0; z-index: 40;
+  padding: 0.35rem 0 0.6rem;
+  background: linear-gradient(180deg, rgba(10,14,24,0.97), rgba(10,14,24,0.92));
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.listen-first-panel > .transport { padding-top: 0; }
+.tweak-divider {
+  margin: 0.9rem 0 0.35rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed rgba(255,255,255,0.12);
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
 .timeline-drop-x2 { font-weight: 700; }
 
 /* Transport / waveform always-on clock */

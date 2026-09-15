@@ -123,24 +123,31 @@ export default function App() {
       )}
       {!isSimple && <HelpPanel />}
 
-      {/* ========== SIMPLE process path (top → bottom) ========== */}
+      {/* ========== SIMPLE process path ==========
+          Listen-first: Generate/Play + waveform + section map + mute stay
+          pinned at top (persistent, not buried mid-scroll). Style/shape/layer
+          tweaks live below — they only take effect on the next Generate. */}
       {isSimple && (
         <>
-          {/* Process: Want/Style → Shape → Generate → Hear → Expand → Layers → Export */}
-          <SimpleWant />
-          <StyleDropZone />
-          <SongShapePicker />
-
-          <div className="transport-sticky" id="generate-hero">
+          <div className="listen-first-panel" id="generate-hero">
             <TransportBar />
+            {result && <Waveform />}
+            {result && liveMixerOk && <SectionTimeline />}
+            {result && <StemMixerCompact />}
           </div>
+
           <ResumeDraftStrip />
           <PostExportStrip />
           <RegenAffordance />
 
-          {result && <Waveform />}
-          {result && <StemMixerCompact />}
-          {result && liveMixerOk && <SectionTimeline />}
+          {result && (
+            <p className="tweak-divider hint" role="status">
+              Tweak the vibe or shape below, then Generate again.
+            </p>
+          )}
+          <SimpleWant />
+          <StyleDropZone />
+          <SongShapePicker />
           {result && liveMixerOk && <LayersChips />}
 
           {result && (
