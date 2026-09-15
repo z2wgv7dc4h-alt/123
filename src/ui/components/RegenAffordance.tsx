@@ -18,7 +18,6 @@ export function RegenAffordance() {
   const promptText = useStudioStore((s) => s.promptText);
   const vibeIntensity = useStudioStore((s) => s.vibeIntensity);
   const generateAgain = useStudioStore((s) => s.generateAgain);
-  const vary = useStudioStore((s) => s.vary);
 
   if (!result || !paramsDirty || busy) return null;
 
@@ -58,18 +57,6 @@ export function RegenAffordance() {
           Again
         </button>
         <HelpTip text={HELP.again} ariaLabel="What Again does" />
-      </span>
-      <span className="transport-btn-wrap">
-        <button
-          type="button"
-          className="btn ghost tiny"
-          disabled={!canGenerate}
-          title="New seed — fresh arrangement, same vibe settings"
-          onClick={() => void vary()}
-        >
-          Vary
-        </button>
-        <HelpTip text={HELP.vary} ariaLabel="What Vary does" />
       </span>
     </div>
   );

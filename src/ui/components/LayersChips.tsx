@@ -35,7 +35,6 @@ export function LayersChips({ showSecondary = false }: Props) {
   const busy = useStudioStore((s) => s.busy);
   const result = useStudioStore((s) => s.result);
   const generateAgain = useStudioStore((s) => s.generateAgain);
-  const vary = useStudioStore((s) => s.vary);
   const paramsDirty = useStudioStore((s) => s.paramsDirty);
   const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
   const defs = showSecondary ? [...PRIMARY, ...SECONDARY] : PRIMARY;
@@ -97,9 +96,6 @@ export function LayersChips({ showSecondary = false }: Props) {
             Re-generate with layers
           </button>
           <HelpTip text={HELP.layers} ariaLabel="About re-generate with layers" />
-          <button type="button" className="btn ghost" disabled={busy} onClick={() => void vary()}>
-            Vary with layers
-          </button>
         </div>
       )}
     </section>

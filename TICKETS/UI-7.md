@@ -1,0 +1,30 @@
+# UI-7 Skin pass — glass, hierarchy, fewer ?
+
+File:
+- src/styles/app.css
+- transport / waveform / primary buttons
+- help-tip components on the home screen
+
+Change:
+Visual pass only after UI-5 and UI-6.
+- CSS variables: bg, glass, accent, text. One accent, not rainbow map + neon pills
+- backdrop-filter glass on shell, wave card, More sheet only
+- lucide-react icons for Play / Pause / Stop (add lucide-react if missing)
+- Generate = primary solid; Vary = ghost
+- Strip help ? from the home screen. One Help inside More
+- Optional: shadcn button/slider/sheet ONLY if we have no equivalent. No Glin, no extra visualizer, no motion on every chip
+- motion allowed on Generate pending state only
+
+Do not:
+- Reorder the page (that is UI-6)
+- ACE, captions, thinking, SFT
+- Full suite or audio
+
+Done when:
+- Home is scannable: intent, Generate, wave+player
+- tsc clean
+- existing transport / single-layout tests still pass
+
+Verify:
+- npx tsc --noEmit
+- npx vitest run src/test/transport-cluster.test.ts src/test/single-layout.test.ts

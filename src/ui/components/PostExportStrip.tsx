@@ -13,7 +13,6 @@ export function PostExportStrip() {
   const flowStep = useStudioStore((s) => s.flowStep);
   const busy = useStudioStore((s) => s.busy);
   const generateAgain = useStudioStore((s) => s.generateAgain);
-  const vary = useStudioStore((s) => s.vary);
   const seed = useStudioStore((s) => s.seed);
   const bpm = useStudioStore((s) => s.bpm);
   const bars = useStudioStore((s) => s.bars);
@@ -64,16 +63,6 @@ export function PostExportStrip() {
         Again
       </button>
       <HelpTip text={HELP.again} ariaLabel="What Again does" />
-      <button
-        type="button"
-        className="btn tiny ghost"
-        disabled={busy}
-        onClick={() => void vary()}
-        title="Vary (V)"
-      >
-        Vary
-      </button>
-      <HelpTip text={HELP.vary} ariaLabel="What Vary does" />
     </div>
   );
 }
