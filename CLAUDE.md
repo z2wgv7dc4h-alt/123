@@ -1,21 +1,18 @@
-﻿# DnB Studio — Claude Code / FCC
+@AGENTS.md
 
-## Product bar (IMPORTANT)
-- Cutting-edge generator UI: listen-first. NOT dumbed-down "3-click Simple Mode".
-- While playing: click a section → select + seek; player, waveform, and song map share ONE playhead/duration.
-- Expand/×2 a section then Generate MUST keep the SAME seed and song; only stretch/repaint that section. Vary = new idea/new seed only.
-- Soft-pass forbidden. Prove with tests + evidence (command output).
-- Legal: generative only — no catalog rips, no artist-clone product, no fake ACE isolated stems.
-- Live mute/solo/gain = Tone.Channel mid-play. Param knobs = next Generate.
-- Sound: dancefloor DnB + dubstep half-time (snare-on-3) + optional trap-bounce fat 808s. Must slap, not toy.
-- Windows: use `npm.cmd` not bare `npm`.
+# DnB Studio — Claude Code
 
-## Verify
-```
-npm.cmd test -- --run
-npx tsc --noEmit
-```
-Prefer targeted tests while iterating; full suite before claiming done.
+The law lives in `AGENTS.md` (imported above) — this file exists only
+because Claude Code reads `CLAUDE.md` by convention; other tools read
+`AGENTS.md` directly. Keep them in sync — if you edit one, edit both.
 
-## Workflow
-Explore/plan for multi-file UI work. Use Critic subagent before done. Delegate research to subagents so main context stays clean. `/clear` between unrelated tasks.
+## Claude Code specifics
+
+- Delegate research (reading the real ACE-Step-1.5 repo, WebSearch, log
+  digging) to subagents so main context stays clean — this project's
+  docs got long partly from not doing this consistently.
+- Use a Critic-style adversarial pass before calling multi-file UI work
+  done.
+- `docs/HANDOFF.md` is the pickup entry point every session.
+  `docs/SESSION-DUMP.md` is the full inventory behind it — read that one
+  before assuming something wasn't tried or a resource wasn't checked.
