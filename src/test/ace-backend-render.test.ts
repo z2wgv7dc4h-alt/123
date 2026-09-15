@@ -287,4 +287,38 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(sentBody?.srcAudioBase64).toBeUndefined();
     expect(sentBody?.audioCoverStrength).toBeUndefined();
   });
+
+  it('Status warnings lead with the real payload and drop stale thinking/rock lines', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === ACE_SIDECAR_RENDER_URL) {
+        return new Response(
+          JSON.stringify({
+            jobId: 'j', seed: 7, gpuUsed: true, mixWavBase64: b64of(fakeWav),
+            warnings: ['thinking=true LM+DiT quality path (instrumental rock-DnB)', 'task_id=abc'],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      throw new Error('unexpected fetch');
+    }) as typeof fetch;
+    const base = {
+      jobId: 'j', seed: 7, bpm: 174, bpmTolerance: 2, durationBars: 8,
+      sampleRateHz: 48000 as const, bitDepth: 16 as const, channels: 2 as const,
+      prompt: { descriptors: ['dnb'], energy: 0.8, darkness: 0.3, chaos: 0.4, text: 'rock dnb' },
+      stemSchemaVersion: 'v0' as const,
+    };
+    const t2m = await backend.render(base);
+    expect(t2m.warnings[0]).toMatch(/^ACE payload · task text2music · thinking true · caption DnB/);
+    expect(t2m.warnings.join('\n')).not.toMatch(/rock|thinking=/i);
+    expect(t2m.warnings).toContain('task_id=abc');
+    const cover = await backend.render({
+      ...base,
+      styleReference: {
+        file: new Blob([fakeWav], { type: 'audio/wav' }), intensity: 0.6, estimatedBpm: 172,
+        energy: 0.7, fileName: 'mine.wav', ownerAttested: true,
+      },
+    });
+    expect(cover.warnings[0]).toMatch(/^ACE payload · task cover · thinking false · caption DnB/);
+    expect(cover.warnings[0]).toMatch(/cover strength 0\.55$/);
+  });
 });

@@ -118,6 +118,10 @@ export function buildAceCaption(input: AceCaptionInput): string {
   const legacy = new Set<string>(LEGACY_STARTER_GUITAR_PHRASES);
   const pushUser = (phrase: string) => {
     if (!guitarOn && legacy.has(phrase.trim().toLowerCase())) return;
+    const t = phrase.trim().toLowerCase();
+    if (/\b\d+\s*bpm\b/.test(t)) return;
+    const halfTimeShape = input.songShape === 'half-time-drop' || input.songShape === 'dubstep';
+    if (!halfTimeShape && /half-time|dubstep|snare on 3/.test(t)) return;
     pushDeduped(phrase);
   };
   const user = input.userText?.trim();
@@ -146,11 +150,7 @@ export function buildAceCaption(input: AceCaptionInput): string {
     pushPhrases('fat 808 glide bass, rolling bounce hats, punchy trap-flavored dnb');
   }
 
-  // BPM last — ACE-Step's own prompting guidance expects it as a trailing
-  // tag. Product tempo is hard-locked 174; drop any earlier copy first.
-  const bpmIdx = parts.findIndex((p) => /^174 bpm$/i.test(p));
-  if (bpmIdx >= 0) parts.splice(bpmIdx, 1);
-  parts.push('174 bpm');
+  // No BPM in caption: tempo goes in the ACE bpm field.
 
   return parts.join(', ');
 }

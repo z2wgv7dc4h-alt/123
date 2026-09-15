@@ -410,8 +410,16 @@ export class AceStepBackend implements AudioBackend {
     );
     const stemsShareMixBlob = order.some((id) => id !== 'mix' && !returnedIds.has(id));
 
+    const payloadLine =
+      `ACE payload · task ${srcAudioBase64 ? 'cover' : 'text2music'} · thinking ${acePayload.thinking} · ` +
+      `caption ${acePayload.captionFamily} · ${acePayload.steps} steps · ${acePayload.model}` +
+      (srcAudioBase64 ? ` · cover strength ${clampCoverStrength(job.styleReference?.coverStrength)}` : '');
+    const bridgeWarnings = (Array.isArray(data.warnings) ? data.warnings.map(String) : []).filter(
+      (w) => !/thinking\s*=|rock/i.test(w),
+    );
     const warnings = [
-      ...(Array.isArray(data.warnings) ? data.warnings.map(String) : []),
+      payloadLine,
+      ...bridgeWarnings,
       'Studio ACE (GPU) â€” original generation; not an artist clone',
       'Stem lanes may share mix until ACE lego/extract is wired',
     ];

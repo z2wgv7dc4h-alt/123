@@ -64,7 +64,7 @@ def torch_cuda() -> bool:
 
 DEFAULT_PROMPT = (
     "drum and bass, instrumental, two-step breakbeat, tight punchy drums, "
-    "rolling reese bass, sub bass, original composition, 174 bpm"
+    "rolling reese bass, sub bass, original composition"
 )
 
 # Studio's default DiT when neither ACE nor the env say otherwise. Matches

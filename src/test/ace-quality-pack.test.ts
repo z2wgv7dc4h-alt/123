@@ -22,15 +22,24 @@ const OLD_STARTER = 'energetic dancefloor drum and bass, rock-dnb crossover, dis
 const knobs = { energy: 0.75, darkness: 0.45, chaos: 0.25 };
 
 describe('buildAceCaption quality pack', () => {
-  it('default caption is concrete 174 DnB with no guitar', () => {
+  it('default caption is concrete DnB, no guitar, no bpm poetry', () => {
     const cap = buildAceCaption({ ...knobs, userText: STARTER });
     expect(cap).not.toMatch(/guitar|rock/i);
     expect(cap).toMatch(/^drum and bass, instrumental/);
     expect(cap).toMatch(/reese|growl/i);
     expect(cap).toMatch(/amen|two-step/i);
     expect(cap).toMatch(/tight punchy drums/);
-    expect(cap.endsWith(', 174 bpm')).toBe(true);
-    expect(cap.match(/174 bpm/g)).toHaveLength(1);
+    expect(cap).not.toMatch(/bpm/i);
+  });
+
+  it('strips bpm, stray shape words and rock from user text', () => {
+    const user = '174 bpm, half-time break, rock-dnb crossover, snare on 3';
+    const normal = buildAceCaption({ ...knobs, userText: user });
+    expect(normal).not.toMatch(/bpm|half-time|rock|snare on 3/i);
+    expect(normal).toMatch(/two-step|amen/i);
+    const htd = buildAceCaption({ ...knobs, userText: user, songShape: 'half-time-drop' });
+    expect(htd).toMatch(/half-time snare on 3/);
+    expect(htd).not.toMatch(/bpm|rock/i);
   });
 
   it('old saved starter text no longer smuggles guitar in', () => {
