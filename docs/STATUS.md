@@ -75,17 +75,21 @@ documentation, all of it is still in git history if ever needed.
 ## Open questions — not yet resolved
 
 - **Does the composition/style actually match the target reference sound**
-  (e.g. Pendulum-style big-room DnB)? First listen (2026-09-15) came back
-  "sounds like nonsense, not composed at all." Traced to real data (not
-  vibes): dumped the actual bass note sequence and found consecutive notes
-  leaping up to 19 semitones apart — `planBass()` picked every note's
-  interval independently from a table relative to a fixed root, no relation
-  to the previous note. Fixed with `nearestOctaveTo()` (see below);
-  worst-case within-section step is now mathematically bounded to <=6
-  semitones. New comparison renders sent for a second listen — **not yet
-  confirmed this actually sounds right**, only that the specific measured
-  defect (random-leap bass) is gone. Don't treat this as closed until Wyatt
-  confirms.
+  (e.g. Pendulum-style big-room DnB)? Two rounds of real listening feedback
+  so far, both from Wyatt on 2026-09-15:
+  1. "sounds like nonsense, not composed at all" → traced to the bass
+     leaping up to 19 semitones between consecutive notes with no voice
+     leading → fixed (`nearestOctaveTo()`, below).
+  2. Still "sounds like a video game" → traced to `writeGuitarChord` /
+     the solo root / `writeRockMid` all being hardcoded to fixed pitches
+     (196 Hz / MIDI 57 / 520 Hz) regardless of `structure.keyRoot` — could
+     clash outright with the bass in any other key — plus raw
+     tanh-distorted sine with no filtering (reads as a buzzy chiptune
+     square wave). Fixed: all three now derive pitch from the real key,
+     the guitar layer voices an actual power chord instead of one bare
+     tone, and a one-pole lowpass shapes the distortion toward an amp
+     tone. Sent for a third listen — **not yet confirmed**, same rule as
+     before: don't mark this resolved until Wyatt says so.
 - **Bass voice leading** (fixed 2026-09-15,
   `src/core/structure/StructureEngine.ts` `nearestOctaveTo()` +
   `src/test/bass-voice-leading.test.ts`): every bass note now re-octaves
@@ -94,11 +98,13 @@ documentation, all of it is still in git history if ever needed.
   plans from an independent RNG stream for the Expand/Repeat
   byte-identical guarantee), so one register jump can still land exactly
   at a section transition — that's intentional, not a bug.
-- **Guitar solo lead line** (`applyGuitarLayers` in `OfflineStubBackend.ts`)
-  was not audited for the same class of bug — it cycles through only 3
-  fixed notes in a repeating 4-bar pattern regardless of section harmony,
-  which is mechanical but not wildly leaping. Worth a closer look if the
-  lead still sounds off after the bass fix.
+- **Guitar/lead/rock-mid key-following** (fixed 2026-09-15,
+  `OfflineStubBackend.ts` + `midiForRoot` exported from
+  `StructureEngine.ts` + `src/test/guitar-layer-key.test.ts`): see above.
+  Still true and un-audited: the solo still cycles through only 3 fixed
+  scale degrees in a repeating 4-bar pattern regardless of section
+  harmony — mechanical, not wildly leaping, but worth a look if the lead
+  specifically still sounds off after this round.
 - **`PreviewPlayer.ts` duck-shape drift risk**: live-preview ducking and
   offline-render ducking both now call the shared `computeDuckShapeParams`
   (fixed 2026-09-15), but they're still two independent implementations
