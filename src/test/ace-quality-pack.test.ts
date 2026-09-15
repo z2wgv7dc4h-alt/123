@@ -1,7 +1,8 @@
 /**
  * ACE quality pack: caption says concrete 174 DnB (Reese/growl, amen or
  * two-step, tight drums), no guitar unless asked, shape words only for the
- * selected shape; payload has thinking off and 64 steps + ADG on base;
+ * selected shape; payload runs the LM (thinking on) for a track plan with
+ * 64 steps + ADG on base and the caption/CoT rewrite locked off;
  * header chip labels the buffer that exists.
  */
 import { describe, expect, it, afterEach } from 'vitest';
@@ -126,10 +127,10 @@ describe('ACE payload quality pack', () => {
     return { body: body as unknown as Record<string, unknown>, probe, result };
   }
 
-  it('base: thinking false, 64 steps, ADG on, loaded checkpoint named, no default guitar', async () => {
+  it('base: thinking on, 64 steps, ADG on, loaded checkpoint named, no default guitar', async () => {
     const { body, probe, result } = await renderAfterProbe('acestep-v15-base', { songShape: 'half-time-drop' });
     expect(probe.checkpoint).toBe('acestep-v15-base');
-    expect(body.thinking).toBe(false);
+    expect(body.thinking).toBe(true);
     expect(body.inferenceSteps).toBe(64);
     expect(body.inferenceSteps).toBe(ACE_BASE_INFERENCE_STEPS);
     expect(body.useAdg).toBe(true);
@@ -137,9 +138,11 @@ describe('ACE payload quality pack', () => {
     const text = (body.prompt as { text: string }).text;
     expect(text).not.toMatch(/guitar/i);
     expect(text).not.toMatch(/dubstep/i);
+    const sections = (body.structureRef as { sections: Array<{ name: string }> }).sections;
+    expect(sections.map((s) => s.name)).toContain('drop');
     expect(result.checkpointId).toBe('acestep-v15-base');
     expect(result.acePayload).toEqual({
-      thinking: false,
+      thinking: true,
       captionFamily: 'DnB',
       steps: 64,
       model: 'acestep-v15-base',
@@ -158,9 +161,9 @@ describe('ACE payload quality pack', () => {
     expect(body.checkpointId).toBe('acestep-v15-turbo');
     expect(body.inferenceSteps).toBe(8);
     expect(body.useAdg).toBe(false);
-    expect(body.thinking).toBe(false);
+    expect(body.thinking).toBe(true);
     expect(result.acePayload).toEqual({
-      thinking: false,
+      thinking: true,
       captionFamily: 'DnB',
       steps: 8,
       model: 'acestep-v15-turbo',

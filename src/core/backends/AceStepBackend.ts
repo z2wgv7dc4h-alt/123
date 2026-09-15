@@ -75,11 +75,12 @@ export const ACE_SHIFT = 3.0;
 export const ACE_DCW_ENABLED = true;
 export const ACE_DCW_MODE = 'low' as const;
 /**
- * LM off: thinking/CoT rewrote the caption into generic prose. The bridge
- * also forces use_cot_caption/use_cot_language false, so Status reporting
- * `thinking: false` matches the bytes actually sent.
+ * LM on for text2music: the 5Hz LM plans the track (audio codes). The bridge
+ * keeps use_cot_caption/use_cot_language false so the LM cannot rewrite our
+ * concrete DnB caption or invent sung words; its only vocal-free structure
+ * comes from the section map. Cover/repaint still force thinking off.
  */
-export const ACE_THINKING = false;
+export const ACE_THINKING = true;
 /**
  * Cover strength for real audio2audio. ACE-Step's own API doc recommends
  * low values (~0.2) for style transfer; the schema default of 1.0 is
@@ -258,8 +259,10 @@ export class AceStepBackend implements AudioBackend {
       seed: job.seed,
     });
     // Snapshot for Status chrome — the payload actually posted, not a claim.
+    // Cover/repaint skip the LM (source audio is the plan), text2music runs it.
+    const thinking = srcAudioBase64 ? false : ACE_THINKING;
     const acePayload = {
-      thinking: ACE_THINKING,
+      thinking,
       captionFamily: /drum and bass|dnb/i.test(caption) ? 'DnB' : 'other',
       steps: sampler.inferenceSteps,
       model: checkpoint ?? ACE_DEFAULT_CHECKPOINT,
@@ -282,9 +285,11 @@ export class AceStepBackend implements AudioBackend {
           sampleRateHz: job.sampleRateHz,
           bitDepth: job.bitDepth,
           channels: job.channels,
-          // LM off: thinking/CoT rewrote the caption into generic prose.
-          // The bridge also forces use_cot_caption/use_cot_language false.
-          thinking: ACE_THINKING,
+          // LM plans the track; bridge locks caption/language CoT off so the
+          // concrete DnB caption survives and the section map is the only text.
+          // Cover tasks have source audio to plan from, so the bridge forces
+          // thinking off there.
+          thinking,
           inferenceSteps: sampler.inferenceSteps,
           useAdg: sampler.useAdg,
           guidanceScale: ACE_GUIDANCE_SCALE,

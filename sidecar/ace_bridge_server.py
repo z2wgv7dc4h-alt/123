@@ -102,11 +102,13 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
     """Map the browser /render body onto ACE /release_task (text2music).
 
     Quality pack:
-    - thinking=False and use_cot_caption/use_cot_language=False: the loaded
-      5Hz LM otherwise rewrites our specific caption into generic prose
-      (ACE inference.py runs the LM whenever any use_cot_* is on, even with
-      thinking off).
+    - thinking=True: the 5Hz LM plans the track (audio codes). With thinking
+      off ACE skipped the LM and produced audio with no arrangement plan.
+    - use_cot_caption=False / use_cot_language=False: the LM must not rewrite
+      our concrete DnB caption or invent sung words. The section map below is
+      the only "lyrics" — temporal tags, never vocals.
     - base/SFT: 64 steps + use_adg; turbo: 8 steps, no ADG (ignored there).
+    - bpm/duration come from the browser plan when sent (174 default).
     """
     prompt = DEFAULT_PROMPT
     if isinstance(req.get("prompt"), dict):
@@ -124,8 +126,12 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
     if "drum and bass" not in prompt.lower() and "dnb" not in prompt.lower():
         prompt = f"{prompt}, drum and bass, original composition"
 
-    bpm = int(float(req.get("bpm") or 174))
-    duration_bars = int(req.get("durationBars") or 16)
+    structure_ref = req.get("structureRef")
+    structure_ref = structure_ref if isinstance(structure_ref, dict) else {}
+    # Tempo + length come from the browser plan; 174 / 16 bars only when the
+    # plan did not carry them.
+    bpm = int(float(req.get("bpm") or structure_ref.get("bpm") or 174))
+    duration_bars = int(req.get("durationBars") or structure_ref.get("bars") or 16)
     duration_sec = max(10.0, min(240.0, duration_bars * 4 * 60.0 / max(bpm, 1)))
     seed = int(req.get("seed") or 42)
     model = str(req.get("checkpointId") or model_default or configured_dit_model())
@@ -134,8 +140,8 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
 
     return {
         "prompt": prompt,
-        "lyrics": build_section_lyrics(req.get("structureRef")),
-        "thinking": False,
+        "lyrics": build_section_lyrics(structure_ref),
+        "thinking": True,
         "use_cot_caption": False,
         "use_cot_language": False,
         "bpm": bpm,
@@ -385,7 +391,7 @@ class Handler(BaseHTTPRequestHandler):
             if smi:
                 notes.append("nvidia-smi visible")
             notes.append("Bridge maps DnB /render â†’ release_task + query_result + /v1/audio")
-            notes.append("Instrumental DnB; DiT-only (thinking/CoT caption rewrite off)")
+            notes.append("Instrumental DnB; LM thinking plans the track, caption/CoT rewrite off; lyrics = section map")
             json_response(
                 self,
                 200,
@@ -590,7 +596,7 @@ class Handler(BaseHTTPRequestHandler):
                     "warnings": [
                         "ACE GPU mix â€” kick/snare/hats/bass are mix placeholders until LEGO extract",
                         f"DiT {dit_model}, {payload['inference_steps']} steps, "
-                        f"use_adg={payload['use_adg']}, thinking=False",
+                        f"use_adg={payload['use_adg']}, thinking={payload['thinking']}",
                         "No artist-clone / no catalog rip â€” original composition only",
                         f"task_id={task_id}",
                     ],

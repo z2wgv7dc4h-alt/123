@@ -50,18 +50,18 @@ describe('retailLabels (cycle-7/8 chrome honesty)', () => {
     expect(chips.join(' ')).not.toMatch(/fullSong|legoStems|loraLoad|OfflineStub|hard-grid/i);
   });
 
-  it('reports the quality-pack payload (thinking off, DnB, 64, base)', () => {
+  it('reports the restored LM plan payload (thinking on, DnB, 64, base)', () => {
     expect(retailModelLabel('acestep-v15-base')).toBe('base');
     expect(retailModelLabel('acestep-v15-sft')).toBe('SFT');
     expect(retailModelLabel('acestep-v15-turbo')).toBe('turbo');
     expect(retailModelLabel(undefined)).toBe('base');
     const line = retailAcePayloadLabel({
-      thinking: false,
+      thinking: true,
       captionFamily: 'DnB',
       steps: 64,
       model: 'acestep-v15-base',
     });
-    expect(line).toBe('thinking false · caption family DnB · 64 steps · model base');
-    expect(line).not.toMatch(/thinking true|instrumental rock|guitar/i);
+    expect(line).toBe('thinking true · caption family DnB · 64 steps · model base');
+    expect(line).not.toMatch(/thinking false|instrumental rock|guitar/i);
   });
 });

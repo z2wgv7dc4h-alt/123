@@ -12,11 +12,11 @@ import ace_bridge_server as bridge  # noqa: E402
 
 
 class BuildRenderPayloadTest(unittest.TestCase):
-    def test_base_is_high_quality_path_with_llm_off(self):
+    def test_base_is_high_quality_path_with_lm_plan_on(self):
         p = bridge.build_render_payload(
             {"prompt": {"text": "drum and bass, instrumental"}, "checkpointId": "acestep-v15-base"}
         )
-        self.assertIs(p["thinking"], False)
+        self.assertIs(p["thinking"], True)
         self.assertIs(p["use_cot_caption"], False)
         self.assertIs(p["use_cot_language"], False)
         self.assertEqual(p["inference_steps"], 64)
@@ -25,9 +25,42 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertEqual(p["dcw_mode"], "low")
         self.assertEqual(p["prompt"], "drum and bass, instrumental")
 
-    def test_thinking_true_in_request_cannot_turn_the_lm_back_on(self):
-        p = bridge.build_render_payload({"thinking": True, "checkpointId": "acestep-v15-base"})
-        self.assertIs(p["thinking"], False)
+    def test_text2music_thinking_is_on_and_caption_stays_locked(self):
+        p = bridge.build_render_payload({"thinking": False, "checkpointId": "acestep-v15-base"})
+        self.assertIs(p["thinking"], True)
+        self.assertIs(p["use_cot_caption"], False)
+        self.assertIs(p["use_cot_language"], False)
+
+    def test_lyrics_are_section_tags_not_sung_words(self):
+        p = bridge.build_render_payload(
+            {
+                "structureRef": {
+                    "sections": [
+                        {"name": "intro"},
+                        {"name": "build"},
+                        {"name": "drop"},
+                        {"name": "breakdown"},
+                        {"name": "outro"},
+                    ]
+                }
+            }
+        )
+        self.assertEqual(
+            p["lyrics"], "[Intro]\n[Build]\n[Drop]\n[Breakdown]\n[Outro]"
+        )
+        for word in ("sing", "vocal", "lyric", "la "):
+            self.assertNotIn(word, p["lyrics"].lower())
+        self.assertEqual(bridge.build_render_payload({})["lyrics"], "[Instrumental]")
+
+    def test_bpm_and_duration_come_from_the_plan(self):
+        p = bridge.build_render_payload(
+            {
+                "structureRef": {"bpm": 174, "bars": 8},
+                "prompt": {"text": "drum and bass, instrumental"},
+            }
+        )
+        self.assertEqual(p["bpm"], 174)
+        self.assertEqual(p["audio_duration"], 8 * 4 * 60.0 / 174)
 
     def test_missing_steps_default_to_64_not_32(self):
         p = bridge.build_render_payload({}, "acestep-v15-sft")

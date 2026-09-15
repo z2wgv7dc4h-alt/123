@@ -123,7 +123,10 @@ describe('AceStepBackend full GPU path', () => {
 
     expect(sentBody).not.toBeNull();
     const body = sentBody as unknown as Record<string, unknown>;
+    expect(body.thinking).toBe(true);
     expect(body.inferenceSteps).toBe(ACE_INFERENCE_STEPS);
+    // The plan's section map is what the bridge turns into section-tag lyrics.
+    expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);
     expect(body.shift).toBe(ACE_SHIFT);
     // DCW ships off for non-Turbo models unless we ask for it.
@@ -229,6 +232,8 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(sentBody?.srcAudioBase64).toBeTruthy();
     expect(sentBody?.srcAudioFileName).toBe('mine.wav');
     expect(sentBody?.audioCoverStrength).toBe(ACE_COVER_STRENGTH);
+    // Cover plans from the source audio; the LM thinking step must stay off.
+    expect(result.acePayload?.thinking).toBe(false);
     // Honesty: only now may the manifest claim ACE consumed the reference.
     expect(result.manifest.styleReference?.acePathActive).toBe(true);
   });
