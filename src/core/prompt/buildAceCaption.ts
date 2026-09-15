@@ -44,54 +44,34 @@ function pickBand(phrases: readonly string[], seed = 0): string {
   return phrases[i]!;
 }
 
-/**
- * Energy band words — must differ across low/mid/high so tests can assert
- * knob sensitivity (required substrings: low -> "laid-back"/"soft drive",
- * high -> "stadium energy"/"high-drive" — src/test/ace-caption-vary.test.ts
- * regex-matches these). Enriched with real DnB subgenre vocabulary (liquid,
- * rolling breakbeats, jump up) instead of generic mood adjectives that could
- * describe any dance genre — per ACE-Step's own prompting guidance,
- * concrete/specific tags outperform vague ones.
- */
+/** Energy: one short tag per band (tests regex laid-back/soft drive and stadium energy/high-drive). */
 export function energyWords(energy: number, seed = 0): string {
   const e = clamp01(energy);
-  if (e < 0.34) return pickBand(['laid-back groove, soft drive, liquid dnb feel', 'laid-back pocket, soft drive, smooth rolling breaks'], seed);
-  if (e < 0.67) return pickBand(['energetic dancefloor, solid drive, rolling breakbeats', 'energetic bounce, solid drive, rolling amen breaks'], seed);
-  return pickBand(['stadium energy, high-drive drop, jump up bassline', 'stadium rush, high-drive drop, jump up energy'], seed);
+  if (e < 0.34) return pickBand(['laid-back soft drive', 'laid-back rolling groove'], seed);
+  if (e < 0.67) return pickBand(['energetic dancefloor', 'energetic bouncy groove'], seed);
+  return pickBand(['high-drive festival energy', 'stadium energy'], seed);
 }
 
-/** Every band names a Reese or growl bass — the DnB bass sound, not "bright airy bass". */
 export function darknessWords(darkness: number, seed = 0): string {
   const d = clamp01(darkness);
-  if (d < 0.34) return pickBand(['smooth rolling reese bass, liquid dnb', 'warm detuned reese bass, melodic liquid dnb'], seed);
-  if (d < 0.67) return pickBand(['weighted bass mood, rolling reese bass', 'weighted low mood, driving reese bass'], seed);
-  return pickBand(['dark murky reese bass, neurofunk-leaning', 'dark murky growl bass, neurofunk energy'], seed);
+  if (d < 0.34) return pickBand(['warm rolling reese bass', 'smooth detuned reese bass'], seed);
+  if (d < 0.67) return pickBand(['heavy reese bass', 'driving reese bass'], seed);
+  return pickBand(['dark growling reese bass', 'dark neuro growl bass'], seed);
 }
 
+/** Drum pattern: two-step when tidy, chopped amen when busy. */
 export function chaosWords(chaos: number, seed = 0): string {
   const c = clamp01(chaos);
-  if (c < 0.34) return pickBand(['tight edits, controlled fills, precise breakbeat chops', 'tight pattern, controlled hats, clean amen chops'], seed);
-  if (c < 0.67) return pickBand(['busy fills, restless hats, chopped breakbeats', 'busy edits, restless hats, syncopated amen breaks'], seed);
-  return pickBand(['chaotic break edits, dense percussion, jungle-style breakbeat chops', 'chaotic fills, dense percussion, ragga jungle chops'], seed);
-}
-
-/**
- * Drum groove: two-step (kick 1, snare 2 and 4 at 174) when the break is
- * tidy, chopped amen when it's busier. Half-time shapes get no groove word
- * here — their shape tag names the half-time snare instead.
- */
-export function grooveWords(chaos: number, songShape?: string): string {
-  if (songShape && HALF_TIME_SHAPES.has(songShape)) return '';
-  return clamp01(chaos) < 0.34 ? 'two-step breakbeat, snare on 2 and 4' : 'chopped amen break';
+  if (c < 0.34) return pickBand(['controlled two-step breakbeat drums', 'controlled tight two-step drums'], seed);
+  if (c < 0.67) return pickBand(['busy chopped amen break', 'busy syncopated amen breakbeat'], seed);
+  return pickBand(['chaotic chopped amen breaks, dense percussion', 'chaotic jungle amen breaks, dense percussion'], seed);
 }
 
 /**
  * Build ACE sidecar prompt.text from knobs (+ optional layers / user text).
  * Always includes energy/darkness/chaos words so Vary + knob changes alter the caption.
  *
- * Order follows ACE-Step's prompting guidance: genre -> concrete drums/bass ->
- * mood -> BPM last. Guitar and rock words appear only when the guitar/solo
- * layer is on or the user typed them. Shape tags only for the selected shape.
+ * Order: genre -> drums -> bass -> energy -> production. Guitar/rock only when the layer is on or typed. Shape tags only for the selected shape.
  */
 export function buildAceCaption(input: AceCaptionInput): string {
   const energy = clamp01(input.energy);
@@ -108,12 +88,14 @@ export function buildAceCaption(input: AceCaptionInput): string {
   };
   const pushPhrases = (text: string) => text.split(',').forEach(pushDeduped);
 
+  // ACE musicians guide: short caption = genre, instruments, one mood, production.
+  const halfTime = HALF_TIME_SHAPES.has(input.songShape ?? '');
   pushPhrases('drum and bass, instrumental');
-  pushPhrases(grooveWords(chaos, input.songShape));
+  pushPhrases(halfTime ? 'heavy half-time drums' : chaosWords(chaos, seed));
+  pushPhrases(darknessWords(darkness, seed));
   pushPhrases('tight punchy drums, sub bass');
   pushPhrases(energyWords(energy, seed));
-  pushPhrases(darknessWords(darkness, seed));
-  pushPhrases(chaosWords(chaos, seed));
+  pushPhrases('polished club mix');
 
   const legacy = new Set<string>(LEGACY_STARTER_GUITAR_PHRASES);
   const pushUser = (phrase: string) => {

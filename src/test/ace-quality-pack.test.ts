@@ -30,6 +30,8 @@ describe('buildAceCaption quality pack', () => {
     expect(cap).toMatch(/amen|two-step/i);
     expect(cap).toMatch(/tight punchy drums/);
     expect(cap).not.toMatch(/bpm/i);
+    expect(cap).not.toMatch(/mood|controlled fills|jump up|precise breakbeat/i);
+    expect(cap.split(', ').length).toBeLessThanOrEqual(12);
   });
 
   it('strips bpm, stray shape words and rock from user text', () => {
@@ -65,8 +67,8 @@ describe('buildAceCaption quality pack', () => {
   });
 
   it('tidy chaos is two-step, busy chaos is amen', () => {
-    expect(buildAceCaption({ ...knobs, chaos: 0.1 })).toMatch(/two-step breakbeat, snare on 2 and 4/);
-    expect(buildAceCaption({ ...knobs, chaos: 0.8 })).toMatch(/chopped amen break/);
+    expect(buildAceCaption({ ...knobs, chaos: 0.1 })).toMatch(/two-step/);
+    expect(buildAceCaption({ ...knobs, chaos: 0.8 })).toMatch(/chopped amen/);
   });
 
   it('shape tags only for the selected shape', () => {
