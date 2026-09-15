@@ -12,7 +12,6 @@ import {
   barBeatFromProgress,
 } from '../lib/barPosition';
 import { HELP } from '../lib/helpCopy';
-import { HelpTip } from './HelpTip';
 import { SectionJumpChips } from './SectionJumpChips';
 
 const PEAK_BINS = 240;
@@ -359,10 +358,7 @@ export function Waveform() {
       aria-label="Mix waveform — drag to seek"
     >
       <div className="waveform-head">
-        <span className="waveform-label label-with-tip">
-          <span className="label-with-tip-text">Mix waveform</span>
-          <HelpTip text={loopRegion ? HELP.waveformLoop : HELP.waveformSeek} ariaLabel="About waveform seek and loop" />
-        </span>
+        <span className="waveform-label">Mix waveform</span>
         <span className="waveform-meta">
           {result.bpmMeasured} BPM · click seek · drag loop · Z zoom · Esc clears
         </span>
@@ -382,10 +378,6 @@ export function Waveform() {
           >
             <span aria-hidden="true">{previewState === 'playing' ? '❚❚' : '▶'}</span>
           </button>
-          <HelpTip
-            text={canPlay ? HELP.play : HELP.playDisabled}
-            ariaLabel={canPlay ? 'What Play does' : 'Why Play is disabled'}
-          />
           {!canPlay ? (
             <span id="help-play-disabled" className="sr-only">
               {HELP.playDisabled}
@@ -403,7 +395,6 @@ export function Waveform() {
           >
             <span aria-hidden="true">■</span>
           </button>
-          <HelpTip text={HELP.stop} ariaLabel="What Stop does" />
         </span>
         {durationSec > 0 ? (
           <span className="transport-clock compact" role="status" aria-live="off" title={HELP.transportClock}>
@@ -415,7 +406,6 @@ export function Waveform() {
                 {playback.mismatchNote}
               </span>
             ) : null}
-            <HelpTip text={HELP.transportClock} ariaLabel="About transport clock" />
           </span>
         ) : null}
       </div>
@@ -462,7 +452,6 @@ export function Waveform() {
               title="Drag to trim loop end"
               onPointerDown={onEdgePointerDown('end')}
             />
-            <HelpTip text={HELP.loopEdges} ariaLabel="About loop edge handles" />
           </>
         ) : null}
         {hoverRatio != null && durationSec > 0 ? (
@@ -485,7 +474,6 @@ export function Waveform() {
         >
           {waveformZoom ? 'Zoom 2× · Esc' : 'Zoom 2×'}
         </button>
-        <HelpTip text={HELP.waveformZoom} ariaLabel="About waveform zoom" />
       </div>
       {!peaks && <span className="waveform-placeholder">Decoding mix peaks…</span>}
       {/* #52 bar:beat+section · #53 ±1 bar — waveform-adjacent only */}
@@ -512,11 +500,6 @@ export function Waveform() {
               '—'
             )}
           </span>
-          <HelpTip text={HELP.barBeatReadout} ariaLabel="About bar beat readout" />
-          <HelpTip text={HELP.transportClock} ariaLabel="About playback clock" />
-          {dropWashRatios(sections, bars) ? (
-            <HelpTip text={HELP.dropWash} ariaLabel="About drop wash" />
-          ) : null}
         </span>
         <span className="waveform-bar-nudge">
           <button
@@ -537,11 +520,9 @@ export function Waveform() {
           >
             ›
           </button>
-          <HelpTip text={HELP.barNudge} ariaLabel="About bar nudge" />
           {hoverRatio != null && durationSec > 0 ? (
             <span className="waveform-hover-time-inline" title={HELP.waveformHoverTime}>
               {formatMmSs(hoverRatio, durationSec)}
-              <HelpTip text={HELP.waveformHoverTime} ariaLabel="About hover time" />
             </span>
           ) : null}
         </span>
@@ -557,13 +538,9 @@ export function Waveform() {
           >
             Clear loop
           </button>
-          <HelpTip text={HELP.clearLoop} ariaLabel="About clear loop" />
         </div>
       ) : null}
       {/* #69 section-enter aria */}
-      <span className="sr-only label-with-tip">
-        <HelpTip text={HELP.sectionAnnounce} ariaLabel="About section announcements" />
-      </span>
       <span className="sr-only" aria-live="polite">
         {bars > 0
           ? (() => {

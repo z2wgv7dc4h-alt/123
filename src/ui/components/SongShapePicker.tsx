@@ -2,8 +2,6 @@ import { DEFAULT_BPM } from '@/core/types';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { SONG_SHAPES, type SongShapeId } from '../lib/songShapes';
 import { barsToDurationSec, formatDurationMmSs } from '../lib/barPosition';
-import { HELP } from '../lib/helpCopy';
-import { HelpTip } from './HelpTip';
 
 const LENGTH_PRESETS = [32, 48, 64] as const;
 
@@ -23,10 +21,7 @@ export function SongShapePicker() {
   return (
     <section className="song-shape-picker panel" aria-label="Song shape">
       <div className="song-shape-head">
-        <h2>
-          Song shape
-          <HelpTip text={HELP.songShape} ariaLabel="About song shape" />
-        </h2>
+        <h2>Song shape</h2>
         <p className="hint">Pick the arc. Then Generate.</p>
       </div>
       <div className="song-shape-chips" role="radiogroup" aria-label="Song shape">
@@ -52,10 +47,7 @@ export function SongShapePicker() {
         })}
       </div>
       <div className="song-length-row" role="group" aria-label="Song length">
-        <span className="song-length-label label-with-tip">
-          Length
-          <HelpTip text={HELP.songLengthChips} ariaLabel="About song length chips" />
-        </span>
+        <span className="song-length-label">Length</span>
         {LENGTH_PRESETS.map((n) => {
           const on = bars === n;
           return (

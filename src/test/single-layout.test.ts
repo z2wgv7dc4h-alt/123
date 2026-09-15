@@ -41,6 +41,24 @@ describe('UI-2 single layout', () => {
     }
   });
 
+  it('UI-7: home intent/wave/map carry no help ? buttons (help lives in More)', () => {
+    const noTip = ['SimpleWant.tsx', 'SongShapePicker.tsx', 'Waveform.tsx', 'SectionTimeline.tsx'];
+    for (const [path, src] of Object.entries(uiSources)) {
+      if (noTip.some((f) => path.endsWith(f))) {
+        expect(src, path).not.toMatch(/HelpTip/);
+      }
+    }
+    // TransportBar's primary (home) half has no ?; ExportControls (More) may.
+    const tb =
+      Object.entries(uiSources).find(([p]) => p.endsWith('TransportBar.tsx'))?.[1] ?? '';
+    const homeHalf = tb.slice(
+      tb.indexOf('export function TransportBar'),
+      tb.indexOf('export function ExportControls'),
+    );
+    expect(homeHalf.length).toBeGreaterThan(0);
+    expect(homeHalf).not.toMatch(/HelpTip/);
+  });
+
   it('saved state carrying `mode` is ignored on restore', () => {
     expect(storeSrc).not.toMatch(/saved\.mode/);
     expect(storeSrc).not.toMatch(/\bmode: s\.mode\b/);

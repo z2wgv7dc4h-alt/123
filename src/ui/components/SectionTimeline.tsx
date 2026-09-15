@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { previewPlayer } from '@/core/audio';
 import { useStudioStore } from '../hooks/useStudioStore';
-import { HELP } from '../lib/helpCopy';
 import { pushToast } from '../lib/toasts';
 import { barsToDurationSec, formatDurationMmSs, sectionClickRatio } from '../lib/barPosition';
 import { DEFAULT_BPM } from '@/core/types';
-import { HelpTip } from './HelpTip';
 import { retailStructureLabel } from '../lib/retailLabels';
 import { totalBarsOf } from '../lib/structureEdit';
 
@@ -83,6 +81,12 @@ export function SectionTimeline() {
   const dragRef = useRef<{ index: number; startX: number; startLen: number } | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
   const [playheadRatio, setPlayheadRatio] = useState(0);
+  // UI-7: Expand / Repeat / ×2 apply only to the selected section.
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [result?.jobId]);
 
   // Shared playhead (same previewPlayer clock as TransportBar/Waveform) so the
   // song map shows where playback is right now, not just where a click seeks to.
@@ -154,10 +158,7 @@ export function SectionTimeline() {
     return (
       <div className={`timeline empty ${busy ? 'busy' : ''}`} aria-live="polite">
         <div className="empty-state timeline-empty">
-          <p className="empty-state-title label-with-tip">
-            <span className="label-with-tip-text">{busy ? 'Generating sketch…' : 'Section map'}</span>
-            <HelpTip text={HELP.sectionTimeline} ariaLabel="About section map" />
-          </p>
+          <p className="empty-state-title">{busy ? 'Generating sketch…' : 'Section map'}</p>
           <p className="hint">
             {busy
               ? 'Building stems on the ~174 BPM song layout — hang tight'
@@ -175,9 +176,8 @@ export function SectionTimeline() {
 
   return (
     <div className="timeline timeline-interactive" role="list" aria-label={`Arrangement ${bars} bars`}>
-      <div className="timeline-head label-with-tip">
+      <div className="timeline-head">
         <span className="label-with-tip-text">Arrangement map</span>
-        <HelpTip text={HELP.sectionTimeline} ariaLabel="About section map" />
         {editedSections && (
           <span className="pill tiny" title="Section lengths edited — Generate again to hear">
             {renderedBars > 0 && bars !== renderedBars
@@ -186,11 +186,8 @@ export function SectionTimeline() {
           </span>
         )}
       </div>
-      <p className="hint timeline-drag-hint label-with-tip">
-        <span className="label-with-tip-text">
-          Drag a section’s right edge to stretch it · or Expand / Repeat / ×2 drop · then Generate again
-        </span>
-        <HelpTip text={HELP.sectionTimeline} ariaLabel="About arrangement edits" />
+      <p className="hint timeline-drag-hint">
+        Select a section for Expand / Repeat / ×2 · or drag its right edge · then Generate again
       </p>
       <div
         className="timeline-track"
@@ -204,13 +201,16 @@ export function SectionTimeline() {
           return (
             <div
               key={`${s.name}-${s.startBar}-${index}`}
-              className={`timeline-seg ${SECTION_CLASS[s.name] ?? 'seg-other'}${dragging === index ? ' dragging' : ''}`}
+              className={`timeline-seg ${SECTION_CLASS[s.name] ?? 'seg-other'}${dragging === index ? ' dragging' : ''}${selectedIndex === index ? ' selected' : ''}`}
               style={{ flex: s.lengthBars }}
               role="listitem"
               tabIndex={0}
               title={label}
               aria-label={label}
+              data-selected={selectedIndex === index}
+              onFocus={() => setSelectedIndex(index)}
               onClick={(e) => {
+                setSelectedIndex(index);
                 if (!result?.structure?.sections?.[index]) return;
                 const section = result.structure.sections[index];
                 const totalBars = result.structure.bars;
@@ -232,8 +232,8 @@ export function SectionTimeline() {
               <span className="timeline-seg-tip" aria-hidden="true">
                 {SECTION_HINT[s.name] ?? 'Section'}
               </span>
-              <div className="timeline-seg-actions">
-                <span className="label-with-tip">
+              {selectedIndex === index && (
+                <div className="timeline-seg-actions">
                   <button
                     type="button"
                     className="btn tiny ghost"
@@ -243,11 +243,6 @@ export function SectionTimeline() {
                   >
                     Expand
                   </button>
-                  {index === 0 && (
-                    <HelpTip text={HELP.expandSection} ariaLabel="About Expand" />
-                  )}
-                </span>
-                <span className="label-with-tip">
                   <button
                     type="button"
                     className="btn tiny ghost"
@@ -257,12 +252,7 @@ export function SectionTimeline() {
                   >
                     Repeat
                   </button>
-                  {index === 0 && (
-                    <HelpTip text={HELP.repeatSection} ariaLabel="About Repeat" />
-                  )}
-                </span>
-                {s.name === 'drop' && (
-                  <span className="label-with-tip">
+                  {s.name === 'drop' && (
                     <button
                       type="button"
                       className="btn tiny ghost timeline-drop-x2"
@@ -272,10 +262,9 @@ export function SectionTimeline() {
                     >
                       ×2
                     </button>
-                    <HelpTip text={HELP.dropX2} ariaLabel="About double drop" />
-                  </span>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 className="timeline-seg-edge"
@@ -316,12 +305,9 @@ export function SectionTimeline() {
         {paramsDirty && (
           <>
             {' · '}
-            <span className="label-with-tip">
-              <button type="button" className="btn tiny accent" disabled={busy} onClick={() => void generateAgain()}>
-                Generate with edits
-              </button>
-              <HelpTip text={HELP.paramsDirtyCue} ariaLabel="Why generate again" />
-            </span>
+            <button type="button" className="btn tiny accent" disabled={busy} onClick={() => void generateAgain()}>
+              Generate with edits
+            </button>
           </>
         )}
       </div>

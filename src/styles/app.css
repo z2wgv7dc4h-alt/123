@@ -3248,6 +3248,7 @@ details summary:hover { color: var(--text); }
 .timeline-drag-hint { margin: 0.15rem 0 0.45rem; font-size: 0.72rem; }
 .timeline-seg { position: relative; overflow: hidden; }
 .timeline-seg.dragging { filter: brightness(1.12); outline: 1px solid rgba(255,255,255,0.35); }
+.timeline-seg.selected { outline: 2px solid var(--accent, #6ee7ff); outline-offset: -2px; }
 .timeline-seg-actions {
   display: flex; gap: 0.25rem; margin-top: 0.25rem; flex-wrap: wrap;
   opacity: 0.85;

@@ -125,7 +125,6 @@ export function TransportBar() {
             >
               {busy ? 'Generating…' : sketchHonesty ? 'Generate · Sketch' : 'Generate'}
             </button>
-            <HelpTip text={HELP.generate} ariaLabel="What Generate does" />
           </span>
           {postHear ? (
             <span className="transport-btn-wrap">
@@ -138,7 +137,6 @@ export function TransportBar() {
               >
                 Vary
               </button>
-              <HelpTip text={HELP.vary} ariaLabel="What Vary does" />
             </span>
           ) : null}
         </span>
@@ -147,20 +145,11 @@ export function TransportBar() {
           aria-live="polite"
         >
           {pill}
-          {mixerDirty && result ? (
-            <>
-              <HelpTip text={HELP.remixLive} ariaLabel="About hearing your tweaks" />
-              <HelpTip text={HELP.rehear} ariaLabel="About rehearing tweaks" />
-            </>
-          ) : null}
         </span>
       </div>
       {coachOpen && result && (
         <div className="first-play-coach" role="status">
-          <span className="first-play-coach-text">
-            Hit Play to hear — stem mutes update live.
-            <HelpTip text={HELP.firstPlayCoach} ariaLabel="About first Play tip" />
-          </span>
+          <span className="first-play-coach-text">Hit Play to hear — stem mutes update live.</span>
           <button type="button" className="btn tiny ghost" onClick={dismissCoach}>
             Got it
           </button>
@@ -180,7 +169,6 @@ export function TransportBar() {
             >
               Again
             </button>
-            <HelpTip text={HELP.again} ariaLabel="What Again does" />
           </span>
           {abFlashback ? (
             <span className="ab-flashback-pill" role="status" aria-live="polite">
@@ -198,7 +186,6 @@ export function TransportBar() {
               >
                 Previous
               </button>
-              <HelpTip text={HELP.restorePrevious} ariaLabel="What Previous does" />
             </span>
           ) : null}
         </div>

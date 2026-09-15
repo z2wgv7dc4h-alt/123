@@ -1,6 +1,4 @@
 import { useStudioStore } from '../hooks/useStudioStore';
-import { HELP } from '../lib/helpCopy';
-import { HelpTip } from './HelpTip';
 
 /**
  * Step 1 of Simple Mode process: what do you want?
@@ -14,10 +12,7 @@ export function SimpleWant() {
   return (
     <section className="simple-want panel" aria-label="What do you want" id="want">
       <div className="simple-want-head">
-        <h2>
-          What do you want?
-          <HelpTip text={HELP.styleText} ariaLabel="About style text" />
-        </h2>
+        <h2>What do you want?</h2>
         <p className="hint">Mood words · optional. Style-ref file drop lives in More.</p>
       </div>
       <label className="simple-want-label">

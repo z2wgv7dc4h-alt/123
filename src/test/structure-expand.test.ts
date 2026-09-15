@@ -221,8 +221,8 @@ describe('structure expand → next generate persist (product wiring)', () => {
       'GAP: SectionTimeline must call setSectionLengthAt on drag and expandSectionAt on Expand',
     ).toBe(true);
     expect(
-      /HELP\.sectionTimeline/.test(timelineSrc) && /HelpTip/.test(timelineSrc),
-      'GAP: new timeline controls must use HelpTip + HELP.sectionTimeline (no invented tip strings)',
+      /selectedIndex/.test(timelineSrc) && /HelpTip/.test(timelineSrc) === false,
+      'UI-7: Expand/Repeat/×2 show only on the selected section; no home HelpTip on the map',
     ).toBe(true);
     expect(
       /×2/.test(timelineSrc) && /expandSectionAt\(index, s\.lengthBars\)/.test(timelineSrc),
