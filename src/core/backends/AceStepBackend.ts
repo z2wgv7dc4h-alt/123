@@ -38,15 +38,32 @@ function aceSidecarBase(): string {
   return 'http://127.0.0.1:8766';
 }
 /**
- * ACE-Step inference parameters. These were bare literals at the call site
- * with no names and no coverage. Values checked against ACE-Step 1.5's own
- * docs (docs/en/INFERENCE.md in the installed repo): the schema's bare
- * default of 8 steps is the Turbo speed default; 30-60 is the documented
- * range for the non-Turbo base model this project runs, and 5-9 is the
- * usual guidance band.
+ * ACE-Step inference parameters, checked against ACE-Step 1.5's own
+ * docs/en/INFERENCE.md: base "1-200 (recommended 32-64)", high-quality tip
+ * "Use base model with inference_steps=64 or higher" + "Enable use_adg=True";
+ * turbo "recommended 8" and ADG is ignored there.
  */
-export const ACE_INFERENCE_STEPS = 50;
+export const ACE_BASE_INFERENCE_STEPS = 64;
+export const ACE_TURBO_INFERENCE_STEPS = 8;
+/** @deprecated name kept for tests — the base/SFT step count. */
+export const ACE_INFERENCE_STEPS = ACE_BASE_INFERENCE_STEPS;
+/** Studio default DiT when the probe did not name one (start-ace-stack.ps1). */
+export const ACE_DEFAULT_CHECKPOINT = 'acestep-v15-base';
 export const ACE_GUIDANCE_SCALE = 7.0;
+
+export function isTurboCheckpoint(checkpoint: string | null | undefined): boolean {
+  return /turbo/i.test(String(checkpoint ?? ''));
+}
+
+/** Steps + ADG for the checkpoint ACE actually has loaded. */
+export function aceSamplerFor(checkpoint: string | null | undefined): {
+  inferenceSteps: number;
+  useAdg: boolean;
+} {
+  return isTurboCheckpoint(checkpoint)
+    ? { inferenceSteps: ACE_TURBO_INFERENCE_STEPS, useAdg: false }
+    : { inferenceSteps: ACE_BASE_INFERENCE_STEPS, useAdg: true };
+}
 /** Timestep shift — base-model-only per ACE-Step docs. */
 export const ACE_SHIFT = 3.0;
 /**
@@ -126,10 +143,13 @@ export class AceStepBackend implements AudioBackend {
   readonly displayName = 'Studio ACE (GPU)';
   readonly capabilities = CAPS;
   readonly preferredCheckpoints = [
+    'ACE-Step/Ace-Step1.5:acestep-v15-sft',
     'ACE-Step/Ace-Step1.5:acestep-v15-base',
     'ACE-Step/Ace-Step1.5:acestep-v15-turbo',
   ] as const;
   readonly deviceHint = 'cuda:0' as const;
+  /** DiT the bridge reported on the last GPU probe; null = not reported. */
+  loadedCheckpoint: string | null = null;
 
   private failSoft(extra?: string): HardwareProbe {
     return {
@@ -161,9 +181,12 @@ export class AceStepBackend implements AudioBackend {
       }
       if (data?.hasGpu === true) {
         const notesFromSidecar = Array.isArray(data.notes) ? data.notes.map((n) => String(n)) : [];
+        this.loadedCheckpoint =
+          typeof data.checkpoint === 'string' && data.checkpoint ? data.checkpoint : null;
         return {
           hasGpu: true,
           vramGb: typeof data.vramGb === 'number' ? data.vramGb : undefined,
+          checkpoint: this.loadedCheckpoint ?? undefined,
           backend: this.id,
           notes: [
             ...notesFromSidecar,
@@ -214,6 +237,11 @@ export class AceStepBackend implements AudioBackend {
     const srcAudioBase64 =
       styleAudio && job.styleReference?.ownerAttested ? await blobToBase64(styleAudio) : undefined;
 
+    // Only name a checkpoint the server said it has loaded; otherwise the
+    // bridge uses ACE's loaded model. Hardcoding base here overrode SFT.
+    const checkpoint = this.loadedCheckpoint;
+    const sampler = aceSamplerFor(checkpoint ?? ACE_DEFAULT_CHECKPOINT);
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ACE_RENDER_TIMEOUT_MS);
     let res: Response;
@@ -231,7 +259,11 @@ export class AceStepBackend implements AudioBackend {
           sampleRateHz: job.sampleRateHz,
           bitDepth: job.bitDepth,
           channels: job.channels,
-          inferenceSteps: ACE_INFERENCE_STEPS,
+          // LM off: thinking/CoT rewrote the caption into generic prose.
+          // The bridge also forces use_cot_caption/use_cot_language false.
+          thinking: false,
+          inferenceSteps: sampler.inferenceSteps,
+          useAdg: sampler.useAdg,
           guidanceScale: ACE_GUIDANCE_SCALE,
           shift: ACE_SHIFT,
           dcwEnabled: ACE_DCW_ENABLED,
@@ -280,7 +312,7 @@ export class AceStepBackend implements AudioBackend {
             })),
           },
           stemSchemaVersion: job.stemSchemaVersion,
-          checkpointId: 'acestep-v15-base',
+          ...(checkpoint ? { checkpointId: checkpoint } : {}),
         }),
       });
     } catch (e) {
@@ -374,13 +406,14 @@ export class AceStepBackend implements AudioBackend {
       }
     }
 
+    const heardCheckpoint = String(data.checkpointId || checkpoint || 'unknown');
     const midiBlob = structureToMidiBlob(structure);
     const manifest = buildExportManifest({
       job,
       structure,
       stems,
       backendId: this.id,
-      checkpointId: String(data.checkpointId || 'acestep-v15-base'),
+      checkpointId: heardCheckpoint,
       bpmMeasured: Number(data.bpmMeasured ?? structure.bpm),
       gpuUsed: true,
       // Only true when the reference audio was actually sent for a cover
@@ -398,7 +431,7 @@ export class AceStepBackend implements AudioBackend {
       mixdownPreviewWav: stems.find((s) => s.id === 'mix')?.url,
       warnings,
       backendId: this.id,
-      checkpointId: String(data.checkpointId || 'acestep-v15-base'),
+      checkpointId: heardCheckpoint,
       structure,
       midiBlob,
       manifest,

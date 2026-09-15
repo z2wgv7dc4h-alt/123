@@ -6,18 +6,23 @@ import { HELP } from '../lib/helpCopy';
 import { retailCapLabel, retailCapState } from '../lib/retailLabels';
 import { HelpTip } from './HelpTip';
 
+// Which one is "in use" comes from the GPU server's probe (aceCheckpoint),
+// never from this list. Order = quality preference.
 const STUDIO_MODELS = [
   {
-    id: 'acestep-v15-turbo',
-    label: 'Studio turbo',
-    hint: 'Fast GPU path — what Generate uses now',
-    status: 'active' as const,
+    id: 'acestep-v15-sft',
+    label: 'Studio SFT',
+    hint: 'Best detail — used automatically when on disk',
   },
   {
     id: 'acestep-v15-base',
     label: 'Studio base',
-    hint: 'Higher quality, slower — not selected yet',
-    status: 'available' as const,
+    hint: 'High quality, 64 steps — default when SFT is absent',
+  },
+  {
+    id: 'acestep-v15-turbo',
+    label: 'Studio turbo',
+    hint: 'Fast, 8 steps — only when you pick it',
   },
   {
     id: 'acestep-v15-xl-base',
@@ -33,6 +38,7 @@ export function PowerExtras() {
   const loraPackId = useStudioStore((s) => s.loraPackId);
   const setLoraPackId = useStudioStore((s) => s.setLoraPackId);
   const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
+  const aceCheckpoint = useStudioStore((s) => s.aceCheckpoint);
   const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
   const setExportBitDepth = useStudioStore((s) => s.setExportBitDepth);
   const [trainMsg, setTrainMsg] = useState<string | null>(null);
@@ -141,7 +147,8 @@ export function PowerExtras() {
 
       <p className="hint label-with-tip" style={{ marginBottom: '0.45rem' }}>
         <span className="label-with-tip-text">
-          Studio models live on your GPU PC (not downloaded in this tab). Active path: turbo.
+          Studio models live on your GPU PC (not downloaded in this tab). Loaded:{' '}
+          {aceCheckpoint ?? 'unknown until the GPU server answers'}.
         </span>
         <HelpTip text={HELP.aceModels} ariaLabel="About Studio models" />
       </p>
@@ -149,17 +156,15 @@ export function PowerExtras() {
         {STUDIO_MODELS.map((m) => (
           <div
             key={m.id}
-            className={`model-slot${m.status === 'active' ? ' model-slot-active' : ''}`}
+            className={`model-slot${m.id === aceCheckpoint ? ' model-slot-active' : ''}`}
           >
             <strong>{m.label}</strong>
             <span className="meta" title={m.id}>
-              {m.status === 'active'
+              {m.id === aceCheckpoint
                 ? aceHasGpu
                   ? 'In use · GPU live'
-                  : 'In use · GPU offline'
-                : m.status === 'available'
-                  ? 'Optional · not selected'
-                  : 'Later · not installed'}
+                  : 'Last seen · GPU offline'
+                : 'Not loaded'}
             </span>
             <span style={{ display: 'block', marginTop: '0.35rem' }}>{m.hint}</span>
             <HelpTip text={HELP.aceModels} ariaLabel={`About ${m.label}`} />

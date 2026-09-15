@@ -20,6 +20,7 @@ import { SongShapePicker } from './ui/components/SongShapePicker';
 import { SimpleWant } from './ui/components/SimpleWant';
 import { LayersChips } from './ui/components/LayersChips';
 import { HELP } from './ui/lib/helpCopy';
+import { heardAudioPathChip } from './ui/lib/retailLabels';
 import { ELEMENTAL_STEM_IDS, useStudioStore } from './ui/hooks/useStudioStore';
 import { useTransportHotkeys } from './ui/hooks/useTransportHotkeys';
 
@@ -38,6 +39,8 @@ export default function App() {
   }, [initBackends]);
 
   const studioLive = productTier === 'studio' && aceHasGpu;
+  // Chip labels the buffer you hear, not the latest probe.
+  const heard = heardAudioPathChip(result?.backendId, studioLive);
   const liveMixerOk = !!(
     result &&
     result.stems.some((s) => (ELEMENTAL_STEM_IDS as readonly string[]).includes(s.id))
@@ -55,11 +58,11 @@ export default function App() {
       <header className="header">
         <div className="header-brand">
           <div className="honesty-chip-row" aria-label="Audio path">
-            <span className={`honesty-chip${studioLive ? ' live' : ' sketch'}`}>
+            <span className={`honesty-chip${heard.live ? ' live' : ' sketch'}`}>
               <span className="honesty-chip-dot" aria-hidden />
-              {studioLive ? 'Studio · GPU' : 'Sketch · CPU'}
+              {heard.label}
               <HelpTip
-                text={studioLive ? HELP.badgeAce : HELP.badgeCpu174}
+                text={heard.live ? HELP.badgeAce : HELP.badgeCpu174}
                 ariaLabel="About audio path"
               />
             </span>

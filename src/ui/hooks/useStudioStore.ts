@@ -231,6 +231,8 @@ export interface StudioState {
   ownerConfirmed: boolean;
   /** Last ACE-Step /probe result — Generate disabled for ACE when false. */
   aceHasGpu: boolean;
+  /** DiT checkpoint the last successful probe reported (null = unknown). */
+  aceCheckpoint: string | null;
   /** One layout: extras live behind the single More toggle. */
   moreOpen: boolean;
   /** Sketch export WAV bit depth (16 default; 24 via encodeWav — not Studio). */
@@ -493,6 +495,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   vibeIntensity: 0.7,
   ownerConfirmed: false,
   aceHasGpu: false,
+  aceCheckpoint: null,
   moreOpen: false,
   exportBitDepth: DEFAULT_BIT_DEPTH,
   flowStep: 'idle',
@@ -899,7 +902,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       if (ace) {
         const probe = await ace.probe();
         const hasGpu = !!probe.hasGpu;
-        set({ aceHasGpu: hasGpu });
+        set({ aceHasGpu: hasGpu, ...(probe.checkpoint ? { aceCheckpoint: probe.checkpoint } : {}) });
         if (hasGpu) {
           // Auto Studio retail when ACE bridge is live — Pendulum-vibe quality path
           set({
@@ -955,6 +958,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         if (probe.hasGpu) {
           set({
             aceHasGpu: true,
+            ...(probe.checkpoint ? { aceCheckpoint: probe.checkpoint } : {}),
             productTier: 'studio',
             backendId: 'ace-step-1.5',
             warnings: [],
@@ -1052,15 +1056,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       if (s.layers.solo) layerBits.push('expressive lead guitar solo, rock-dnb crossover lead, original');
       if (s.layers.vocalish) layerBits.push('vocal-ish synth texture, chopped pad vocalese, no lyrics, original');
       if (s.layers.extraDrums) layerBits.push('extra breakbeat layers, dense percussion fills, original');
+      // Layer + shape caption words are owned by buildAceCaption (job.layers,
+      // job.songShape). Appending them here too duplicated guitar phrases and
+      // captioned half-time-drop as "dubstep-feel".
       if (layerBits.length) {
-        prompt.text = [prompt.text, ...layerBits].filter(Boolean).join(', ');
         prompt.descriptors = [...prompt.descriptors, ...layerBits.map((b) => b.split(',')[0]!.trim())];
-      }
-      if (s.songShape === 'dubstep' || s.songShape === 'half-time-drop') {
-        prompt.text = [prompt.text, 'half-time snare on 3, heavy dubstep-feel drop at 174 bpm'].filter(Boolean).join(', ');
-      }
-      if (s.songShape === 'trap-bounce') {
-        prompt.text = [prompt.text, 'fat 808 glide, rolling bounce hats, trap-flavored dnb at 174 bpm'].filter(Boolean).join(', ');
       }
 
       const live = get();

@@ -6,6 +6,22 @@ export function retailBackendLabel(backendId: string): string {
   return backendId;
 }
 
+/**
+ * Header audio-path chip. Once a buffer exists it labels THAT buffer
+ * (result.backendId), not the latest probe — a Sketch fallback render must
+ * not show "Studio" just because ACE answered a probe afterwards.
+ */
+export function heardAudioPathChip(
+  resultBackendId: string | null | undefined,
+  studioLive: boolean,
+): { live: boolean; label: string } {
+  if (resultBackendId) {
+    const studio = resultBackendId.startsWith('ace-step');
+    return { live: studio, label: studio ? 'Studio · GPU' : 'Sketch · CPU' };
+  }
+  return { live: studioLive, label: studioLive ? 'Studio ready · GPU' : 'Sketch · CPU' };
+}
+
 export function retailStructureLabel(version: string | undefined | null): string {
   if (!version) return 'song layout ~174';
   if (/hard-grid/i.test(version)) return 'song layout ~174';

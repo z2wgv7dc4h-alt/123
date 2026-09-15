@@ -113,6 +113,8 @@ export interface HardwareProbe {
   vramGb?: number;
   backend: string;
   notes: string[];
+  /** DiT checkpoint the GPU server reports as loaded (e.g. acestep-v15-base). */
+  checkpoint?: string;
 }
 
 export interface LoRAPackRef {
@@ -334,15 +336,16 @@ export const ARTIST_NAME_BLOCKLIST = [] as const;
 // "gated pads" (vague filler) removed 2026-09-15 — genre dilution traced in
 // the raw ACE model log: the caption's own "thinking" expansion drifted
 // toward "fuses elements of trance and drum and bass" with the old wording.
+// "distorted guitar riffs" / "rock-dnb crossover" removed 2026-09-16: the
+// starter text put guitar in every Studio caption with the guitar layer off.
+// "half-time break" removed: shape words come from the selected song shape.
 export const DEFAULT_DESCRIPTORS = [
   'energetic dancefloor drum and bass',
-  'rock-dnb crossover',
-  'distorted guitar riffs',
-  'reese bass',
-  'half-time break',
+  'rolling reese bass',
+  'tight punchy drums',
+  'heavy sub bass',
   '174 bpm',
   'rolling breakbeats',
-  'aggressive transient drums',
 ] as const;
 
 /** User-owned style reference — browser File API only; never external rips. */

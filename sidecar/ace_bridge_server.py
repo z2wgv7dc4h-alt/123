@@ -63,9 +63,103 @@ def torch_cuda() -> bool:
         return False
 
 DEFAULT_PROMPT = (
-    "energetic rock drum and bass, dancefloor, distorted bass, heavy breaks, "
-    "174 bpm, stadium energy, original composition, instrumental"
+    "drum and bass, instrumental, two-step breakbeat, tight punchy drums, "
+    "rolling reese bass, sub bass, original composition, 174 bpm"
 )
+
+# Studio's default DiT when neither ACE nor the env say otherwise. Matches
+# scripts/windows/start-ace-stack.ps1 (SFT if on disk, else base).
+DEFAULT_DIT_MODEL = "acestep-v15-base"
+# ACE docs/en/INFERENCE.md: base/SFT "recommended 32-64", high quality tip is
+# "inference_steps=64 or higher" + use_adg=True. Turbo: "recommended 8".
+BASE_INFERENCE_STEPS = 64
+TURBO_INFERENCE_STEPS = 8
+
+
+def is_turbo_model(name: str | None) -> bool:
+    return "turbo" in str(name or "").lower()
+
+
+def configured_dit_model() -> str:
+    return os.environ.get("ACESTEP_CONFIG_PATH") or DEFAULT_DIT_MODEL
+
+
+def loaded_dit_model() -> str:
+    """The DiT ACE actually has loaded (GET /v1/models default_model), falling
+    back to the env the stack script set. The env alone can lie when ACE was
+    started by hand (ACE's own default is turbo)."""
+    try:
+        _, payload = http_json("GET", f"{ACE_API}/v1/models", timeout=2.0)
+        data, _, _ = unwrap(payload)
+        if isinstance(data, dict) and data.get("default_model"):
+            return str(data["default_model"])
+    except Exception:
+        pass
+    return configured_dit_model()
+
+
+def build_render_payload(req: dict, model_default: str | None = None) -> dict:
+    """Map the browser /render body onto ACE /release_task (text2music).
+
+    Quality pack:
+    - thinking=False and use_cot_caption/use_cot_language=False: the loaded
+      5Hz LM otherwise rewrites our specific caption into generic prose
+      (ACE inference.py runs the LM whenever any use_cot_* is on, even with
+      thinking off).
+    - base/SFT: 64 steps + use_adg; turbo: 8 steps, no ADG (ignored there).
+    """
+    prompt = DEFAULT_PROMPT
+    if isinstance(req.get("prompt"), dict):
+        text = str(req["prompt"].get("text") or "").strip()
+        tags = req["prompt"].get("tags") or req["prompt"].get("descriptors") or []
+        if text:
+            prompt = text
+        elif tags:
+            prompt = ", ".join(str(t) for t in tags)
+    elif isinstance(req.get("prompt"), str) and req["prompt"].strip():
+        prompt = req["prompt"].strip()
+    prompt = scrub_artist(prompt)
+    if "instrumental" not in prompt.lower():
+        prompt = f"{prompt}, instrumental only, no vocals"
+    if "drum and bass" not in prompt.lower() and "dnb" not in prompt.lower():
+        prompt = f"{prompt}, drum and bass, original composition"
+
+    bpm = int(float(req.get("bpm") or 174))
+    duration_bars = int(req.get("durationBars") or 16)
+    duration_sec = max(10.0, min(240.0, duration_bars * 4 * 60.0 / max(bpm, 1)))
+    seed = int(req.get("seed") or 42)
+    model = str(req.get("checkpointId") or model_default or configured_dit_model())
+    turbo = is_turbo_model(model)
+    use_adg = req.get("useAdg")
+
+    return {
+        "prompt": prompt,
+        "lyrics": build_section_lyrics(req.get("structureRef")),
+        "thinking": False,
+        "use_cot_caption": False,
+        "use_cot_language": False,
+        "bpm": bpm,
+        "audio_duration": duration_sec,
+        "time_signature": "4",
+        "audio_format": "wav",
+        "use_random_seed": False,
+        "seed": seed,
+        "batch_size": 1,
+        "inference_steps": int(
+            req.get("inferenceSteps") or (TURBO_INFERENCE_STEPS if turbo else BASE_INFERENCE_STEPS)
+        ),
+        "guidance_scale": float(req.get("guidanceScale") or 7.0),
+        # Timestep shift: base-model-only per ACE-Step's own docs.
+        "shift": float(req.get("shift") or 3.0),
+        # ADG is base/SFT-only; turbo DiT ignores it.
+        "use_adg": (not turbo) if use_adg is None else (bool(use_adg) and not turbo),
+        # DCW: ACE leaves it off for non-turbo unless asked. Wired as "low";
+        # scaler defaults deliberately untouched.
+        "dcw_enabled": bool(req.get("dcwEnabled", True)),
+        "dcw_mode": str(req.get("dcwMode") or "low"),
+        "task_type": "text2music",
+        "model": model,
+    }
 
 # Our arrangement's Section.name -> ACE's temporal lyric structure tag.
 # Caption (prompt) is the global vibe; lyrics is where ACE gets timing/structure —
@@ -280,7 +374,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 smi = nvidia_visible()
             has_gpu = bool(up or cuda or smi)
-            ckpt = os.environ.get("ACESTEP_CONFIG_PATH", "acestep-v15-base")
+            ckpt = loaded_dit_model() if up else configured_dit_model()
             notes = []
             if up:
                 notes.append("ACE upstream /health OK at 127.0.0.1:8001")
@@ -291,7 +385,7 @@ class Handler(BaseHTTPRequestHandler):
             if smi:
                 notes.append("nvidia-smi visible")
             notes.append("Bridge maps DnB /render â†’ release_task + query_result + /v1/audio")
-            notes.append("Instrumental rock-DnB; thinking=true LM+DiT quality path")
+            notes.append("Instrumental DnB; DiT-only (thinking/CoT caption rewrite off)")
             json_response(
                 self,
                 200,
@@ -347,58 +441,13 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
-        prompt = DEFAULT_PROMPT
-        if isinstance(req.get("prompt"), dict):
-            text = str(req["prompt"].get("text") or "").strip()
-            tags = req["prompt"].get("tags") or req["prompt"].get("descriptors") or []
-            if text:
-                prompt = text
-            elif tags:
-                prompt = ", ".join(str(t) for t in tags)
-        elif isinstance(req.get("prompt"), str) and req["prompt"].strip():
-            prompt = req["prompt"].strip()
-        prompt = scrub_artist(prompt)
-        if "instrumental" not in prompt.lower():
-            prompt = f"{prompt}, instrumental only, no vocals"
-        if "drum and bass" not in prompt.lower() and "dnb" not in prompt.lower():
-            prompt = f"{prompt}, drum and bass, rock-dnb energy, original composition"
-
-        bpm = int(float(req.get("bpm") or 174))
-        duration_bars = int(req.get("durationBars") or 16)
-        duration_sec = max(10.0, min(240.0, duration_bars * 4 * 60.0 / max(bpm, 1)))
         job_id = str(req.get("jobId") or f"bridge-{int(time.time())}")
-        seed = int(req.get("seed") or 42)
-        lyrics = build_section_lyrics(req.get("structureRef"))
-
-        payload = {
-            "prompt": prompt,
-            "lyrics": lyrics,
-            "thinking": True,
-            "bpm": bpm,
-            "audio_duration": duration_sec,
-            "time_signature": "4",
-            "audio_format": "wav",
-            "use_random_seed": False,
-            "seed": seed,
-            "batch_size": 1,
-            "inference_steps": int(req.get("inferenceSteps") or 32),
-            "guidance_scale": float(req.get("guidanceScale") or 7.0),
-            # Timestep shift: base-model-only per ACE-Step's own docs. The
-            # bridge used to drop this on the floor even though the backend
-            # sent it.
-            "shift": float(req.get("shift") or 3.0),
-            # DCW is a training-free sampler-side quality correction that
-            # ACE-Step enables by default for Turbo models and DISABLES by
-            # default for non-Turbo. This project always runs
-            # acestep-v15-base (non-Turbo), so it was silently off on every
-            # render. docs/en/DCW.md names "low" as the sensible starting
-            # mode; scaler defaults are left untouched deliberately.
-            "dcw_enabled": bool(req.get("dcwEnabled", True)),
-            "dcw_mode": str(req.get("dcwMode") or "low"),
-            "task_type": "text2music",
-            "model": req.get("checkpointId")
-            or os.environ.get("ACESTEP_CONFIG_PATH", "acestep-v15-base"),
-        }
+        payload = build_render_payload(
+            req, None if req.get("checkpointId") else loaded_dit_model()
+        )
+        seed = payload["seed"]
+        bpm = payload["bpm"]
+        duration_sec = payload["audio_duration"]
 
         # Real audio2audio: when the browser sends the user's own style-ref
         # audio, switch from text2music to ACE's `cover` task and hand the
@@ -449,7 +498,7 @@ class Handler(BaseHTTPRequestHandler):
 
             audio_url = None
             metas = {}
-            dit_model = os.environ.get("ACESTEP_CONFIG_PATH", "acestep-v15-base")
+            dit_model = payload["model"]
             last = None
             for _ in range(180):
                 time.sleep(1.0)
@@ -540,7 +589,8 @@ class Handler(BaseHTTPRequestHandler):
                     "audioFormat": "wav",
                     "warnings": [
                         "ACE GPU mix â€” kick/snare/hats/bass are mix placeholders until LEGO extract",
-                        "thinking=true LM+DiT quality path (instrumental rock-DnB)",
+                        f"DiT {dit_model}, {payload['inference_steps']} steps, "
+                        f"use_adg={payload['use_adg']}, thinking=False",
                         "No artist-clone / no catalog rip â€” original composition only",
                         f"task_id={task_id}",
                     ],

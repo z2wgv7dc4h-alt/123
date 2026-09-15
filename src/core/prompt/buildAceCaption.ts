@@ -23,6 +23,16 @@ export type AceCaptionInput = {
   seed?: number;
 };
 
+/**
+ * Phrases from the OLD starter prompt text (DEFAULT_DESCRIPTORS before
+ * 2026-09-16). Saved drafts still carry them, so they reach the caption as
+ * if the user typed them. Dropped unless the guitar layer is on.
+ */
+export const LEGACY_STARTER_GUITAR_PHRASES = ['distorted guitar riffs', 'rock-dnb crossover'] as const;
+
+/** Shapes whose drums run half-time (StructureEngine halfTime). */
+const HALF_TIME_SHAPES = new Set(['dubstep', 'half-time-drop']);
+
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.min(1, Math.max(0, n));
@@ -50,9 +60,10 @@ export function energyWords(energy: number, seed = 0): string {
   return pickBand(['stadium energy, high-drive drop, jump up bassline', 'stadium rush, high-drive drop, jump up energy'], seed);
 }
 
+/** Every band names a Reese or growl bass — the DnB bass sound, not "bright airy bass". */
 export function darknessWords(darkness: number, seed = 0): string {
   const d = clamp01(darkness);
-  if (d < 0.34) return pickBand(['bright airy bass, liquid dnb', 'bright open bass, melodic liquid dnb'], seed);
+  if (d < 0.34) return pickBand(['smooth rolling reese bass, liquid dnb', 'warm detuned reese bass, melodic liquid dnb'], seed);
   if (d < 0.67) return pickBand(['weighted bass mood, rolling reese bass', 'weighted low mood, driving reese bass'], seed);
   return pickBand(['dark murky reese bass, neurofunk-leaning', 'dark murky growl bass, neurofunk energy'], seed);
 }
@@ -65,81 +76,83 @@ export function chaosWords(chaos: number, seed = 0): string {
 }
 
 /**
+ * Drum groove: two-step (kick 1, snare 2 and 4 at 174) when the break is
+ * tidy, chopped amen when it's busier. Half-time shapes get no groove word
+ * here — their shape tag names the half-time snare instead.
+ */
+export function grooveWords(chaos: number, songShape?: string): string {
+  if (songShape && HALF_TIME_SHAPES.has(songShape)) return '';
+  return clamp01(chaos) < 0.34 ? 'two-step breakbeat, snare on 2 and 4' : 'chopped amen break';
+}
+
+/**
  * Build ACE sidecar prompt.text from knobs (+ optional layers / user text).
  * Always includes energy/darkness/chaos words so Vary + knob changes alter the caption.
  *
- * Tag order follows ACE-Step's own prompting guidance (genre -> concrete
- * elements -> mood -> production -> BPM last, 5-12 keywords, specificity
- * over generality): the old caption led with a fused "rock drum and bass"
- * phrase and buried "174 bpm" mid-sentence, then filled the rest with vague
- * mood adjectives ("energetic dancefloor, solid drive") that could describe
- * house or techno just as well — nothing told the model this was
- * specifically drum and bass. Lead with an unambiguous, concrete DnB genre
- * lock (real breakbeat/bass vocabulary) before introducing the rock
- * crossover flavor, and put BPM at the end where the model expects it.
+ * Order follows ACE-Step's prompting guidance: genre -> concrete drums/bass ->
+ * mood -> BPM last. Guitar and rock words appear only when the guitar/solo
+ * layer is on or the user typed them. Shape tags only for the selected shape.
  */
 export function buildAceCaption(input: AceCaptionInput): string {
   const energy = clamp01(input.energy);
   const darkness = clamp01(input.darkness);
   const chaos = clamp01(input.chaos ?? 0.25);
+  const guitarOn = Boolean(input.layers?.guitar || input.layers?.solo);
 
   const seed = input.seed ?? 0;
-  const parts: string[] = [
-    'drum and bass',
-    'instrumental',
-    'rolling breakbeats',
-    'sub bass',
-    energyWords(energy, seed),
-    darknessWords(darkness, seed),
-    chaosWords(chaos, seed),
-    'rock-dnb crossover',
-  ];
-
-  // Split user text into individual comma phrases and dedup each against
-  // what's already queued — pushing it as one un-split blob (the old
-  // behavior) let phrases like "rock-dnb crossover" duplicate a structural
-  // tag above with no way to catch it, since the containment check only
-  // ever ran on `descriptors`, never on `userText` itself (confirmed in the
-  // raw ACE log: "rock-dnb crossover" and "174 bpm" both appeared twice).
+  const parts: string[] = [];
+  // Substring dedup: a phrase already covered by a queued part is skipped.
   const pushDeduped = (phrase: string) => {
     const t = phrase.trim();
     if (t && !parts.some((p) => p.toLowerCase().includes(t.toLowerCase()))) parts.push(t);
   };
-  const user = input.userText?.trim();
-  if (user) user.split(',').forEach(pushDeduped);
+  const pushPhrases = (text: string) => text.split(',').forEach(pushDeduped);
 
-  if (input.descriptors?.length) {
-    for (const d of input.descriptors) pushDeduped(String(d ?? ''));
-  }
+  pushPhrases('drum and bass, instrumental');
+  pushPhrases(grooveWords(chaos, input.songShape));
+  pushPhrases('tight punchy drums, sub bass');
+  pushPhrases(energyWords(energy, seed));
+  pushPhrases(darknessWords(darkness, seed));
+  pushPhrases(chaosWords(chaos, seed));
+
+  const legacy = new Set<string>(LEGACY_STARTER_GUITAR_PHRASES);
+  const pushUser = (phrase: string) => {
+    if (!guitarOn && legacy.has(phrase.trim().toLowerCase())) return;
+    pushDeduped(phrase);
+  };
+  const user = input.userText?.trim();
+  if (user) user.split(',').forEach(pushUser);
+  for (const d of input.descriptors ?? []) String(d ?? '').split(',').forEach(pushUser);
 
   if (input.layers?.guitar) {
-    parts.push('original rock-dnb guitar riffs, distorted rhythm guitar');
+    pushPhrases('rock-dnb crossover, original rock-dnb guitar riffs, distorted rhythm guitar');
   }
   if (input.layers?.solo) {
-    parts.push('original lead guitar solo, expressive rock-dnb crossover lead');
+    pushPhrases('original lead guitar solo, expressive rock-dnb crossover lead');
   }
   if (input.layers?.vocalish) {
-    parts.push('vocal-ish synth texture, chopped pad vocalese, no lyrics');
+    pushPhrases('vocal-ish synth texture, chopped pad vocalese, no lyrics');
   }
   if (input.layers?.extraDrums) {
-    parts.push('extra breakbeat layers, dense percussion fills');
+    pushPhrases('extra breakbeat layers, dense percussion fills');
   }
 
   const shape = input.songShape;
   if (shape === 'dubstep') {
-    parts.push('half-time snare, wobble growl bass, dubstep-influenced drop');
+    pushPhrases('half-time snare, wobble growl bass, dubstep-influenced drop');
   } else if (shape === 'half-time-drop') {
-    parts.push('half-time snare, heavy weighted drop, rolling reese movement');
-  }
-  if (shape === 'trap-bounce') {
-    parts.push('fat 808 glide bass, rolling bounce hats, punchy trap-flavored dnb');
+    pushPhrases('half-time snare on 3, heavy weighted drop, rolling reese movement');
+  } else if (shape === 'trap-bounce') {
+    pushPhrases('fat 808 glide bass, rolling bounce hats, punchy trap-flavored dnb');
   }
 
   // BPM last — ACE-Step's own prompting guidance expects it as a trailing
-  // tag, not buried mid-sentence. Product tempo is a hard-locked ~174.
-  pushDeduped('174 bpm');
+  // tag. Product tempo is hard-locked 174; drop any earlier copy first.
+  const bpmIdx = parts.findIndex((p) => /^174 bpm$/i.test(p));
+  if (bpmIdx >= 0) parts.splice(bpmIdx, 1);
+  parts.push('174 bpm');
 
-  return parts.join(', ').replace(/,\s*,/g, ',').trim();
+  return parts.join(', ');
 }
 
 /** Tags array for ACE payload — includes guitar/solo honesty tags when layers on. */
