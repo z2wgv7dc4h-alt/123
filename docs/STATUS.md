@@ -75,8 +75,8 @@ documentation, all of it is still in git history if ever needed.
 ## Open questions — not yet resolved
 
 - **Does the composition/style actually match the target reference sound**
-  (e.g. Pendulum-style big-room DnB)? Two rounds of real listening feedback
-  so far, both from Wyatt on 2026-09-15:
+  (e.g. Pendulum-style big-room DnB)? Three rounds of real listening
+  feedback so far, all from Wyatt on 2026-09-15:
   1. "sounds like nonsense, not composed at all" → traced to the bass
      leaping up to 19 semitones between consecutive notes with no voice
      leading → fixed (`nearestOctaveTo()`, below).
@@ -87,9 +87,22 @@ documentation, all of it is still in git history if ever needed.
      tanh-distorted sine with no filtering (reads as a buzzy chiptune
      square wave). Fixed: all three now derive pitch from the real key,
      the guitar layer voices an actual power chord instead of one bare
-     tone, and a one-pole lowpass shapes the distortion toward an amp
-     tone. Sent for a third listen — **not yet confirmed**, same rule as
-     before: don't mark this resolved until Wyatt says so.
+     tone, and a lowpass shapes the distortion toward an amp tone.
+  3. "theres a machinegun in the background... get a source from git" →
+     hats were firing 32nd notes through the *entire* drop/build section
+     for syncopated/trap families (~43ms apart at 174bpm, sustained).
+     Researched real production references instead of guessing again:
+     16th notes are the actual DnB hat baseline; 32nds are an
+     occasional roll/accent technique, never a sustained grid. Fixed
+     the density, and separately rebuilt kick/snare/hat synthesis after
+     reading a real sample-free Web Audio drum synthesis reference
+     ([dev.to/sendotltd, MIT-licensed](https://dev.to/sendotltd/sample-free-drum-synthesis-in-web-audio-building-kick-snare-and-hi-hat-from-oscillators-in-60-2c0k)):
+     added a proper resonant bandpass biquad (RBJ Audio EQ Cookbook
+     formula) for snare crack and hat metallic ring — the old "filter"
+     was a bare 1-pole differencer that just reads as fizzy hiss with
+     no resonance — plus a steeper kick pitch-sweep for more attack.
+  Sent a fourth comparison render — **not yet confirmed**, same rule as
+  every round before it: don't mark this resolved until Wyatt says so.
 - **Bass voice leading** (fixed 2026-09-15,
   `src/core/structure/StructureEngine.ts` `nearestOctaveTo()` +
   `src/test/bass-voice-leading.test.ts`): every bass note now re-octaves
