@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { previewPlayer } from '@/core/audio';
-import { useStudioStore } from '../hooks/useStudioStore';
+import { useStudioStore, canPlayPreview } from '../hooks/useStudioStore';
 import {
   formatBarBeatSection,
   formatMmSs,
@@ -157,6 +157,8 @@ export function Waveform() {
   const previewState = useStudioStore((s) => s.previewState);
   const mixerDirty = useStudioStore((s) => s.mixerDirty);
   const seekPreview = useStudioStore((s) => s.seekPreview);
+  const play = useStudioStore((s) => s.play);
+  const stop = useStudioStore((s) => s.stop);
   const setLoopRegion = useStudioStore((s) => s.setLoopRegion);
   const clearLoopRegion = useStudioStore((s) => s.clearLoopRegion);
   const loopRegion = useStudioStore((s) => s.loopRegion);
@@ -344,6 +346,8 @@ export function Waveform() {
     bpm: result?.bpmMeasured ?? 174,
   });
   const durationSec = playback.durationSec;
+  // Critic ONE Play truth: ready|stopped only (shared with Space hotkey).
+  const canPlay = canPlayPreview(result, previewState);
 
   // P0.7: cold load — no empty “Peaks appear…” / second Generate
   if (!result) return null;
@@ -362,6 +366,58 @@ export function Waveform() {
         <span className="waveform-meta">
           {result.bpmMeasured} BPM · click seek · drag loop · Z zoom · Esc clears
         </span>
+      </div>
+      {/* UI-5: compact Play/Stop + time readout — same store handlers as the old top-bar buttons */}
+      <div className="waveform-transport" role="group" aria-label="Play, Stop">
+        <span className="transport-btn-wrap">
+          <button
+            type="button"
+            className="btn tiny ghost btn-play-compact"
+            disabled={!canPlay}
+            aria-label={previewState === 'playing' ? 'Playing' : 'Play'}
+            aria-keyshortcuts="Space"
+            title={canPlay ? 'Play mix preview — replay OK after end (Space)' : HELP.playDisabled}
+            aria-describedby={!canPlay ? 'help-play-disabled' : undefined}
+            onClick={() => void play()}
+          >
+            <span aria-hidden="true">{previewState === 'playing' ? '❚❚' : '▶'}</span>
+          </button>
+          <HelpTip
+            text={canPlay ? HELP.play : HELP.playDisabled}
+            ariaLabel={canPlay ? 'What Play does' : 'Why Play is disabled'}
+          />
+          {!canPlay ? (
+            <span id="help-play-disabled" className="sr-only">
+              {HELP.playDisabled}
+            </span>
+          ) : null}
+        </span>
+        <span className="transport-btn-wrap">
+          <button
+            type="button"
+            className={`btn tiny ghost btn-stop-compact ${previewState === 'playing' ? 'on' : ''}`}
+            disabled={previewState !== 'playing'}
+            aria-label="Stop"
+            title="Stop mix preview (Space)"
+            onClick={() => stop()}
+          >
+            <span aria-hidden="true">■</span>
+          </button>
+          <HelpTip text={HELP.stop} ariaLabel="What Stop does" />
+        </span>
+        {durationSec > 0 ? (
+          <span className="transport-clock compact" role="status" aria-live="off" title={HELP.transportClock}>
+            <span className="transport-clock-elapsed">
+              {formatElapsedTotal(progress * durationSec, durationSec)}
+            </span>
+            {playback.mismatch && playback.mismatchNote ? (
+              <span className="transport-clock-mismatch" title={HELP.durationMismatch}>
+                {playback.mismatchNote}
+              </span>
+            ) : null}
+            <HelpTip text={HELP.transportClock} ariaLabel="About transport clock" />
+          </span>
+        ) : null}
       </div>
       {mixerDirty && (
         <p className="waveform-dirty-note" role="note">

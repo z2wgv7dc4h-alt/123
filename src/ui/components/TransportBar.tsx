@@ -1,13 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
-import { useStudioStore, canPlayPreview } from '../hooks/useStudioStore';
+import { useEffect, useState } from 'react';
+import { useStudioStore } from '../hooks/useStudioStore';
 import { HELP } from '../lib/helpCopy';
 import { HelpTip } from './HelpTip';
 import type { PreviewState } from '@/core/audio';
-import { previewPlayer } from '@/core/audio';
-import {
-  formatElapsedTotal,
-  resolvePlaybackDuration,
-} from '../lib/barPosition';
 import {
   shouldShowFirstPlayCoach,
   dismissFirstPlayCoach,
@@ -62,34 +57,11 @@ export function TransportBar() {
   const generate = useStudioStore((s) => s.generate);
   const generateAgain = useStudioStore((s) => s.generateAgain);
   const vary = useStudioStore((s) => s.vary);
-  const play = useStudioStore((s) => s.play);
-  const stop = useStudioStore((s) => s.stop);
   const exportStems = useStudioStore((s) => s.exportStems);
   const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
   const previousResult = useStudioStore((s) => s.previousResult);
   const abFlashback = useStudioStore((s) => s.abFlashback);
   const restorePrevious = useStudioStore((s) => s.restorePrevious);
-
-  // Critic ONE Play truth: ready|stopped only (shared with Space hotkey).
-  const canPlay = canPlayPreview(result, previewState);
-  const playNeedsAttention =
-    !!result && flowStep === 'generated' && (previewState === 'ready' || previewState === 'stopped');
-  // #78 mixerDirty → pulse Play (rehear), NEVER Generate
-  const rehearPulse =
-    !!result && mixerDirty && previewState !== 'playing' && previewState !== 'loading';
-  const playPulse = playNeedsAttention || rehearPulse;
-  const [playGlowOnce, setPlayGlowOnce] = useState(false);
-  const lastGlowJob = useRef<string | null>(null);
-
-  // Soft 1.2s Play glow on new result (reduced-motion: CSS static outline only)
-  useEffect(() => {
-    if (!result || flowStep !== 'generated') return;
-    if (lastGlowJob.current === result.jobId) return;
-    lastGlowJob.current = result.jobId;
-    setPlayGlowOnce(true);
-    const id = window.setTimeout(() => setPlayGlowOnce(false), 1200);
-    return () => window.clearTimeout(id);
-  }, [result, flowStep]);
 
   // Studio/ACE without GPU: keep Generate enabled — store fail-softs to Sketch audio
   const sketchHonesty = (productTier === 'studio' && !aceHasGpu) || (backendId.startsWith('ace-step') && !aceHasGpu);
@@ -98,39 +70,14 @@ export function TransportBar() {
   const pill = previewPillLabel(previewState, mixerDirty, !!result, abFlashback);
   const [coachOpen, setCoachOpen] = useState(false);
   const [exportCoachOpen, setExportCoachOpen] = useState(false);
-  const playBtnRef = useRef<HTMLButtonElement>(null);
-  const lastAutofocusJob = useRef<string | null>(null);
 
   // #43 soft first-play coach — once per browser, after first Generate until Play/dismiss
+  // (Play itself now lives on the waveform card — this banner just watches previewState.)
   useEffect(() => {
     if (result && flowStep === 'generated' && shouldShowFirstPlayCoach()) {
       setCoachOpen(true);
     }
   }, [result, flowStep]);
-
-  // #77 Play autofocus after Generate — skip while typing / HelpTip open
-  useEffect(() => {
-    if (!result || flowStep !== 'generated' || busy) return;
-    if (lastAutofocusJob.current === result.jobId) return;
-    const typingOrTip = () => {
-      if (typeof document === 'undefined') return true;
-      if (document.querySelector('.help-tip-wrap[data-open="true"]')) return true;
-      if (document.querySelector('.help-tip-btn[aria-expanded="true"]')) return true;
-      const t = document.activeElement as HTMLElement | null;
-      if (!t) return false;
-      const tag = t.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable) return true;
-      return false;
-    };
-    if (typingOrTip()) return;
-    lastAutofocusJob.current = result.jobId;
-    // Defer so Generate click blur settles
-    const id = window.setTimeout(() => {
-      if (typingOrTip()) return;
-      playBtnRef.current?.focus({ preventScroll: true });
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, [result, flowStep, busy]);
 
   useEffect(() => {
     if (previewState === 'playing' && coachOpen) {
@@ -192,89 +139,13 @@ export function TransportBar() {
     setExportCoachOpen(false);
   };
 
-  // Always-on clock: elapsed / total from honest playback duration (mix/live).
-  const [clockProgress, setClockProgress] = useState(0);
-  const [liveDur, setLiveDur] = useState(0);
-  useEffect(() => {
-    if (!result) {
-      setClockProgress(0);
-      setLiveDur(0);
-      return;
-    }
-    let raf = 0;
-    const tick = () => {
-      setClockProgress(previewPlayer.getProgress());
-      setLiveDur(previewPlayer.getDurationSec());
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [result, previewState]);
-
-  const structBars = result?.structure?.bars ?? 0;
-  const bpm = result?.bpmMeasured ?? 174;
-  const mixDur = result?.stems.find((s) => s.id === 'mix')?.durationSec ?? 0;
-  const playback = resolvePlaybackDuration({
-    mixDurationSec: mixDur,
-    liveDurationSec: liveDur > 0 ? liveDur : null,
-    bars: structBars,
-    bpm,
-  });
-  const elapsedSec = clockProgress * playback.durationSec;
   const postHear = !!result && (flowStep === 'played' || flowStep === 'exported' || previewState === 'playing' || previewState === 'stopped' || previewState === 'ready');
 
   return (
     <>
       <div id="transport" className="transport" role="toolbar" aria-label="Transport">
-        {/* UI-1: Play · Stop · Generate · Vary in one cluster — same handlers, nothing between them. */}
-        <span className="transport-cluster" role="group" aria-label="Play, Stop, Generate, Vary">
-          <span className="transport-btn-wrap">
-            <button
-              ref={playBtnRef}
-              type="button"
-              className={`btn btn-play ${playPulse ? 'accent pulse' : ''}${playGlowOnce ? ' glow-once' : ''}`}
-              disabled={!canPlay}
-              aria-keyshortcuts="Space"
-              title={
-                rehearPulse
-                  ? 'Tweaks ready — hit Play to rehear (Space)'
-                  : canPlay
-                    ? 'Play mix preview — replay OK after end (Space)'
-                    : HELP.playDisabled
-              }
-              aria-describedby={!canPlay ? 'help-play-disabled' : undefined}
-              onClick={() => void play()}
-            >
-              Play
-            </button>
-            <HelpTip
-              text={canPlay ? HELP.play : HELP.playDisabled}
-              ariaLabel={canPlay ? 'What Play does' : 'Why Play is disabled'}
-            />
-            {!canPlay ? (
-              <span id="help-play-disabled" className="sr-only">
-                {HELP.playDisabled}
-              </span>
-            ) : null}
-            {mixerDirty && result ? (
-              <span className="heard-remix-badge" role="status">
-                Heard remix
-                <HelpTip text={HELP.heardBadge} ariaLabel="About heard remix badge" />
-              </span>
-            ) : null}
-          </span>
-          <span className="transport-btn-wrap">
-            <button
-              type="button"
-              className={`btn btn-stop ${previewState === 'playing' ? 'on' : ''}`}
-              disabled={previewState !== 'playing'}
-              title="Stop mix preview (Space)"
-              onClick={() => stop()}
-            >
-              Stop
-            </button>
-            <HelpTip text={HELP.stop} ariaLabel="What Stop does" />
-          </span>
+        {/* UI-5: Play/Stop moved to the waveform card's compact controls — only Generate/Vary here. */}
+        <span className="transport-cluster" role="group" aria-label="Generate, Vary">
           <span className="transport-btn-wrap">
             <button
               type="button"
@@ -359,29 +230,6 @@ export function TransportBar() {
             </span>
           ) : null}
         </span>
-        {playNeedsAttention ? (
-          <span className="sr-only" role="status" aria-live="polite">
-            Ready — hit Play
-          </span>
-        ) : null}
-        {result && playback.durationSec > 0 ? (
-          <span
-            className="transport-clock compact"
-            role="status"
-            aria-live="off"
-            title={HELP.transportClock}
-          >
-            <span className="transport-clock-elapsed">
-              {formatElapsedTotal(elapsedSec, playback.durationSec)}
-            </span>
-            {playback.mismatch && playback.mismatchNote ? (
-              <span className="transport-clock-mismatch" title={HELP.durationMismatch}>
-                {playback.mismatchNote}
-              </span>
-            ) : null}
-            <HelpTip text={HELP.transportClock} ariaLabel="About transport clock" />
-          </span>
-        ) : null}
         <span
           className={`pill${!result ? ' pill-pre' : ''}${mixerDirty && result ? ' remix-live' : ''}${abFlashback ? ' ab-flashback' : ''}`}
           aria-live="polite"

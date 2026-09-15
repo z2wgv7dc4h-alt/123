@@ -568,6 +568,24 @@ details summary:hover { color: var(--text); }
   font-size: 0.7rem;
   color: var(--muted);
 }
+/* UI-5: compact Play/Stop + clock, relocated off the top action bar */
+.waveform-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.btn-play-compact,
+.btn-stop-compact {
+  min-width: 2.15rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.btn-stop-compact.on {
+  opacity: 1;
+  color: var(--on);
+}
 .waveform.loading .waveform-canvas {
   opacity: 0.55;
 }
@@ -1453,38 +1471,27 @@ details summary:hover { color: var(--text); }
    Consumer polish — Ableton / Spotify Simple Mode hierarchy
    ═══════════════════════════════════════════════════════════ */
 
-/* Primary transport CTAs stand out; Stop stays quiet chrome */
+/* Primary transport CTAs stand out */
 .transport .btn-generate,
-.transport .btn.primary {
+.transport .btn.primary,
+.transport .btn-vary-primary {
   padding: 0.72rem 1.35rem;
   font-size: var(--font-md);
   border-radius: 12px;
   min-height: 2.75rem;
 }
-.transport .btn-play,
 .transport .btn-export {
   padding: 0.64rem 1.15rem;
   min-height: 2.55rem;
   font-size: var(--font-md);
 }
-.transport .btn-stop {
-  padding: 0.5rem 0.85rem;
-  opacity: 0.88;
-  font-weight: 600;
-  color: var(--muted);
-}
-.transport .btn-stop.on {
-  opacity: 1;
-  color: var(--on);
-}
-.transport .btn-play.accent.pulse,
 .transport .btn.accent.pulse {
   box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.35), var(--glow-accent);
 }
 .transport-btn-wrap {
   gap: 0.22rem;
 }
-/* UI-1: Play · Stop · Generate · Vary group keeps the toolbar's own spacing/wrap */
+/* UI-5: Generate · Vary keep the toolbar's own spacing/wrap (Play/Stop moved to the waveform card) */
 .transport-cluster {
   display: inline-flex;
   flex-wrap: wrap;
@@ -2318,20 +2325,6 @@ details summary:hover { color: var(--text); }
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   margin-left: 0.35rem;
-}
-.heard-remix-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  margin-left: 0.35rem;
-  padding: 0.12rem 0.4rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  color: var(--accent);
-  background: rgba(0, 229, 255, 0.1);
-  border: 1px solid rgba(0, 229, 255, 0.28);
 }
 .resume-draft-strip {
   display: flex;
