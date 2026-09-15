@@ -16,7 +16,6 @@ const fakeVibe: VibeProfile = {
 describe('browser E2E store invariants', () => {
   beforeEach(() => {
     useStudioStore.setState({
-      mode: 'simple',
       moreOpen: false,
       vibe: fakeVibe,
       ownerConfirmed: true,
@@ -40,29 +39,26 @@ describe('browser E2E store invariants', () => {
     });
   });
 
-  it('Style Ref preserve: setMode Simple↔Power keeps vibe + ownerConfirmed', () => {
-    useStudioStore.getState().setMode('power');
-    expect(useStudioStore.getState().mode).toBe('power');
+  it('Style Ref preserve: opening/closing More keeps vibe + ownerConfirmed', () => {
+    useStudioStore.getState().setMoreOpen(true);
+    expect(useStudioStore.getState().moreOpen).toBe(true);
     expect(useStudioStore.getState().vibe?.fileName).toBe('mine.wav');
     expect(useStudioStore.getState().ownerConfirmed).toBe(true);
-    useStudioStore.getState().setMode('simple');
+    useStudioStore.getState().setMoreOpen(false);
     expect(useStudioStore.getState().vibe?.fingerprintHash).toBe('abc123deadbeef');
     expect(useStudioStore.getState().ownerConfirmed).toBe(true);
   });
 
-  it('setMode(simple) clears moreOpen', () => {
-    useStudioStore.setState({ mode: 'power', moreOpen: true });
-    useStudioStore.getState().setMode('simple');
-    expect(useStudioStore.getState().mode).toBe('simple');
-    expect(useStudioStore.getState().moreOpen).toBe(false);
-    // Style + mixer survive
-    expect(useStudioStore.getState().vibe).not.toBeNull();
+  it('one layout: store has no mode / setMode', () => {
+    const s = useStudioStore.getState() as unknown as Record<string, unknown>;
+    expect('mode' in s).toBe(false);
+    expect('setMode' in s).toBe(false);
   });
 
-  it('mute ≠ mode flip: toggleMute does not change mode or wipe style', () => {
-    useStudioStore.setState({ mode: 'power', moreOpen: true });
+  it('mute does not close More or wipe style', () => {
+    useStudioStore.setState({ moreOpen: true });
     useStudioStore.getState().toggleMute('kick');
-    expect(useStudioStore.getState().mode).toBe('power');
+    expect(useStudioStore.getState().moreOpen).toBe(true);
     expect(useStudioStore.getState().mixer.mute.kick).toBe(true);
     expect(useStudioStore.getState().mixerDirty).toBe(true);
     expect(computeMixerDirty(useStudioStore.getState().mixer)).toBe(true);

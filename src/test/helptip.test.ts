@@ -51,7 +51,6 @@ describe('HELP copy catalog', () => {
       'energyNudge',
       'darknessNudge',
       'flowChips',
-      'simpleMode',
       'waveform',
       'sectionTimeline',
       'stems',

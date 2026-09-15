@@ -4,7 +4,6 @@ import {
   DEFAULT_BIT_DEPTH,
   DEFAULT_DESCRIPTORS,
   DEFAULT_SAMPLE_RATE,
-  type AppMode,
   type ProductTier,
   type FlowStep,
   type MixerState,
@@ -198,7 +197,6 @@ function pushMixerUndo(prev: MixerState): void {
 
 
 export interface StudioState {
-  mode: AppMode;
   /** Retail product: Sketch (CPU now) vs Studio (GPU when live). */
   productTier: ProductTier;
   seed: number;
@@ -233,7 +231,7 @@ export interface StudioState {
   ownerConfirmed: boolean;
   /** Last ACE-Step /probe result — Generate disabled for ACE when false. */
   aceHasGpu: boolean;
-  /** Simple Mode: power panels behind More controls. */
+  /** One layout: extras live behind the single More toggle. */
   moreOpen: boolean;
   /** Sketch export WAV bit depth (16 default; 24 via encodeWav — not Studio). */
   exportBitDepth: 16 | 24;
@@ -271,7 +269,6 @@ export interface StudioState {
     /** Real breakbeat loop under drops (Sketch). Opt-OUT: defaults on. */
     realBreak: boolean;
   };
-  setMode: (m: AppMode) => void;
   setProductTier: (t: ProductTier) => void;
   setSeed: (n: number) => void;
   setKeepSeed: (v: boolean) => void;
@@ -469,7 +466,6 @@ function maybeToastRemixLive(get: () => StudioState): void {
 }
 
 export const useStudioStore = create<StudioState>((set, get) => ({
-  mode: 'simple',
   productTier: 'sketch',
   seed: 17400,
   keepSeed: false,
@@ -511,27 +507,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   editedSections: null,
   layers: { guitar: false, solo: false, vocalish: false, extraDrums: false, realBreak: true },
 
-  setMode: (m) => {
-    const st = get();
-    // Style Ref + mixer + result survive Simple↔Power — never clear vibe/owner/mixerDirty.
-    if (st.mode === m) {
-      if (m === 'simple' && st.moreOpen) set({ moreOpen: false });
-      return;
-    }
-    const patch: Partial<StudioState> = { mode: m };
-    if (m === 'simple') patch.moreOpen = false; // CoS: clear More chrome on Simple
-    if (m === 'power') patch.moreOpen = true;
-    set(patch);
-    void refreshPreviewAfterMixerChange(set, get);
-    if (m === 'simple' && st.mixerDirty) {
-      const nonEl = (['drums', 'mix'] as const).some(
-        (id) => st.mixer.mute[id] || st.mixer.solo[id],
-      );
-      if (nonEl) {
-        pushToast('Some mutes are under Full mixer (More) — Reset mix clears all', 'info', 4200);
-      }
-    }
-  },
   setProductTier: (tier) => {
     const st = get();
     if (tier === 'sketch') {
@@ -743,16 +718,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   toggleMute: (id) => {
     previewPlayer.unlockAudioSync();
-    const modeBefore = get().mode;
     const vibeBefore = get().vibe;
     const ownerBefore = get().ownerConfirmed;
     pushMixerUndo(get().mixer);
     set((s) => {
       const mixer = { ...s.mixer, mute: { ...s.mixer.mute, [id]: !s.mixer.mute[id] } };
-      // mute ≠ mode flip — never write mode / vibe / ownerConfirmed here
+      // mute never writes vibe / ownerConfirmed
       return { mixer, mixerDirty: computeMixerDirty(mixer), mixerUndoAvailable: true };
     });
-    if (get().mode !== modeBefore) set({ mode: modeBefore });
     if (get().vibe !== vibeBefore || get().ownerConfirmed !== ownerBefore) {
       set({ vibe: vibeBefore, ownerConfirmed: ownerBefore });
     }
@@ -766,16 +739,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
   toggleSolo: (id) => {
     previewPlayer.unlockAudioSync();
-    const modeBefore = get().mode;
     const vibeBefore = get().vibe;
     const ownerBefore = get().ownerConfirmed;
     pushMixerUndo(get().mixer);
     set((s) => {
       const mixer = { ...s.mixer, solo: { ...s.mixer.solo, [id]: !s.mixer.solo[id] } };
-      // mute/solo parity — never write mode / vibe / ownerConfirmed
+      // mute/solo parity — never write vibe / ownerConfirmed
       return { mixer, mixerDirty: computeMixerDirty(mixer), mixerUndoAvailable: true };
     });
-    if (get().mode !== modeBefore) set({ mode: modeBefore });
     if (get().vibe !== vibeBefore || get().ownerConfirmed !== ownerBefore) {
       set({ vibe: vibeBefore, ownerConfirmed: ownerBefore });
     }
@@ -789,7 +760,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
   exclusiveSolo: (id) => {
     previewPlayer.unlockAudioSync();
-    const modeBefore = get().mode;
     const vibeBefore = get().vibe;
     const ownerBefore = get().ownerConfirmed;
     pushMixerUndo(get().mixer);
@@ -806,7 +776,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const mixer = { ...s.mixer, solo };
       return { mixer, mixerDirty: computeMixerDirty(mixer), mixerUndoAvailable: true };
     });
-    if (get().mode !== modeBefore) set({ mode: modeBefore });
     if (get().vibe !== vibeBefore || get().ownerConfirmed !== ownerBefore) {
       set({ vibe: vibeBefore, ownerConfirmed: ownerBefore });
     }
@@ -1182,11 +1151,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         previewState: previewReady,
         editedSections: null,
         bars: result.structure?.bars ?? preserved.bars,
-        // Style Ref preserve — generate must not drop attached vibe / ownership / mode
+        // Style Ref preserve — generate must not drop attached vibe / ownership
         vibe: preserved.vibe,
         ownerConfirmed: preserved.ownerConfirmed,
         vibeIntensity: preserved.vibeIntensity,
-        mode: preserved.mode,
         songShape: preserved.songShape,
         layers: preserved.layers,
       });
@@ -1262,7 +1230,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         pushToast(msg, 'error', 0);
         return;
       }
-      // load → play (or toast). Style ref / mode / mixerDirty must survive Play.
+      // load → play (or toast). Style ref / mixerDirty must survive Play.
       previewPlayer.onState = (ps) => set({ previewState: ps });
       await loadPreviewFromMixer(result, mixer);
       if (mixerRefreshQueued) {
@@ -1589,13 +1557,13 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 }));
 
 
-/** Survive Vite HMR so concurrent agent edits don't wipe Style Ref / mode / preview (E2E). */
+/** Survive Vite HMR so concurrent agent edits don't wipe Style Ref / preview (E2E).
+ *  Old saved data may still carry a `mode` key — it is never read (one layout). */
 if (import.meta.hot) {
   import.meta.hot.accept();
   const saved = import.meta.hot.data.studioData as Record<string, unknown> | undefined;
   if (saved) {
     useStudioStore.setState({
-      mode: saved.mode as StudioState['mode'],
       productTier: (saved.productTier as StudioState['productTier']) ?? 'sketch',
       moreOpen: saved.moreOpen as boolean,
       exportBitDepth: (saved.exportBitDepth as StudioState['exportBitDepth']) ?? DEFAULT_BIT_DEPTH,
@@ -1624,7 +1592,6 @@ if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     const s = useStudioStore.getState();
     import.meta.hot!.data.studioData = {
-      mode: s.mode,
       productTier: s.productTier,
       moreOpen: s.moreOpen,
       exportBitDepth: s.exportBitDepth,

@@ -229,9 +229,7 @@ export function StemMixerCompact() {
 }
 
 export function StemMixer() {
-  const mode = useStudioStore((s) => s.mode);
   const result = useStudioStore((s) => s.result);
-  const isSimple = mode === 'simple';
   const sharedMix =
     Boolean(result?.manifest?.gpuUsed) ||
     Boolean(result?.backendId?.startsWith('ace-step'));
@@ -248,14 +246,10 @@ export function StemMixer() {
           ? 'Studio ACE may share one mix across lanes — Mute/Solo are preview-relative, not isolated stems yet.'
           : 'Mute / Solo / Gain update the preview live. ZIP always keeps dry stems for DAW work; when you tweak, it also adds mix_as_heard.wav matching this preview.'}
       </p>
-      {isSimple ? (
-        <details className="stem-mixer-details" open>
-          <summary>Preview stem mix (optional)</summary>
-          <MixerBody />
-        </details>
-      ) : (
+      <details className="stem-mixer-details" open>
+        <summary>Preview stem mix (optional)</summary>
         <MixerBody />
-      )}
+      </details>
     </section>
   );
 }

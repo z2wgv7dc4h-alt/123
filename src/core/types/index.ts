@@ -320,8 +320,6 @@ export interface MixerState {
   gainDb: Record<StemId, number>;
 }
 
-export type AppMode = 'simple' | 'power';
-
 /** Retail product path — Sketch = CPU/browser now; Studio = GPU/ACE when live. */
 export type ProductTier = 'sketch' | 'studio';
 

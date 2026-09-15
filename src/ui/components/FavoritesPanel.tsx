@@ -49,9 +49,6 @@ export function FavoritesPanel() {
   const [items, setItems] = useState<FavoriteSnapshot[]>(() => loadFavorites());
   const busy = useStudioStore((s) => s.busy);
   const result = useStudioStore((s) => s.result);
-  const mode = useStudioStore((s) => s.mode);
-  const backendId = useStudioStore((s) => s.backendId);
-  const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
   const generate = useStudioStore((s) => s.generate);
   const generateAgain = useStudioStore((s) => s.generateAgain);
 
@@ -61,8 +58,8 @@ export function FavoritesPanel() {
     refresh();
   }, [refresh, result?.jobId]);
 
-  const aceBlocked = mode !== 'simple' && backendId.startsWith('ace-step') && !aceHasGpu;
-  const canGenerate = !busy && !aceBlocked;
+  // Studio without GPU never blocks: generate() fail-softs to Sketch audio.
+  const canGenerate = !busy;
 
   const onSave = () => {
     const entry = addFavorite(snapshotFromStore());

@@ -44,8 +44,8 @@ export function PowerExtras() {
   return (
     <section className="panel section-accent-power">
       <h2>
-        Power Mode
-        <HelpTip text={HELP.powerPanel} ariaLabel="About Power Mode panel" />
+        Advanced
+        <HelpTip text={HELP.powerPanel} ariaLabel="About Advanced panel" />
       </h2>
 
       <p className="power-callout" role="note">

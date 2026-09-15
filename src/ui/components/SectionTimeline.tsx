@@ -62,7 +62,6 @@ function sectionLabel(name: string, startBar: number, lengthBars: number): strin
 export function SectionTimeline() {
   const result = useStudioStore((s) => s.result);
   const busy = useStudioStore((s) => s.busy);
-  const mode = useStudioStore((s) => s.mode);
   const expandSectionAt = useStudioStore((s) => s.expandSectionAt);
   const repeatSectionAt = useStudioStore((s) => s.repeatSectionAt);
   const setSectionLengthAt = useStudioStore((s) => s.setSectionLengthAt);
@@ -174,10 +173,8 @@ export function SectionTimeline() {
     );
   }
 
-  const interactive = mode === 'simple' || true;
-
   return (
-    <div className={`timeline${interactive ? ' timeline-interactive' : ''}`} role="list" aria-label={`Arrangement ${bars} bars`}>
+    <div className="timeline timeline-interactive" role="list" aria-label={`Arrangement ${bars} bars`}>
       <div className="timeline-head label-with-tip">
         <span className="label-with-tip-text">Arrangement map</span>
         <HelpTip text={HELP.sectionTimeline} ariaLabel="About section map" />

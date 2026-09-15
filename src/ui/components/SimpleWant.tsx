@@ -15,7 +15,7 @@ export function SimpleWant() {
     <section className="simple-want panel" aria-label="What do you want" id="want">
       <div className="simple-want-head">
         <h2>
-          <span className="step-num" aria-hidden>1</span> What do you want?
+          What do you want?
           <HelpTip text={HELP.styleText} ariaLabel="About style text" />
         </h2>
         <p className="hint">Mood words · optional. Drop a vibe MP3 below if you have one.</p>

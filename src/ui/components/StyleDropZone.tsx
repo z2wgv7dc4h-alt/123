@@ -6,13 +6,12 @@ import { HELP } from '../lib/helpCopy';
 import { HelpTip } from './HelpTip';
 
 /**
- * Simple Mode style reference — File picker / drag-drop ONLY.
+ * Style reference — File picker / drag-drop ONLY.
  * No URL / YouTube. User must confirm own/licensed before attach.
  */
 export function StyleDropZone() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const mode = useStudioStore((s) => s.mode);
   const vibe = useStudioStore((s) => s.vibe);
   const vibeBusy = useStudioStore((s) => s.vibeBusy);
   const ownerConfirmed = useStudioStore((s) => s.ownerConfirmed);
@@ -53,27 +52,19 @@ export function StyleDropZone() {
   return (
     <section
       id="style-ref"
-      className={`panel style-ref-panel style-drop ${dragOver ? 'drag' : ''} ${vibe ? 'has-vibe' : ''}${mode === 'simple' ? ' optional-quiet' : ''}`}
+      className={`panel style-ref-panel style-drop ${dragOver ? 'drag' : ''} ${vibe ? 'has-vibe' : ''} optional-quiet`}
       aria-label="Optional vibe reference"
     >
       <div className="style-drop-head">
         <h2>
-          {mode === 'simple' ? 'Optional vibe' : 'Your MP3 → this vibe'}
+          Optional vibe
           <HelpTip
             text={HELP.styleRef}
             ariaLabel="About style reference"
           />
         </h2>
         <span className="style-legal">
-          {mode === 'simple' ? (
-            <>Optional — drop a track you own. Sketch biases mood; Studio conditions on the audio itself. Original output, not a copy. Skip anytime.</>
-          ) : (
-            <>
-              Optional. Drop a track <strong>you own</strong>. On Sketch we map it to mood/energy
-              only. On Studio the audio itself conditions generation, so the result can resemble
-              it — still an original render, not a copy. No YouTube.
-            </>
-          )}
+          Optional — drop a track you own. Sketch biases mood; Studio conditions on the audio itself. Original output, not a copy. Skip anytime.
         </span>
       </div>
 
@@ -123,7 +114,7 @@ export function StyleDropZone() {
           onClick={() => openPicker()}
         >
           <p className="style-ref-drop-title style-drop-cta">
-            {vibeBusy ? 'Analyzing…' : mode === 'simple' ? 'Drop a track you own' : 'Drop your track'}
+            {vibeBusy ? 'Analyzing…' : 'Drop a track you own'}
           </p>
           <p className="style-ref-drop-sub">MP3 · WAV · FLAC · stays in this browser</p>
           <p className="hint">
@@ -159,141 +150,69 @@ export function StyleDropZone() {
             <strong className="vibe-name style-ref-filename" title={vibe.fileName}>
               {vibe.fileName}
             </strong>
-            {mode !== 'simple' && (
-              <span className="pill tiny badge-with-tip">
-                tag {vibe.fingerprintHash.slice(0, 8)}
-                <HelpTip text={HELP.hashPill} ariaLabel="About style ref tag" />
-              </span>
-            )}
             <span className="pill tiny ready-chip">Ready · vibe locked</span>
           </div>
-          {mode === 'simple' ? (
-            <details className="vibe-details-fold">
-              <summary>Vibe details & nudges</summary>
-              <ul className="vibe-stats">
-                <li>
-                  Estimated BPM{' '}
-                  <strong>{vibe.estimatedBpm != null ? vibe.estimatedBpm.toFixed(1) : '—'}</strong>{' '}
-                  <span className="muted">(card only)</span>
-                </li>
-                <li>
-                  Energy <strong>{vibe.energy.toFixed(2)}</strong> · Brightness{' '}
-                  <strong>{vibe.brightness.toFixed(2)}</strong>
-                </li>
-                <li className="vibe-lock">
-                  Arrangement stays <strong>174 BPM</strong> — vibe mapped, not tempo-cloned
-                </li>
-              </ul>
-              <div className="vibe-nudges">
-                <label>
-                  <span className="label-with-tip">
-                    <span className="label-with-tip-text">Energy · {energy.toFixed(2)}</span>
-                    <HelpTip text={HELP.energyNudge} ariaLabel="About energy nudge" />
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={energy}
-                    onChange={(e) => setEnergy(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  <span className="label-with-tip">
-                    <span className="label-with-tip-text">Darkness · {darkness.toFixed(2)}</span>
-                    <HelpTip text={HELP.darknessNudge} ariaLabel="About darkness nudge" />
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={darkness}
-                    onChange={(e) => setDarkness(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  <span className="label-with-tip">
-                    <span className="label-with-tip-text">Intensity · {vibeIntensity.toFixed(2)}</span>
-                    <HelpTip text={HELP.vibeIntensity} ariaLabel="About vibe intensity" />
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={vibeIntensity}
-                    onChange={(e) => setVibeIntensity(Number(e.target.value))}
-                  />
-                </label>
-              </div>
-            </details>
-          ) : (
-            <>
-              <ul className="vibe-stats">
-                <li>
-                  Estimated BPM{' '}
-                  <strong>{vibe.estimatedBpm != null ? vibe.estimatedBpm.toFixed(1) : '—'}</strong>{' '}
-                  <span className="muted">(card only)</span>
-                </li>
-                <li>
-                  Energy <strong>{vibe.energy.toFixed(2)}</strong> · Brightness{' '}
-                  <strong>{vibe.brightness.toFixed(2)}</strong>
-                </li>
-                <li>
-                  Section guess: <strong>{vibe.sectionHints.slice(0, 2).join(' · ') || '—'}</strong>
-                </li>
-                <li className="vibe-lock">
-                  Arrangement stays <strong>174 BPM</strong> — vibe mapped, not tempo-cloned
-                </li>
-              </ul>
-              <div className="vibe-nudges">
-                <label>
-                  <span className="label-with-tip">
-                    <span className="label-with-tip-text">Energy nudge · {energy.toFixed(2)}</span>
-                    <HelpTip text={HELP.energyNudge} ariaLabel="About energy nudge" />
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={energy}
-                    onChange={(e) => setEnergy(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  <span className="label-with-tip">
-                    <span className="label-with-tip-text">Darkness nudge · {darkness.toFixed(2)}</span>
-                    <HelpTip text={HELP.darknessNudge} ariaLabel="About darkness nudge" />
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={darkness}
-                    onChange={(e) => setDarkness(Number(e.target.value))}
-                  />
-                </label>
-                <label>
-                  <span className="label-with-tip">
-                    <span className="label-with-tip-text">Vibe intensity · {vibeIntensity.toFixed(2)}</span>
-                    <HelpTip text={HELP.vibeIntensity} ariaLabel="About vibe intensity" />
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={vibeIntensity}
-                    onChange={(e) => setVibeIntensity(Number(e.target.value))}
-                  />
-                </label>
-              </div>
-            </>
-          )}
+          <details className="vibe-details-fold">
+            <summary>Vibe details & nudges</summary>
+            <ul className="vibe-stats">
+              <li>
+                Estimated BPM{' '}
+                <strong>{vibe.estimatedBpm != null ? vibe.estimatedBpm.toFixed(1) : '—'}</strong>{' '}
+                <span className="muted">(card only)</span>
+              </li>
+              <li>
+                Energy <strong>{vibe.energy.toFixed(2)}</strong> · Brightness{' '}
+                <strong>{vibe.brightness.toFixed(2)}</strong>
+              </li>
+              <li className="vibe-lock">
+                Arrangement stays <strong>174 BPM</strong> — vibe mapped, not tempo-cloned
+              </li>
+            </ul>
+            <div className="vibe-nudges">
+              <label>
+                <span className="label-with-tip">
+                  <span className="label-with-tip-text">Energy · {energy.toFixed(2)}</span>
+                  <HelpTip text={HELP.energyNudge} ariaLabel="About energy nudge" />
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={energy}
+                  onChange={(e) => setEnergy(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span className="label-with-tip">
+                  <span className="label-with-tip-text">Darkness · {darkness.toFixed(2)}</span>
+                  <HelpTip text={HELP.darknessNudge} ariaLabel="About darkness nudge" />
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={darkness}
+                  onChange={(e) => setDarkness(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                <span className="label-with-tip">
+                  <span className="label-with-tip-text">Intensity · {vibeIntensity.toFixed(2)}</span>
+                  <HelpTip text={HELP.vibeIntensity} ariaLabel="About vibe intensity" />
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={vibeIntensity}
+                  onChange={(e) => setVibeIntensity(Number(e.target.value))}
+                />
+              </label>
+            </div>
+          </details>
 
           <div className="vibe-actions">
             <button

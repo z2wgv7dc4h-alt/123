@@ -15,7 +15,7 @@ More (that is UI-3). Do not delete `e2e-invariants` assertions; rewrite them for
 the single layout.
 
 Done when: no element renders the text "Simple" or "Power" as a layout toggle;
-`grep -rn "[123] · " src/ui` returns nothing; `App.tsx` has no `isSimple`
+no numbered step label matches `[0-3] · (Generate|Play|Export|Style Ref)` in `src/ui` (plain `"[123] · "` also hits song-shape blurbs like "Snare on 3 · …"); `App.tsx` has no `isSimple`
 branch; old saved state still loads.
 
 Verify: `npx vitest run src/test/e2e-invariants.test.ts && npm.cmd test -- --run && npx tsc --noEmit`

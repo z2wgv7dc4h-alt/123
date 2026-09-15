@@ -6,7 +6,6 @@ import type { PreviewState } from '@/core/audio';
 import { previewPlayer } from '@/core/audio';
 import {
   formatElapsedTotal,
-  formatBarSectionClockLine,
   resolvePlaybackDuration,
 } from '../lib/barPosition';
 import {
@@ -58,7 +57,6 @@ export function TransportBar() {
   const flowStep = useStudioStore((s) => s.flowStep);
   const backendId = useStudioStore((s) => s.backendId);
   const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
-  const mode = useStudioStore((s) => s.mode);
   const productTier = useStudioStore((s) => s.productTier);
   const mixerDirty = useStudioStore((s) => s.mixerDirty);
   const generate = useStudioStore((s) => s.generate);
@@ -67,9 +65,7 @@ export function TransportBar() {
   const play = useStudioStore((s) => s.play);
   const stop = useStudioStore((s) => s.stop);
   const exportStems = useStudioStore((s) => s.exportStems);
-  const exportHeardSingle = useStudioStore((s) => s.exportHeardSingle);
   const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
-  const setExportBitDepth = useStudioStore((s) => s.setExportBitDepth);
   const previousResult = useStudioStore((s) => s.previousResult);
   const abFlashback = useStudioStore((s) => s.abFlashback);
   const restorePrevious = useStudioStore((s) => s.restorePrevious);
@@ -249,18 +245,12 @@ export function TransportBar() {
               aria-describedby={!canPlay ? 'help-play-disabled' : undefined}
               onClick={() => void play()}
             >
-              {mode === 'simple' ? 'Play' : '2 · Play'}
+              Play
             </button>
             <HelpTip
               text={canPlay ? HELP.play : HELP.playDisabled}
               ariaLabel={canPlay ? 'What Play does' : 'Why Play is disabled'}
             />
-            {mode !== 'simple' && (
-              <HelpTip text={HELP.playAutofocus} ariaLabel="About Play autofocus" />
-            )}
-            {mode !== 'simple' && rehearPulse ? (
-              <HelpTip text={HELP.rehearPulse} ariaLabel="About rehear pulse on Play" />
-            ) : null}
             {!canPlay ? (
               <span id="help-play-disabled" className="sr-only">
                 {HELP.playDisabled}
@@ -301,19 +291,7 @@ export function TransportBar() {
               }
               onClick={() => void generate()}
             >
-              {busy
-                ? 'Generating…'
-                : mode === 'simple'
-                  ? sketchHonesty
-                    ? 'Generate · Sketch'
-                    : studioLive
-                      ? 'Generate'
-                      : 'Generate'
-                  : sketchHonesty
-                    ? '1 · Generate (Sketch)'
-                    : studioLive
-                      ? '1 · Generate'
-                      : '1 · Generate'}
+              {busy ? 'Generating…' : sketchHonesty ? 'Generate · Sketch' : 'Generate'}
             </button>
             <HelpTip text={HELP.generate} ariaLabel="What Generate does" />
           </span>
@@ -348,7 +326,7 @@ export function TransportBar() {
             }
             aria-describedby={!result ? 'help-export-disabled' : undefined}
           >
-            {mode === 'simple' ? 'Export ZIP' : '3 · Export Sketch ZIP'}
+            Export ZIP
           </button>
           <HelpTip
             text={
@@ -366,12 +344,6 @@ export function TransportBar() {
                   : 'What Export ZIP does'
             }
           />
-          {mode !== 'simple' && (
-            <>
-              <HelpTip text={HELP.peakWarnExport} ariaLabel="About hot mix export warning" />
-              <HelpTip text={HELP.exportNamePreview} ariaLabel="About export file name" />
-            </>
-          )}
           {!result ? (
             <span id="help-export-disabled" className="sr-only">
               {HELP.exportDisabled}
@@ -387,35 +359,6 @@ export function TransportBar() {
             </span>
           ) : null}
         </span>
-        {result && mode !== 'simple' ? (
-          <span className="transport-btn-wrap">
-            <button
-              type="button"
-              className="btn ghost tiny"
-              title={`Download one WAV of the mix you heard · ${exportBitDepth}-bit Sketch`}
-              onClick={() => exportHeardSingle()}
-            >
-              Download heard
-            </button>
-            <HelpTip text={HELP.exportHeardSingle} ariaLabel="What Download heard does" />
-          </span>
-        ) : null}
-        {result && mode !== 'simple' && (
-          <span className="transport-btn-wrap export-bit-depth-inline" title="Sketch export bit depth">
-            <label className="export-bit-depth-compact">
-              <span className="sr-only">Export bit depth</span>
-              <select
-                value={exportBitDepth}
-                onChange={(e) => setExportBitDepth(e.target.value === '24' ? 24 : 16)}
-                aria-label="Sketch export bit depth"
-              >
-                <option value={16}>16-bit</option>
-                <option value={24}>24-bit</option>
-              </select>
-            </label>
-            <HelpTip text={HELP.exportBitDepth} ariaLabel="About export bit depth" />
-          </span>
-        )}
         {playNeedsAttention ? (
           <span className="sr-only" role="status" aria-live="polite">
             Ready — hit Play
@@ -423,7 +366,7 @@ export function TransportBar() {
         ) : null}
         {result && playback.durationSec > 0 ? (
           <span
-            className={`transport-clock${mode === 'simple' ? ' compact' : ''}`}
+            className="transport-clock compact"
             role="status"
             aria-live="off"
             title={HELP.transportClock}
@@ -431,16 +374,6 @@ export function TransportBar() {
             <span className="transport-clock-elapsed">
               {formatElapsedTotal(elapsedSec, playback.durationSec)}
             </span>
-            {mode !== 'simple' ? (
-              <span className="transport-clock-bar">
-                {formatBarSectionClockLine(
-                  clockProgress,
-                  structBars,
-                  result.structure?.sections,
-                  playback.durationSec,
-                )}
-              </span>
-            ) : null}
             {playback.mismatch && playback.mismatchNote ? (
               <span className="transport-clock-mismatch" title={HELP.durationMismatch}>
                 {playback.mismatchNote}
@@ -501,12 +434,6 @@ export function TransportBar() {
             </button>
             <HelpTip text={HELP.vary} ariaLabel="What Vary does" />
           </span>
-          {mode !== 'simple' && (
-            <>
-              <HelpTip text={HELP.againVaryHotkeys} ariaLabel="About R and V hotkeys" />
-              <HelpTip text={HELP.holdBFlashback} ariaLabel="About Hold-B A/B" />
-            </>
-          )}
           {abFlashback ? (
             <span className="ab-flashback-pill" role="status" aria-live="polite">
               A/B · previous
@@ -528,13 +455,7 @@ export function TransportBar() {
           ) : null}
         </div>
       )}
-      {mode !== 'simple' ? (
-        <p className="help-prose transport-help">
-          {sketchHonesty
-            ? 'Studio needs a local GPU — not live. Generate/Export stay on Sketch (CPU). Not Studio AI yet.'
-            : 'Optional vibe ref · Generate = original 174 BPM Sketch · Play = preview · Export Sketch ZIP = stems + mix_as_heard when remixed'}
-        </p>
-      ) : sketchHonesty ? (
+      {sketchHonesty ? (
         <p className="help-prose transport-help transport-help-simple" role="status">
           Studio GPU not live — Generate stays on Sketch.
         </p>

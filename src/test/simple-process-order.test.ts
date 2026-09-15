@@ -1,6 +1,7 @@
 /**
- * P0.2–P0.3: Simple process order — Expand/Layers after Hear only when liveMixerOk.
- * Soft-pass forbidden: cold-load LayersChips before Transport = FAIL.
+ * App process order — one layout (UI-2). Listen first: transport → waveform →
+ * song map; everything else mounts only behind the single More toggle.
+ * Soft-pass forbidden: an extra mounted before the More toggle = FAIL.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -13,47 +14,54 @@ const appSrc = readFileSync(resolve(here, '../App.tsx'), 'utf8');
 const wantSrc = readFileSync(resolve(here, '../ui/components/SimpleWant.tsx'), 'utf8');
 const layersSrc = readFileSync(resolve(here, '../ui/components/LayersChips.tsx'), 'utf8');
 
-describe('Simple process order (P0.2–P0.3)', () => {
+describe('App process order (one layout)', () => {
   it('defines liveMixerOk from elemental stems kick|snare|hats|perc|bass', () => {
     expect(appSrc).toMatch(/liveMixerOk/);
     expect(appSrc).toMatch(/ELEMENTAL_STEM_IDS/);
     expect([...ELEMENTAL_STEM_IDS]).toEqual(['kick', 'snare', 'hats', 'perc', 'bass']);
   });
 
-  it('Simple path: no LayersChips before TransportBar', () => {
-    const simpleStart = appSrc.indexOf('{/* ========== SIMPLE process path');
-    const powerStart = appSrc.indexOf('{/* ========== POWER layout');
-    expect(simpleStart).toBeGreaterThan(-1);
-    expect(powerStart).toBeGreaterThan(simpleStart);
-    const simple = appSrc.slice(simpleStart, powerStart);
-    const transportIdx = simple.indexOf('<TransportBar');
-    expect(transportIdx).toBeGreaterThan(-1);
-    const beforeTransport = simple.slice(0, transportIdx);
-    expect(beforeTransport).not.toMatch(/<LayersChips/);
-    expect(beforeTransport).not.toMatch(/simple-step-heat/);
+  it('transport, then waveform, then song map, then the More toggle', () => {
+    const at = (s: string) => appSrc.indexOf(s);
+    expect(at('<TransportBar')).toBeGreaterThan(-1);
+    expect(at('<Waveform')).toBeGreaterThan(at('<TransportBar'));
+    expect(at('<SectionTimeline')).toBeGreaterThan(at('<Waveform'));
+    expect(at('more-toggle-row')).toBeGreaterThan(at('<SectionTimeline'));
   });
 
-  it('gates Expand + Layers after Hear with result && liveMixerOk', () => {
+  it('style text, style ref, shape, layers, mixer and panels mount only behind More', () => {
+    const moreStart = appSrc.indexOf('{moreOpen && (');
+    expect(moreStart).toBeGreaterThan(appSrc.indexOf('more-toggle-row'));
+    const beforeMore = appSrc.slice(0, moreStart);
+    const insideMore = appSrc.slice(moreStart);
+    for (const tag of [
+      '<SimpleWant',
+      '<StyleDropZone',
+      '<SongShapePicker',
+      '<LayersChips',
+      '<StemMixer',
+      '<ParamPanel',
+      '<SurpriseMeButton',
+      '<FavoritesPanel',
+      '<ProductTierPanel',
+      '<HelpPanel',
+      '<PowerExtras',
+    ]) {
+      expect(beforeMore, tag).not.toContain(tag);
+      expect(insideMore, tag).toContain(tag);
+    }
+  });
+
+  it('gates waveform, song map, layers and compact mixer on result (+ liveMixerOk)', () => {
     expect(appSrc).toMatch(/\{result && <Waveform \/>\}/);
     expect(appSrc).toMatch(/\{result && <StemMixerCompact \/>\}/);
     expect(appSrc).toMatch(/\{result && liveMixerOk && <SectionTimeline \/>\}/);
-    expect(appSrc).toMatch(/\{result && liveMixerOk && <LayersChips \/>\}/);
-  });
-
-  it('moreOpen secondary LayersChips gated on result + liveMixerOk', () => {
-    expect(appSrc).toMatch(
-      /\{result && liveMixerOk && <LayersChips showSecondary \/>\}/,
-    );
-  });
-
-  it('Power Expand/Layers gated result && liveMixerOk (no cold Expand)', () => {
-    // Critic nit: Power must not mount SectionTimeline / Layers ungated
+    expect(appSrc).toMatch(/\{result && liveMixerOk && <LayersChips showSecondary \/>\}/);
+    // One mount each — no ungated / duplicate second tree
     expect(appSrc).not.toMatch(/\n\s*<SectionTimeline \/>/);
-    expect(appSrc).not.toMatch(/\{result && <LayersChips showSecondary \/>\}/);
-    const gated = [...appSrc.matchAll(/\{result && liveMixerOk && <SectionTimeline \/>\}/g)];
-    expect(gated.length).toBeGreaterThanOrEqual(2); // Simple + Power
-    const gatedLayers = [...appSrc.matchAll(/\{result && liveMixerOk && <LayersChips showSecondary \/>\}/g)];
-    expect(gatedLayers.length).toBeGreaterThanOrEqual(2); // moreOpen + Power
+    expect([...appSrc.matchAll(/<SectionTimeline \/>/g)]).toHaveLength(1);
+    expect([...appSrc.matchAll(/<LayersChips/g)]).toHaveLength(1);
+    expect([...appSrc.matchAll(/<TransportBar \/>/g)]).toHaveLength(1);
   });
 
   it('SimpleWant placeholder is exact vibe string with unicode ellipsis', () => {

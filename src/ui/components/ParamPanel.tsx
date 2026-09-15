@@ -4,7 +4,6 @@ import { HelpTip, LabelWithTip } from './HelpTip';
 import { pushToast } from '../lib/toasts';
 
 export function ParamPanel() {
-  const mode = useStudioStore((s) => s.mode);
   const seed = useStudioStore((s) => s.seed);
   const bpm = useStudioStore((s) => s.bpm);
   const bars = useStudioStore((s) => s.bars);
@@ -15,7 +14,6 @@ export function ParamPanel() {
   const setSeed = useStudioStore((s) => s.setSeed);
   const keepSeed = useStudioStore((s) => s.keepSeed);
   const setKeepSeed = useStudioStore((s) => s.setKeepSeed);
-  const setBpm = useStudioStore((s) => s.setBpm);
   const setBars = useStudioStore((s) => s.setBars);
   const setEnergy = useStudioStore((s) => s.setEnergy);
   const setDarkness = useStudioStore((s) => s.setDarkness);
@@ -23,8 +21,6 @@ export function ParamPanel() {
   const setPromptText = useStudioStore((s) => s.setPromptText);
   const paramsDirty = useStudioStore((s) => s.paramsDirty);
   const generateAgain = useStudioStore((s) => s.generateAgain);
-
-  const isSimple = mode === 'simple';
 
   return (
     <section className="panel" aria-label="Arrangement parameters">
@@ -34,9 +30,7 @@ export function ParamPanel() {
         <HelpTip text={HELP.paramsVsMixer} ariaLabel="Knobs vs mute solo" />
       </h2>
       <p className="hint">
-        {isSimple
-          ? 'Nudge the sketch feel. Tempo stays about 174. Knobs apply on next Generate (not live).'
-          : 'Song layout places the bars. Drive / Mood / Chaos apply on next Generate — mute/solo/gain are live.'}
+        Nudge the sketch feel. Tempo stays about 174. Knobs apply on next Generate (not live).
       </p>
       {paramsDirty && (
         <p className="regen-inline-hint" role="status">
@@ -47,25 +41,11 @@ export function ParamPanel() {
         </p>
       )}
 
-      {isSimple ? (
-        <p className="bpm-pill-row" aria-label="Tempo">
-          <span className="bpm-pill">174 BPM</span>
-          <HelpTip text={HELP.bpmLock} ariaLabel="About BPM lock" />
-        </p>
-      ) : (
-        <label>
-          <LabelWithTip tip={HELP.bpmPower} tipLabel="About BPM">
-            BPM · locked near 174 (UI band 170–176)
-          </LabelWithTip>
-          <input
-            type="number"
-            min={170}
-            max={176}
-            value={bpm}
-            onChange={(e) => setBpm(Number(e.target.value))}
-          />
-        </label>
-      )}
+      {/* Generate always renders at DEFAULT_BPM — show the lock, not a fake input. */}
+      <p className="bpm-pill-row" aria-label="Tempo">
+        <span className="bpm-pill">174 BPM</span>
+        <HelpTip text={HELP.bpmLock} ariaLabel="About BPM lock" />
+      </p>
 
       <div className="seed-row">
         <label>
@@ -130,16 +110,14 @@ export function ParamPanel() {
           </button>
           <HelpTip text={HELP.copySettings} ariaLabel="About copy settings" />
         </span>
-        {!isSimple && (
-          <button
-            type="button"
-            className="btn ghost"
-            title="Pick a fresh uint32 seed"
-            onClick={() => setSeed((Math.random() * 1e9) >>> 0)}
-          >
-            Shuffle seed
-          </button>
-        )}
+        <button
+          type="button"
+          className="btn ghost"
+          title="Pick a fresh uint32 seed"
+          onClick={() => setSeed((Math.random() * 1e9) >>> 0)}
+        >
+          Shuffle seed
+        </button>
         <label className="keep-seed-toggle" title="Keep seed on Generate">
           <input
             type="checkbox"
@@ -150,25 +128,21 @@ export function ParamPanel() {
           <HelpTip text={HELP.keepSeed} ariaLabel="About Keep seed" />
         </label>
       </div>
-      {!isSimple && (
-        <>
-          <label>
-            Bars · Power only (16–64)
-            <input
-              type="number"
-              min={16}
-              max={64}
-              step={4}
-              value={bars}
-              onChange={(e) => setBars(Number(e.target.value))}
-            />
-          </label>
-        </>
-      )}
+      <label>
+        Bars (16–64)
+        <input
+          type="number"
+          min={16}
+          max={64}
+          step={4}
+          value={bars}
+          onChange={(e) => setBars(Number(e.target.value))}
+        />
+      </label>
 
       <label>
         <LabelWithTip tip={HELP.energy} tipLabel="About energy">
-          {isSimple ? `Drive · ${energy.toFixed(2)}` : `Energy · drive / drop weight · ${energy.toFixed(2)}`}
+          {`Drive · ${energy.toFixed(2)}`}
         </LabelWithTip>
         <input
           type="range"
@@ -181,7 +155,7 @@ export function ParamPanel() {
       </label>
       <label>
         <LabelWithTip tip={HELP.darkness} tipLabel="About darkness / mood">
-          {isSimple ? `Mood · ${darkness.toFixed(2)}` : `Darkness · bass mood · ${darkness.toFixed(2)}`}
+          {`Mood · ${darkness.toFixed(2)}`}
         </LabelWithTip>
         <input
           type="range"

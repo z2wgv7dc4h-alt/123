@@ -16,7 +16,6 @@ import { shouldShowFirstPlayCoach } from '../lib/firstPlayCoach';
 export function FavoritesNudge() {
   const flowStep = useStudioStore((s) => s.flowStep);
   const setMoreOpen = useStudioStore((s) => s.setMoreOpen);
-  const mode = useStudioStore((s) => s.mode);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -47,7 +46,7 @@ export function FavoritesNudge() {
         type="button"
         className="btn tiny ghost"
         onClick={() => {
-          if (mode === 'simple') setMoreOpen(true);
+          setMoreOpen(true);
           dismiss();
         }}
       >

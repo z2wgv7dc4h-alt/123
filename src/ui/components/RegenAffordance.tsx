@@ -19,15 +19,11 @@ export function RegenAffordance() {
   const vibeIntensity = useStudioStore((s) => s.vibeIntensity);
   const generateAgain = useStudioStore((s) => s.generateAgain);
   const vary = useStudioStore((s) => s.vary);
-  const backendId = useStudioStore((s) => s.backendId);
-  const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
-  const mode = useStudioStore((s) => s.mode);
 
   if (!result || !paramsDirty || busy) return null;
 
-  const aceBlocked =
-    mode !== 'simple' && backendId.startsWith('ace-step') && !aceHasGpu;
-  const canGenerate = !busy && !aceBlocked;
+  // Studio without GPU never blocks: generate() fail-softs to Sketch audio.
+  const canGenerate = !busy;
 
   const changed = listChangedParamLabels(lastRenderFingerprint, {
     seed,

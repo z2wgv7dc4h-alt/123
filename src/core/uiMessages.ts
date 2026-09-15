@@ -27,7 +27,7 @@ export function formatStudioError(raw: string): string {
     return 'All stems are muted — unmute at least one stem, then Play.';
   }
   if (/Generate first/i.test(msg)) {
-    return 'Nothing to export yet — press 1 · Generate, then 3 · Export ZIP.';
+    return 'Nothing to export yet — press Generate, then Export ZIP.';
   }
   if (/Preview load timeout/i.test(msg)) {
     return 'Preview failed to load the mix WAV — try Generate again.';

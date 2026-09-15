@@ -14,7 +14,7 @@ export const HELP = {
   darknessNudge:
     'What: Fine-tunes bass mood from your file. When: After vibe is applied; before next Generate. What happens: Higher = murkier bass. Applies on next Generate.',
   hashPill:
-    'What: Private session tag for the attached file. When: Power Mode with a Style Ref on. What happens: Shows which upload is active — nothing uploads.',
+    'What: Private session tag for the attached file. When: A Style Ref is on. What happens: Shows which upload is active — nothing uploads.',
   generate:
     'What: Builds a new drum & bass sketch here. When: Click Generate (G) anytime. What happens: Kick/snare/hats/bass near 174 BPM — original, not a clone.',
   play:
@@ -25,8 +25,6 @@ export const HELP = {
     'What: Downloads a Sketch ZIP for your DAW. When: After you like it (E). What happens: Dry tracks + MIDI at 16|24; remixed Play adds mix_as_heard.wav.',
   flowChips:
     'What: Progress chips only (not a checklist gate). When: Watch as you work. What happens: Idle → Generated → Played → Exported. Style Ref is never required.',
-  simpleMode:
-    'What: Easy layout. When: Stay here for first runs. What happens: Style Ref → Generate → Play → Quick mute → Export. More hides extras. Product is still Sketch.',
   productSketch:
     'What: Sketch — the product you have now. When: Always in this web app. What happens: CPU browser sound at ~174 BPM, 16-bit. Not Studio-quality AI.',
   productStudio:
@@ -72,23 +70,23 @@ export const HELP = {
   dropX2:
     'What: Double drop section length. When: Click ×2 on drop section. What happens: Only this section changes; same seed; rest of song stays.',
   backendCpu:
-    'What: Browser Sketch engine (CPU). When: Default in Simple / when Studio GPU is off. What happens: Generate works now — no GPU setup.',
+    'What: Browser Sketch engine (CPU). When: Default / when Studio GPU is off. What happens: Generate works now — no GPU setup.',
   backendGpu:
-    'What: Studio GPU engine (richer sound later). When: Power → Backend if local GPU is live. What happens: Without GPU, you stay on Sketch.',
+    'What: Studio GPU engine (richer sound later). When: More → Audio path if local GPU is live. What happens: Without GPU, you stay on Sketch.',
   powerPanel:
-    'What: Advanced Studio/Sketch controls. When: More or Power. What happens: Engines, export bit depth, style packs — Simple stays easy without these.',
+    'What: Advanced Studio/Sketch controls. When: Under More. What happens: Engines, export bit depth, style packs — the main screen stays easy without these.',
   powerCaps:
-    'What: Plain-English engine limits. When: Power / More. What happens: Song length, stem rebuild plans, sample rates — no eng IDs.',
+    'What: Plain-English engine limits. When: Under More. What happens: Song length, stem rebuild plans, sample rates — no eng IDs.',
   arrangement:
     'What: Knobs that change how the next sketch feels. When: Move a slider, then Regenerate or Vary. What happens: Mute/solo do not need Regenerate — knobs do.',
   bpmPower:
     'What: Tempo stays near 174 (classic drum & bass). When: Only change if you want 170–176. What happens: Layout still locks measured tempo near 174 on render.',
   backendSelect:
-    'What: Chooses Sketch vs Studio engine. When: Power Mode. What happens: Sketch is ready now; Studio needs your local GPU setup.',
+    'What: Chooses Sketch vs Studio engine. When: Under More. What happens: Sketch is ready now; Studio needs your local GPU setup.',
   loraPack:
-    'What: Optional style packs. When: Power Mode. What happens: Early packs for experiments; real training comes with Studio GPU later.',
+    'What: Optional style packs. When: Under More. What happens: Early packs for experiments; real training comes with Studio GPU later.',
   aceModels:
-    'What: ACE model sizes on your GPU PC. When: Power extras. Turbo = fast Generate now; Base later; XL needs more VRAM. What happens: Weights install outside the browser; this panel only shows status.',
+    'What: ACE model sizes on your GPU PC. When: Under More. Turbo = fast Generate now; Base later; XL needs more VRAM. What happens: Weights install outside the browser; this panel only shows status.',
   statusPanel:
     'What: Ready / error / next-step messages. When: After Generate or if something looks off. What happens: Points you to Play, Export, or a fix.',
   remixPreview:
@@ -210,7 +208,7 @@ export const HELP = {
     'What: Shows the ZIP file name on Export. When: You click Export. What happens: Toast names the file; dry stems (+ heard mix if remixed).',
   /** Sketch 16|24-bit export (Critic P1 — not Studio). */
   exportBitDepth:
-    'What: WAV bit depth for Sketch export. When: Power before Export. What happens: 16-bit default; 24-bit optional — still Sketch, not Studio GPU.',
+    'What: WAV bit depth for Sketch export. When: Under More, before Export. What happens: 16-bit default; 24-bit optional — still Sketch, not Studio GPU.',
   /** #64 Clear loop chip */
   clearLoop:
     'What: Clears the loop region on the wave. When: A loop is set (drag or section double-click). What happens: Esc or Clear stops looping; full sketch plays.',
@@ -350,7 +348,6 @@ export const SIMPLE_HELP_KEYS = [
   'darknessNudge',
   'generate',
   'exportZip',
-  'simpleMode',
   'productSketch',
   'productStudio',
   'badgeCpu174',

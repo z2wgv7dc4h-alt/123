@@ -154,7 +154,6 @@ function ratioFromPointer(e: { clientX: number }, el: HTMLElement): number {
  */
 export function Waveform() {
   const result = useStudioStore((s) => s.result);
-  const mode = useStudioStore((s) => s.mode);
   const previewState = useStudioStore((s) => s.previewState);
   const mixerDirty = useStudioStore((s) => s.mixerDirty);
   const seekPreview = useStudioStore((s) => s.seekPreview);
@@ -163,7 +162,6 @@ export function Waveform() {
   const loopRegion = useStudioStore((s) => s.loopRegion);
   const waveformZoom = useStudioStore((s) => s.waveformZoom);
   const setWaveformZoom = useStudioStore((s) => s.setWaveformZoom);
-  const generate = useStudioStore((s) => s.generate);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const dragOriginRef = useRef<number | null>(null);
@@ -347,32 +345,8 @@ export function Waveform() {
   });
   const durationSec = playback.durationSec;
 
-  // P0.7: Simple cold load — no empty “Peaks appear…” / second Generate
-  if (!result) {
-    if (mode === 'simple') return null;
-    return (
-      <div className="waveform empty" role="img" aria-label="Mix waveform empty — hit Generate">
-        <div className="waveform-head">
-          <span className="waveform-label label-with-tip">
-            <span className="label-with-tip-text">Mix waveform</span>
-            <HelpTip text={HELP.waveform} ariaLabel="About mix waveform" />
-            <HelpTip text={HELP.emptyWaveformCta} ariaLabel="About empty waveform tip" />
-          </span>
-          <span className="waveform-meta">after Generate</span>
-        </div>
-        <div className="waveform-empty-cta" role="status">
-          <p className="waveform-placeholder">Peaks appear here after Generate</p>
-          <button
-            type="button"
-            className="btn tiny accent waveform-empty-generate"
-            onClick={() => void generate()}
-          >
-            1 · Generate
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // P0.7: cold load — no empty “Peaks appear…” / second Generate
+  if (!result) return null;
 
   return (
     <div

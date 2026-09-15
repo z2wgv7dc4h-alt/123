@@ -56,26 +56,26 @@ export function HelpPanel() {
         <kbd>?</kbd> / <kbd>H</kbd> toggles this panel · <kbd>Esc</kbd> closes{' '}
         <HelpTip text={HELP.helpHotkey} ariaLabel="About help shortcut" />
       </p>
-      <ol className="help-steps">
+      <ul className="help-steps">
         <li>
-          <strong>0 · Style Ref (optional)</strong> — What: vibe from a track you own. When: drop
+          <strong>Style Ref (optional)</strong> — What: vibe from a track you own. When: drop
           before Generate (or skip). What happens: biases mood — never clones; tempo stays ~174.
         </li>
         <li>
-          <strong>1 · Generate</strong> (<kbd>G</kbd>) — What: new drum &amp; bass sketch here. When:
+          <strong>Generate</strong> (<kbd>G</kbd>) — What: new drum &amp; bass sketch here. When:
           click anytime. What happens: kick/snare/hats/bass near 174 — original, not a clone.
         </li>
         <li>
-          <strong>2 · Play</strong> (<kbd>Space</kbd>) — What: hear the mix preview. When: after
+          <strong>Play</strong> (<kbd>Space</kbd>) — What: hear the mix preview. When: after
           Generate. What happens: listen; quick mute updates Play live — no Generate for mute/solo/gain.
           (Locked until you Generate.)
         </li>
         <li>
-          <strong>3 · Export ZIP</strong> (<kbd>E</kbd>) — What: ZIP for your music software. When:
+          <strong>Export ZIP</strong> (<kbd>E</kbd>) — What: ZIP for your music software. When:
           after you like the sketch. What happens: dry tracks + MIDI; remixed Play also adds{' '}
           <code>mix_as_heard.wav</code>. Or <strong>Download what I heard</strong> for one preview WAV.
         </li>
-      </ol>
+      </ul>
       <p className="help-note">
         <strong>Want another take?</strong> <strong>Again</strong> = same seed + knobs.{' '}
         <strong>Vary</strong> = new seed. Knobs need Again/Vary; mute/solo do not. Under More: Surprise
