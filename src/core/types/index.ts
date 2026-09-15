@@ -228,6 +228,21 @@ export interface RenderResult {
   manifest: ExportManifest;
 }
 
+/**
+ * Honesty record for real (not synthesized) audio blended into a Sketch
+ * mix. If this is present, the render is NOT 100% generative.
+ */
+export interface RealBreakLoopProvenance {
+  used: true;
+  /** Asset stem name under src/assets/samples/breaks/. */
+  loopName: string;
+  /** Pattern family that triggered it (amen | twoStep). */
+  patternFamily: string;
+  /** Blend gain applied under the synthesized kit. */
+  gain: number;
+  note: string;
+}
+
 export interface ExportManifest {
   schemaVersion: 'stem-v0';
   jobId: string;
@@ -263,6 +278,12 @@ export interface ExportManifest {
   productTier: ProductTier;
   /** Present when a user-owned style reference biased generation. */
   styleReference?: StyleReferenceProvenance;
+  /**
+   * Present when a real pre-recorded breakbeat loop was blended into the
+   * mix (Sketch only). Absent means the render is fully synthesized —
+   * the same honesty contract `styleReference` and the perc stem follow.
+   */
+  realBreakLoop?: RealBreakLoopProvenance;
   /**
    * Optional honesty notes (stem-v0 additive).
    * e.g. drums bus formula; perc elemental export when structure plans perc.

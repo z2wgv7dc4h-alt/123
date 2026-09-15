@@ -329,22 +329,29 @@ function sawFromTime(freqHz: number, t: number): number {
  * low blend gain, so it colors the sound without replacing or disturbing
  * anything the existing per-stem tests assert on.
  */
-const REAL_BREAK_GAIN = 0.32;
+export const REAL_BREAK_GAIN = 0.32;
 
-function breakLoopNameForFamily(family: string): BreakLoopName | null {
+export function breakLoopNameForFamily(family: string): BreakLoopName | null {
   if (family === 'amen') return 'amen_174bpm_1bar';
   if (family === 'twoStep') return 'funky_drummer_174bpm_1bar';
   return null; // syncopated: no strong genre-authentic break match, stays pure synth
 }
 
-async function buildRealBreakBus(
+export type RealBreakBus = {
+  bus: Float32Array;
+  loopName: BreakLoopName;
+  gain: number;
+};
+
+export async function buildRealBreakBus(
   family: string,
   sections: StructureMap['sections'],
   bars: number,
   samplesPerBar: number,
-): Promise<Float32Array | null> {
+  gain: number = REAL_BREAK_GAIN,
+): Promise<RealBreakBus | null> {
   const loopName = breakLoopNameForFamily(family);
-  if (!loopName) return null;
+  if (!loopName || gain <= 0) return null;
 
   let loop: Float32Array;
   try {
@@ -361,13 +368,13 @@ async function buildRealBreakBus(
     if (sectionAt(sections, bar).name !== 'drop') continue;
     const barStart = bar * samplesPerBar;
     for (let i = 0; i < samplesPerBar; i++) {
-      let g = REAL_BREAK_GAIN;
+      let g = gain;
       if (i < fadeSamples) g *= i / fadeSamples;
       else if (i >= samplesPerBar - fadeSamples) g *= (samplesPerBar - i) / fadeSamples;
       out[barStart + i] = loop[i]! * g;
     }
   }
-  return out;
+  return { bus: out, loopName, gain };
 }
 
 function writeBass(
@@ -979,9 +986,15 @@ export class OfflineStubBackend implements AudioBackend {
     // Real breakbeat loop, additive under drop bars — mix-only (not a
     // separate stem, doesn't touch any tested per-stem bus). See
     // buildRealBreakBus for rationale/sourcing.
-    const realBreak = await buildRealBreakBus(family, structure.sections, structure.bars, structure.samplesPerBar);
+    const realBreak = await buildRealBreakBus(
+      family,
+      structure.sections,
+      structure.bars,
+      structure.samplesPerBar,
+    );
     if (realBreak) {
-      for (let i = 0; i < totalSamples; i++) mix[i]! += realBreak[i]!;
+      const bus = realBreak.bus;
+      for (let i = 0; i < totalSamples; i++) mix[i]! += bus[i]!;
     }
     // P0: mix bus glue + soft ceiling (master only)
     applyMixBusGlue(mix, sr, { hot: dubMode || trapMode || energy > 0.72 });
@@ -1086,6 +1099,17 @@ export class OfflineStubBackend implements AudioBackend {
       gpuUsed: false,
       acePathActive: false,
       notes: schemaNotes,
+      ...(realBreak
+        ? {
+            realBreakLoop: {
+              used: true as const,
+              loopName: realBreak.loopName,
+              patternFamily: family,
+              gain: realBreak.gain,
+              note: `Mix contains a real pre-recorded breakbeat loop (${realBreak.loopName}) blended under drop bars — this render is not 100% synthesized.`,
+            },
+          }
+        : {}),
     });
 
     const waveformPeaks = computeWaveformPeaks(mix, 160);

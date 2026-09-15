@@ -4,6 +4,7 @@ import type {
   StemFile,
   StructureMap,
   StyleReferenceProvenance,
+  RealBreakLoopProvenance,
 } from '../types/index.ts';
 import { DEFAULT_PPQ } from '../types/index.ts';
 
@@ -44,6 +45,8 @@ export function buildExportManifest(opts: {
   acePathActive?: boolean;
   /** Optional stem-v0 honesty notes (drums bus / perc). */
   notes?: string[];
+  /** Set when a real breakbeat loop was blended into the mix (Sketch only). */
+  realBreakLoop?: RealBreakLoopProvenance;
 }): ExportManifest {
   const { job, structure, stems, backendId, checkpointId, bpmMeasured, gpuUsed } = opts;
   const acePathActive = opts.acePathActive === true;
@@ -82,6 +85,7 @@ export function buildExportManifest(opts: {
     gpuUsed,
     productTier: gpuUsed ? 'studio' : 'sketch',
     ...(styleReference ? { styleReference } : {}),
+    ...(opts.realBreakLoop ? { realBreakLoop: opts.realBreakLoop } : {}),
     ...(opts.notes?.length ? { notes: [...opts.notes] } : {}),
   };
 }
