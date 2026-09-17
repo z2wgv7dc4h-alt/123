@@ -1,5 +1,23 @@
 # REVIEW-SOUND
 
+> **Superseded 2026-09-17.** Kept as history. Current facts: `docs/ACE-NOTES.md`
+> and `docs/HANDOFF.md`.
+>
+> **What was actually wrong** (found later, in the ACE log and process list):
+> 1. **A stale bridge answered every request.** Three bridge processes shared
+>    port 8766 (`SO_REUSEADDR`), and the oldest one, from before any of these
+>    fixes, served the renders. None of the S-series payload fixes reached ACE
+>    until `474a926`.
+> 2. **Lyrics were section tags**, so ACE's `is_instrumental()` was false and it
+>    planned a vocal song → nonsense (`228c8c6`).
+> 3. **The base model** (README: *Medium*) instead of turbo (*Very High*) (`228c8c6`).
+> 4. **`use_cot_caption` defaults to true**, so the LM rewrote our caption into
+>    prose even with thinking off (fixed with the explicit `false`).
+> 5. A 14-tag mood-word caption and 44 s (32-bar) renders (`e173211`, `29693bc`).
+>
+> The body below recommends base 64 steps, SFT download, and a 174 lock. All
+> three are obsolete.
+
 This is an honest review of why the output sounds cheap. It is based on reading
 the code, not on rendering. No audio was generated for this document.
 

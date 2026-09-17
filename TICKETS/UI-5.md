@@ -1,5 +1,7 @@
 # UI-5 Compact player on the waveform
 
+**Status: Done** `8626978`.
+
 File: TransportBar / waveform card / app.css / transport-cluster.test.ts
 
 Change:

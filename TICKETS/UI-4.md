@@ -1,5 +1,7 @@
 # UI-4 Tests: Play does not call render; Expand keeps seed
 
+**Status: Unverified.** No `button-contract.test.ts` exists; partial coverage in `transport-cluster.test.ts`.
+
 File: new `src/test/button-contract.test.ts` (extend, don't duplicate, `src/test/listen-expand.test.ts` / `src/test/structure-expand.test.ts` if a case already exists)
 
 Change: Tests only. Stub the ACE probe (`backendRegistry.get('ace-step-1.5').probe`)

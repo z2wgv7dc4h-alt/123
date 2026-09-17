@@ -1,5 +1,7 @@
 # UI-6 Intent above Generate
 
+**Status: Done** `756e116`.
+
 File:
 - src/App.tsx (or the main shell UI-2 left)
 - whatever still mounts style text, song shape, vibe/style-ref

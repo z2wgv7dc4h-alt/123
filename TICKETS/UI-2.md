@@ -1,5 +1,7 @@
 # UI-2 One layout — remove Simple vs Power as two products
 
+**Status: Done** `905fac2`.
+
 File: `src/App.tsx`, `src/ui/components/TransportBar.tsx`, `src/ui/components/Waveform.tsx`, `src/ui/components/SimpleWant.tsx`, `src/ui/hooks/useStudioStore.ts` (`mode`, `setMode`), `src/test/e2e-invariants.test.ts`
 
 Change: Delete the Simple/Power toggle (`App.tsx:89-113`) and merge the two

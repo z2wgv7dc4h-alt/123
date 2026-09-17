@@ -1,5 +1,7 @@
 # UI-3 Demote Export, second Vary, Surprise Me ×2, style-pack train behind More
 
+**Status: Done** `da3625f`, `313beaf`.
+
 File: `src/ui/components/TransportBar.tsx`, `src/ui/components/RegenAffordance.tsx`, `src/ui/components/PostExportStrip.tsx`, `src/ui/components/LayersChips.tsx`, `src/ui/components/FavoritesPanel.tsx`, `src/ui/components/SurpriseMeButton.tsx`, `src/ui/components/PowerExtras.tsx`, `src/App.tsx`, `src/test/e2e-invariants.test.ts`
 
 Change: The primary row keeps only Play, Stop, Generate and Vary. Move these into More, keeping exactly one of each:

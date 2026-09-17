@@ -1,5 +1,7 @@
 # UI-1 Move Play/Stop next to Generate/Vary
 
+**Status: Done** `ac11db6`.
+
 File: `src/ui/components/TransportBar.tsx`; new `src/test/transport-cluster.test.ts`
 
 Change: Reorder the `#transport` toolbar so that `btn-play`, `btn-stop`,
