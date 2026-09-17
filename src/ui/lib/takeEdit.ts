@@ -1,4 +1,5 @@
 import type { GenreId, RenderJob, RenderResult, SectionRole, StructureMap } from '@/core/types';
+import { BAR_GRID_MIN_CONFIDENCE } from '@/core/audio/downbeatGrid';
 
 export type SectionStyle = { role?: SectionRole; genre?: GenreId; words?: string };
 
@@ -36,12 +37,26 @@ export function secondsPerBar(bpm: number): number {
   return 240 / bpm;
 }
 
+/** Bar-1 offset to use for edits: the estimate when confident, else 0. */
+export function gridOffsetSec(result: RenderResult): number {
+  const g = result.barGrid;
+  return g && g.confidence >= BAR_GRID_MIN_CONFIDENCE ? g.offsetSec : 0;
+}
+
 /** Section index → [startSec, endSec) on the take (startBar is 0-based). */
-export function sectionWindowSec(structure: StructureMap, index: number, bpm: number): { startSec: number; endSec: number } | null {
+export function sectionWindowSec(
+  structure: StructureMap,
+  index: number,
+  bpm: number,
+  offsetSec = 0,
+): { startSec: number; endSec: number } | null {
   const sec = structure.sections[index];
   if (!sec) return null;
   const spb = secondsPerBar(bpm);
-  return { startSec: sec.startBar * spb, endSec: (sec.startBar + sec.lengthBars) * spb };
+  return {
+    startSec: offsetSec + sec.startBar * spb,
+    endSec: offsetSec + (sec.startBar + sec.lengthBars) * spb,
+  };
 }
 
 /** Grow one section; later sections shift; total bars grow. */
@@ -76,8 +91,9 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
   const source = result.stems.find((s) => s.id === 'mix')!.blob!;
   const bpm = result.bpmMeasured || structure.bpm;
   const spb = secondsPerBar(bpm);
+  const off = gridOffsetSec(result);
   if (req.kind === 'redo') {
-    const w = sectionWindowSec(structure, req.sectionIndex, bpm);
+    const w = sectionWindowSec(structure, req.sectionIndex, bpm, off);
     if (!w) return null;
     const sec = structure.sections[req.sectionIndex]!;
     const style: SectionStyle = { ...req.style, role: req.style?.role ?? roleForSectionName(sec.name) };
@@ -89,8 +105,8 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
     edit: {
       kind: 'repaint',
       source,
-      startSec: Math.max(0, structure.bars - 1) * spb,
-      endSec: (structure.bars + req.deltaBars) * spb,
+      startSec: off + Math.max(0, structure.bars - 1) * spb,
+      endSec: off + (structure.bars + req.deltaBars) * spb,
     },
     structureRef: extendStructure(structure, last, req.deltaBars),
     seed: result.seed,

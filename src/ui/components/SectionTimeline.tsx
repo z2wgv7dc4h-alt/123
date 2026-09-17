@@ -7,6 +7,7 @@ import { DEFAULT_BPM } from '@/core/types';
 import { retailStructureLabel } from '../lib/retailLabels';
 import { totalBarsOf } from '../lib/structureEdit';
 import { isStudioTake, REDO_PRESETS } from '../lib/takeEdit';
+import { BAR_GRID_MIN_CONFIDENCE } from '@/core/audio/downbeatGrid';
 
 const SECTION_CLASS: Record<string, string> = {
   intro: 'seg-intro',
@@ -386,7 +387,11 @@ export function SectionTimeline() {
         </div>
       )}
       <div className="timeline-meta">
-        {result!.bpmMeasured} BPM · seed {result!.seed} · {bars} bars · {retailStructureLabel(result!.manifest.structureVersion)}
+        {result!.bpmMeasured} BPM · seed {result!.seed} · {bars} bars ·{' '}
+        {result!.barGrid && result!.barGrid.confidence >= BAR_GRID_MIN_CONFIDENCE
+          ? ` bar 1 at ${result!.barGrid.offsetSec.toFixed(2)}s ·`
+          : ''}
+        {retailStructureLabel(result!.manifest.structureVersion)}
         {paramsDirty && (
           <>
             {' · '}

@@ -252,6 +252,14 @@ export interface AcePayloadSnapshot {
   model: string;
 }
 
+/** Where bar 1 actually starts in rendered audio (R-3). */
+export interface BarGrid {
+  offsetSec: number;
+  /** 0..1 share of low-band onsets that sit on the beat grid. */
+  confidence: number;
+  bpm: number;
+}
+
 export interface RenderResult {
   jobId: string;
   seed: number;
@@ -268,6 +276,8 @@ export interface RenderResult {
   structure?: StructureMap;
   midiBlob?: Blob;
   manifest: ExportManifest;
+  /** Estimated bar grid of the mix (Studio). Absent = unknown → treat offset as 0. */
+  barGrid?: BarGrid;
 }
 
 /**

@@ -7,6 +7,7 @@
 import type {
   AudioBackend,
   BackendCaps,
+  BarGrid,
   HardwareProbe,
   RenderJob,
   RenderResult,
@@ -17,6 +18,8 @@ import { buildExportManifest } from '../export/manifest.ts';
 import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
 import { structureToMidiBlob } from '../midi/exportMidi.ts';
 import { buildAceCaption, buildAceLyrics, buildAceTags } from '../prompt';
+import { estimateBarGrid } from '../audio/downbeatGrid';
+import { decodeWavToMono } from '../audio/onsetGrid';
 
 const CAPS: BackendCaps = {
   fullSong: true,
@@ -422,6 +425,18 @@ export class AceStepBackend implements AudioBackend {
       throw new Error('ACE sidecar returned no mixWavBase64 â€” generation produced no audio');
     }
 
+    // R-3: where bar 1 really starts, so section edits land on bar lines.
+    let barGrid: BarGrid | undefined;
+    try {
+      const bin = atob(mixB64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const decoded = decodeWavToMono(bytes.buffer);
+      barGrid = estimateBarGrid(decoded.mono, decoded.sampleRateHz, structure.bpm);
+    } catch {
+      barGrid = undefined; // not PCM WAV (or test stub) → edits use offset 0
+    }
+
     const durationSec =
       data.stems?.find((s) => s.id === 'mix')?.durationSec ??
       (structure.samplesPerBar * structure.bars) / job.sampleRateHz;
@@ -503,6 +518,7 @@ export class AceStepBackend implements AudioBackend {
       structure,
       midiBlob,
       manifest,
+      barGrid,
     };
   }
 }

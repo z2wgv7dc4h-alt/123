@@ -43,6 +43,8 @@ export {
 } from './onsetGrid';
 export type { OnsetGridReport, OnsetGridRoleReport } from './onsetGrid';
 
+export { estimateBarGrid, BAR_GRID_MIN_CONFIDENCE } from './downbeatGrid';
+
 export {
   DROP_INTRO_RMS_MIN_RATIO,
   findSection,
