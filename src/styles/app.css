@@ -2086,9 +2086,8 @@ details summary:hover { color: var(--text); }
 .section-jump-chip {
   text-transform: capitalize;
   min-height: 32px;
-}
-.section-jump-chip.seg-drop {
-  border-color: var(--border-glow);
+  color: var(--text);
+  background: transparent;
 }
 
 .first-play-coach {
