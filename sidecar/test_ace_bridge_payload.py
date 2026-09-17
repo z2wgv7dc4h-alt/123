@@ -100,6 +100,26 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertIn("task_type=text2music", plain)
         self.assertNotIn("audio_cover_strength", plain)
 
+    def test_source_task_repaint_extend(self):
+        base = bridge.build_render_payload({"checkpointId": "acestep-v15-turbo"})
+        p = bridge.apply_source_task(base, {"srcAudioBase64": "AAAA", "taskType": "repaint", "repaintStartSec": 80.0, "repaintEndSec": 102.0})
+        self.assertEqual(p["task_type"], "repaint")
+        self.assertEqual(p["repainting_start"], 80.0)
+        self.assertEqual(p["repainting_end"], 102.0)
+        self.assertEqual(p["chunk_mask_mode"], "explicit")
+        self.assertIs(p["thinking"], False)
+        self.assertNotIn("audio_duration", p)
+        self.assertNotIn("audio_cover_strength", p)
+        self.assertIn("repaint=80.0-102.0s", bridge.format_payload_note("acestep-v15-turbo", p))
+
+    def test_source_task_cover_unchanged_and_text2music_passthrough(self):
+        base = bridge.build_render_payload({"checkpointId": "acestep-v15-turbo"})
+        c = bridge.apply_source_task(base, {"srcAudioBase64": "AAAA"})
+        self.assertEqual(c["task_type"], "cover")
+        self.assertEqual(c["audio_cover_strength"], 0.55)
+        self.assertIs(c["thinking"], False)
+        self.assertIs(bridge.apply_source_task(base, {}), base)
+
     def test_fallback_prompt_has_no_guitar_or_rock(self):
         p = bridge.build_render_payload({"checkpointId": "acestep-v15-base"})
         self.assertNotIn("guitar", p["prompt"].lower())

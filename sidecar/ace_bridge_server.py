@@ -108,7 +108,31 @@ def format_payload_note(dit_model: str, payload: dict) -> str:
     )
     if task_type == "cover":
         note += f", audio_cover_strength={payload['audio_cover_strength']}"
+    elif task_type == "repaint":
+        note += f", repaint={payload['repainting_start']}-{payload['repainting_end']}s"
     return note
+
+
+def apply_source_task(payload: dict, req: dict) -> dict:
+    """Turn a text2music payload into cover or repaint when source audio is sent.
+    Cover/repaint skip the LM, so thinking is forced off."""
+    if not req.get("srcAudioBase64"):
+        return payload
+    out = dict(payload)
+    out["thinking"] = False
+    if req.get("taskType") == "repaint":
+        out["task_type"] = "repaint"
+        out["repainting_start"] = float(req.get("repaintStartSec") or 0.0)
+        end = req.get("repaintEndSec")
+        out["repainting_end"] = float(end) if end is not None else -1.0
+        out["chunk_mask_mode"] = "explicit"
+        # Length comes from the source (+ padding past its end), not the plan.
+        out.pop("audio_duration", None)
+        out.pop("audio_cover_strength", None)
+    else:
+        out["task_type"] = "cover"
+        out["audio_cover_strength"] = clamp_cover_strength(req.get("audioCoverStrength"))
+    return out
 
 
 def is_turbo_model(name: str | None) -> bool:
@@ -505,10 +529,7 @@ class Handler(BaseHTTPRequestHandler):
         src_audio_name = str(req.get("srcAudioFileName") or "style-ref.wav")
         try:
             if src_audio_b64:
-                payload["task_type"] = "cover"
-                payload["audio_cover_strength"] = clamp_cover_strength(req.get("audioCoverStrength"))
-                # Cover/repaint skip the LM regardless — don't pretend otherwise.
-                payload["thinking"] = False
+                payload = apply_source_task(payload, req)
                 fields = {k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
                           for k, v in payload.items()}
                 _, released_raw = http_multipart(

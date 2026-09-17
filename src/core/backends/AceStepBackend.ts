@@ -258,8 +258,10 @@ export class AceStepBackend implements AudioBackend {
     // actual bytes so ACE can run `cover` against them. Without this the
     // reference only ever survives as a few scalar knob nudges.
     const styleAudio = job.styleReference?.file;
-    const srcAudioBase64 =
-      styleAudio && job.styleReference?.ownerAttested ? await blobToBase64(styleAudio) : undefined;
+    const editAudio = job.edit?.source;
+    const srcAudioBase64 = editAudio
+      ? await blobToBase64(editAudio)
+      : styleAudio && job.styleReference?.ownerAttested ? await blobToBase64(styleAudio) : undefined;
 
     // Only name a checkpoint the server said it has loaded; otherwise the
     // bridge uses ACE's loaded model. Hardcoding base here overrode SFT.
@@ -313,13 +315,21 @@ export class AceStepBackend implements AudioBackend {
           shift: ACE_SHIFT,
           dcwEnabled: aceDcwEnabled(checkpoint ?? ACE_DEFAULT_CHECKPOINT, Boolean(srcAudioBase64)),
           dcwMode: ACE_DCW_MODE,
-          ...(srcAudioBase64
+          ...(job.edit
             ? {
                 srcAudioBase64,
-                srcAudioFileName: job.styleReference?.fileName ?? 'style-ref.wav',
-                audioCoverStrength: clampCoverStrength(job.styleReference?.coverStrength),
+                srcAudioFileName: 'take.wav',
+                taskType: 'repaint',
+                repaintStartSec: job.edit.startSec,
+                repaintEndSec: job.edit.endSec,
               }
-            : {}),
+            : srcAudioBase64
+              ? {
+                  srcAudioBase64,
+                  srcAudioFileName: job.styleReference?.fileName ?? 'style-ref.wav',
+                  audioCoverStrength: clampCoverStrength(job.styleReference?.coverStrength),
+                }
+              : {}),
           prompt: {
             text: caption,
             tags: buildAceTags({
@@ -463,7 +473,7 @@ export class AceStepBackend implements AudioBackend {
       // Only true when the reference audio was actually sent for a cover
       // render — a reference that merely exists but was reduced to knob
       // nudges must not claim the ACE path consumed it.
-      acePathActive: Boolean(srcAudioBase64),
+      acePathActive: Boolean(srcAudioBase64 && !job.edit),
       notes,
     });
 

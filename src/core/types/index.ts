@@ -202,6 +202,13 @@ export interface RenderJob {
     /** Darkness hint from Vibe Mirror (0..1). */
     darknessHint?: number;
   };
+  /** Edit an existing take instead of generating from scratch (ACE repaint; end past source = extend). */
+  edit?: {
+    kind: 'repaint';
+    source: Blob;
+    startSec: number;
+    endSec: number;
+  };
 }
 
 export type StemId = 'kick' | 'snare' | 'hats' | 'perc' | 'bass' | 'mix' | 'drums' | 'other';

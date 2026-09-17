@@ -326,4 +326,30 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(cover.warnings[0]).toMatch(/^ACE payload · task cover · thinking false · caption DnB/);
     expect(cover.warnings[0]).toMatch(/cover strength 0\.55$/);
   });
+
+  it('edit.repaint sends the take as source with repaint window; not a style-ref claim', async () => {
+    let sent: Record<string, unknown> | null = null;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === ACE_SIDECAR_RENDER_URL) {
+        sent = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ jobId: 'j', seed: 7, gpuUsed: true, mixWavBase64: b64of(fakeWav) }), { status: 200 });
+      }
+      throw new Error('unexpected fetch');
+    }) as typeof fetch;
+    const result = await backend.render({
+      jobId: 'j', seed: 7, bpm: 174, bpmTolerance: 2, durationBars: 64,
+      sampleRateHz: 48000, bitDepth: 16, channels: 2,
+      prompt: { descriptors: [], energy: 0.9, darkness: 0.4, chaos: 0.3, text: 'festival drum and bass' },
+      stemSchemaVersion: 'v0',
+      edit: { kind: 'repaint', source: new Blob([fakeWav], { type: 'audio/wav' }), startSec: 80, endSec: 102 },
+    });
+    const body = sent as unknown as Record<string, unknown>;
+    expect(body.taskType).toBe('repaint');
+    expect(body.repaintStartSec).toBe(80);
+    expect(body.repaintEndSec).toBe(102);
+    expect(body.srcAudioBase64).toBeTruthy();
+    expect(body.audioCoverStrength).toBeUndefined();
+    expect(result.acePayload?.thinking).toBe(false);
+    expect(result.manifest.styleReference?.acePathActive ?? false).toBe(false);
+  });
 });
