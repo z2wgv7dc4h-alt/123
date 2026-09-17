@@ -29,7 +29,7 @@ Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
 | Caption | `buildAceCaption`: genre-aware, short tags (genre, drums, bass, energy, "polished club mix"), no BPM, no guitar unless the guitar layer is on or the user typed it. |
 | Tempo | A setting, 70–200 (`clampProductBpm`). Genres set the default: DnB 174, dubstep 140, half-time 170, jungle 165. |
 | Home UI | Genre row → style presets → style text → song shape → Generate / Vary → waveform + compact Play/Stop → song map → More. |
-| Song map edits | Expand / Repeat / ×2 on the **selected** section exist (`8d2de74`), but they still **re-render the whole song**. R-2 replaces this with edits on a kept take. |
+| Song map edits | **Studio take** (R-2, `6aede3d`): the selected section gets **Redo** (ACE repaint of that bar range) and **+8 / +16** on the last section (repaint past the end); **Undo edit** steps back through `takeHistory` without rendering; Generate / Vary start a new take. **Sketch** keeps Expand / Repeat / ×2, which re-render the whole song. |
 | Header chip | Labels the backend of the buffer you hear, not the last probe. |
 
 **Sketch** (`OfflineStubBackend`) is the CPU fallback. It honors the tempo. Its
@@ -49,13 +49,24 @@ real break loops are cut at 174, so they switch off more than 6 BPM away.
 
 ## Next, in order
 
+**Product goal (user, 2026-09-17)**: diverse bass music in one track: DnB with
+big builds and epic drops that can switch to dubstep or trap for a section.
+ACE renders one BPM per call, so switches come in two kinds:
+- **Same-tempo switch** (DnB → half-time dubstep/trap feel at 174): repaint that
+  section with another genre + role caption. ACE crossfades the seams.
+- **Tempo switch** (174 → 140): render a separate block at its own BPM, using
+  the previous block as ACE `reference_audio` for palette continuity; join with
+  a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
+
 | # | Ticket | What |
 |---|---|---|
-| 1 | R-2 | Keep a take; the selected section gets Redo / Extend via repaint; take history with undo |
+| 1 | A-1 | Section roles (build / drop / breakdown / switch) in captions, "Redo as…" (role, genre, own words), trap genre |
 | 2 | R-3 | Downbeat detection so the bar grid lines up with the take |
-| 3 | R-4 | Duplicate / move sections with seam repaint |
-| 4 | UI-7 | Skin pass (after the waveform and song map stop changing) |
-| 5 | R-5 | Mastering stage (loudness) |
+| 3 | A-2 | Arrangement builder, same tempo: lay out blocks, generate once, repaint each block with its role/genre |
+| 4 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins, per-block tempo on the song map |
+| 5 | R-4 | Duplicate / move sections with seam repaint; extend in the middle |
+| 6 | UI-7 | Skin pass (after the editor settles) |
+| 7 | R-5 | Mastering (matched loudness across blocks) |
 
 Open, unscheduled: S-5 (cover strength listening A/B), `05` (extract; base-model
 only), `07` (raw samples).

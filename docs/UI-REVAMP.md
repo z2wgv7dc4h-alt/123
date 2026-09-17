@@ -48,11 +48,18 @@ On Sketch, the edit buttons are disabled with an honest "Studio only" label.
 
 | # | Ticket | Depends on |
 |---|---|---|
-| 1 | R-2 keep take + Redo/Extend on the selected section + take history | R-1 (done `4c4d2e6`) |
+| ✓ | R-2 Redo / Extend last section / Undo edit on the Studio take (`6aede3d`). No separate "Keep take" button: edits act on the Studio result you hear. | R-1 |
+| 1 | A-1 section roles in captions, "Redo as…" (role / genre / own words), trap genre | R-2 |
 | 2 | R-3 downbeat detection: bar grid aligned to the take | R-2 |
-| 3 | R-4 duplicate / move sections with seam repaint | R-3 |
-| 4 | UI-7 skin pass (glass, one accent, icons, fewer `?`) | R-4 |
-| 5 | R-5 mastering stage (loudness) | — |
+| 3 | A-2 arrangement builder (same tempo): blocks with role + genre, one render, per-block repaint | A-1, R-3 |
+| 4 | A-3 tempo blocks: per-block BPM, `reference_audio` continuity, transition joins | A-2 |
+| 5 | R-4 duplicate / move sections with seam repaint | R-3 |
+| 6 | UI-7 skin pass (glass, one accent, icons, fewer `?`) | A-3, R-4 |
+| 7 | R-5 mastering stage (loudness matched across blocks) | — |
+
+**Switch-ups**: same-tempo genre switches (DnB → half-time dubstep/trap feel)
+are section repaints and sound like one track. Tempo switches (174 → 140) are
+separate blocks joined by a transition, because ACE renders one BPM per call.
 
 ## Open cleanup
 
