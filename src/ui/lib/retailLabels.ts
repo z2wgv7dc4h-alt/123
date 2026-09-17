@@ -25,8 +25,8 @@ export function heardAudioPathChip(
 }
 
 export function retailStructureLabel(version: string | undefined | null): string {
-  if (!version) return 'song layout ~174';
-  if (/hard-grid/i.test(version)) return 'song layout ~174';
+  if (!version) return 'song layout';
+  if (/hard-grid/i.test(version)) return 'song layout';
   return version;
 }
 

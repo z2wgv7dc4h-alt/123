@@ -116,10 +116,10 @@ export function TransportBar() {
               aria-keyshortcuts="g"
               title={
                 sketchHonesty
-                  ? 'Studio GPU not live — Generate still makes Sketch (CPU 16-bit) near 174 BPM (G)'
+                  ? 'Studio GPU not live — Generate still makes Sketch (CPU 16-bit) at your genre tempo (G)'
                   : studioLive
-                    ? 'Creates original Studio ACE rock-DnB near 174 BPM (G)'
-                    : 'Creates an original Sketch near 174 BPM (G)'
+                    ? 'Creates original Studio ACE rock-DnB at your genre tempo (G)'
+                    : 'Creates an original Sketch at your genre tempo (G)'
               }
               onClick={() => void generate()}
             >

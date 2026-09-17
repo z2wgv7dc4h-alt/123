@@ -26,11 +26,11 @@ export const HELP = {
   flowChips:
     'What: Progress chips only (not a checklist gate). When: Watch as you work. What happens: Idle → Generated → Played → Exported. Style Ref is never required.',
   productSketch:
-    'What: Sketch — the product you have now. When: Always in this web app. What happens: CPU browser sound at ~174 BPM, 16-bit. Not Studio-quality AI.',
+    'What: Sketch — the product you have now. When: Always in this web app. What happens: CPU browser sound at your genre tempo, 16-bit. Not Studio-quality AI.',
   productStudio:
     'What: Studio — future GPU path. When: Needs a local GPU setup. What happens: Gated until ready; Generate stays on Sketch. No fake Studio audio.',
   badgeCpu174:
-    'What: You are on Sketch (CPU) at ~174 BPM. When: Always in this build. What happens: That is the sound you hear now. Studio GPU later is not live here.',
+    'What: You are on Sketch (CPU) at your genre tempo. When: Always in this build. What happens: That is the sound you hear now. Studio GPU later is not live here.',
   badgeSketch16:
     'What: Sketch WAVs export at 16 or 24-bit. When: Pick depth under More/Export. What happens: Default 16-bit; 24-bit is still Sketch CPU — not Studio.',
   badgeAce:
@@ -92,7 +92,7 @@ export const HELP = {
   remixPreview:
     'What: Quick mute for key parts on the hero. When: After Generate. What happens: Play updates live — no Generate. ZIP keeps dry tracks + mix_as_heard if tweaked.',
   vary:
-    'What: New variation with a fresh layout (new seed). When: After a sketch, same vibe knobs. What happens: Different arrangement — still original DnB near 174.',
+    'What: New variation with a fresh layout (new seed). When: After a sketch, same vibe knobs. What happens: Different arrangement — still original DnB at your tempo.',
   again:
     'What: Rebuild with same seed and current knobs. When: After Energy/Mood/Chaos changes. What happens: Same skeleton, new render. Use Vary for a fresh layout.',
   remixLive:
@@ -100,14 +100,14 @@ export const HELP = {
   favorites:
     'What: Saves this sketch’s settings in this browser. When: More → Favorites → Save after a sketch you like. What happens: Recall later — nothing uploads.',
   favoritesAgain:
-    'What: Loads a favorite and generates again. When: Click Again on a saved row. What happens: Same vibe rebuilt — original audio near 174 BPM.',
+    'What: Loads a favorite and generates again. When: Click Again on a saved row. What happens: Same vibe rebuilt — original audio at your tempo.',
   songShape:
     'What: The arc of the track (intro length, breakdown, double drop, half-time drop). When: Before Generate. What happens: Changes section layout — not a second menu of knobs.',
   layers:
     'What: Optional guitar / solo / vocal-ish / extra drums. When: After (or before) Generate. What happens: Adds original generative textures on next Generate/Vary — never artist stems.',
 
   surpriseMe:
-    'What: Random seed + song shape + mood template. When: Under More (not on the main row). What happens: Fresh layout and vibe near 174 BPM — then hit Play.',
+    'What: Random seed + song shape + mood template. When: Under More (not on the main row). What happens: Fresh layout and vibe at your genre tempo — then hit Play.',
   favoritesVary:
     'What: Favorite knobs + new seed (slight variation). When: Click Slight variation on a saved row. What happens: Cousin of that sketch, then generates.',
   glossaryStem:
@@ -115,7 +115,7 @@ export const HELP = {
   glossarySeed:
     'What: Number that locks song layout. When: Same seed + settings. What happens: Same arrangement. Vary picks a new seed.',
   why174:
-    'What: Classic energetic DnB sits near 174 BPM. When: Always here. What happens: Layout locks ~174 so drops feel right — upload BPM is not forced onto the song.',
+    'What: Classic energetic DnB sits at 174 BPM; dubstep 140, half-time 170. When: Always here. What happens: Layout follows your Genre/Tempo setting so drops feel right — upload BPM is not forced onto the song.',
   /** Disabled Play — teach next step. */
   playDisabled:
     'What: Play is locked. When: Before you Generate. What happens: Create a sketch first, then Play unlocks so you can hear the mix (Space).',
@@ -199,7 +199,7 @@ export const HELP = {
     'What: Bring back the previous sketch audio. When: After you Generate again (More/secondary). What happens: Swaps to the last take — hit Play to hear it.',
   /** #61 Favorites empty Surprise CTA */
   favoritesEmpty:
-    'What: Empty Favorites tip toward Surprise Me. When: More → Favorites with nothing saved yet. What happens: Offers a fresh random sketch near 174.',
+    'What: Empty Favorites tip toward Surprise Me. When: More → Favorites with nothing saved yet. What happens: Offers a fresh random sketch at your genre tempo.',
   /** #62 Shift+1–4 mute */
   stemMuteHotkeys:
     'What: Shift+1–4 mutes kick/snare/hats/bass. When: After Generate, not while typing. What happens: Preview mutes that part live — no Generate.',
@@ -256,7 +256,7 @@ export const HELP = {
     'What: Click a stem name (1–4) to exclusive-solo. When: Full mixer after Generate. What happens: Only that part plays; click again clears.',
   /** #85 sketch_notes.txt in ZIP */
   sketchNotes:
-    'What: sketch_notes.txt in the ZIP. When: Every Export. What happens: Seed, ~174 BPM, bars, knobs, depth — sketch honesty (original, no catalog rips).',
+    'What: sketch_notes.txt in the ZIP. When: Every Export. What happens: Seed, your genre tempo, bars, knobs, depth — sketch honesty (original, no catalog rips).',
   /** #86 once-flag post-export DAW tip */
   exportDawTip:
     'What: Reminder to open the ZIP in your DAW. When: Once after your first Export. What happens: Soft toast only; never stacks with coaches.',
@@ -288,8 +288,8 @@ export const GLOSSARY_BLURBS = {
   browserSketch: 'Sketch = CPU sound you hear now. Studio GPU later is not live here.',
   productSketch: 'Sketch product — CPU/browser now, 16-bit.',
   productStudio: 'Studio product — GPU/ACE later; gated until live.',
-  bpm174: 'Genre tempo: DnB 174, dubstep 140, half-time 170, jungle 165.',
-  why174: 'Why 174? Classic DnB tempo — dubstep sits at 140, jungle 165.',
+  bpm174: 'Set your genre tempo (70–200 BPM). Defaults: DnB 174, dubstep 140, half-time 170, jungle 165.',
+  why174: 'Why defaults? Classic DnB sits at 174 — adjust the Tempo slider for your vibe.',
   rehear: 'Hit Play again after stem tweaks — no Generate.',
   playDisabled: 'Play locked until you Generate.',
   exportDisabled: 'Export locked until you Generate.',

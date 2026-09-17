@@ -171,7 +171,7 @@ export function SectionTimeline() {
           <p className="empty-state-title">{busy ? 'Generating sketch…' : 'Section map'}</p>
           <p className="hint">
             {busy
-              ? 'Building stems on the ~174 BPM song layout — hang tight'
+              ? 'Building stems on the song layout at your genre tempo — hang tight'
               : 'Appears after Generate · drag edges or Expand a part you like'}
           </p>
           {busy && (
@@ -374,7 +374,7 @@ export function SectionTimeline() {
           className="energy-strip"
           role="img"
           aria-label="Structure energy curve across bars"
-          title="Energy curve from song layout (~174 BPM)"
+          title="Energy curve from song layout"
         >
           {energyBars.map((level, i) => (
             <span

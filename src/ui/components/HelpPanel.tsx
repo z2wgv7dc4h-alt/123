@@ -59,11 +59,11 @@ export function HelpPanel() {
       <ul className="help-steps">
         <li>
           <strong>Style Ref (optional)</strong> — What: vibe from a track you own. When: drop
-          before Generate (or skip). What happens: biases mood — never clones; tempo stays ~174.
+          before Generate (or skip). What happens: biases mood — never clones; tempo follows your Genre/Tempo setting.
         </li>
         <li>
           <strong>Generate</strong> (<kbd>G</kbd>) — What: new drum &amp; bass sketch here. When:
-          click anytime. What happens: kick/snare/hats/bass near 174 — original, not a clone.
+          click anytime. What happens: kick/snare/hats/bass at your genre tempo — original, not a clone.
         </li>
         <li>
           <strong>Play</strong> (<kbd>Space</kbd>) — What: hear the mix preview. When: after
@@ -82,7 +82,7 @@ export function HelpPanel() {
         Me and Favorites.
       </p>
       <p className="help-note">
-        <strong>What you hear now:</strong> browser sketch near 174 BPM. Local GPU later is not live
+        <strong>What you hear now:</strong> browser sketch at your genre tempo. Local GPU later is not live
         here. No YouTube / artist clones. Files stay in this browser.
       </p>
       <details className="help-why174">

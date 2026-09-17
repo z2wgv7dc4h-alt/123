@@ -53,7 +53,7 @@ export function ParamPanel() {
           max={BPM_MAX}
           step={1}
           value={bpm}
-          title="174 drum & bass · 140 dubstep · 85 half-time"
+          title="Genre tempo: 174 drum & bass · 140 dubstep · 170 half-time · 165 jungle"
           onChange={(e) => setBpm(Number(e.target.value))}
         />
       </label>

@@ -165,7 +165,7 @@ export function StyleDropZone() {
                 <strong>{vibe.brightness.toFixed(2)}</strong>
               </li>
               <li className="vibe-lock">
-                Arrangement stays <strong>174 BPM</strong> — vibe mapped, not tempo-cloned
+                Arrangement follows your <strong>Genre/Tempo setting</strong> — vibe mapped, not tempo-cloned
               </li>
             </ul>
             <div className="vibe-nudges">

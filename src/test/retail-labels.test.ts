@@ -14,8 +14,8 @@ describe('retailLabels (cycle-7/8 chrome honesty)', () => {
     expect(retailBackendLabel('offline-stub')).toBe('browser sketch');
     expect(retailBackendLabel('offline-stub-v2')).toBe('browser sketch');
     expect(retailBackendLabel('ace-step-1.5')).toBe('Studio GPU');
-    expect(retailStructureLabel('hard-grid-v0')).toBe('song layout ~174');
-    expect(retailStructureLabel('hard-grid-v1')).toBe('song layout ~174');
+    expect(retailStructureLabel('hard-grid-v0')).toBe('song layout');
+    expect(retailStructureLabel('hard-grid-v1')).toBe('song layout');
     for (const s of [
       retailBackendLabel('offline-stub'),
       retailStructureLabel('hard-grid-v0'),
