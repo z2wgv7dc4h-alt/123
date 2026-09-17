@@ -1,6 +1,6 @@
 # Handoff
 
-**Updated**: 2026-09-17. **Last code commit**: `c9c878f` (B-2 genres).
+**Updated**: 2026-09-17. **Last code commit**: `84db6eb` (P-1 prompt v2).
 Law is `AGENTS.md` + `CLAUDE.md` only. `docs/_archive_*` is not law.
 
 Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
@@ -23,13 +23,13 @@ Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
 |---|---|
 | DiT | `acestep-v15-turbo` by default (`start-ace-stack.ps1`, bridge `DEFAULT_DIT_MODEL`). ACE README rates turbo *Very High*, SFT *High*, base *Medium*. The bridge sends ACE's loaded model and ignores the browser's `checkpointId`. |
 | LM | `acestep-5Hz-lm-1.7B`, auto-selected by ACE. |
-| text2music payload | `thinking: true`, `use_cot_caption: false`, `use_cot_language: false`, `lyrics: "[Instrumental]"`, `lm_cfg_scale: 2.0`, `bpm` = job tempo, duration from bars. Turbo 8 steps; base/SFT 64 steps + ADG. |
+| text2music payload | `thinking: true`, `use_cot_caption: false`, `use_cot_language: false`, `lyrics` = song-map structure tags (`[Build - rising tension]`, `[Drop - explosive]` …; bridge keeps tag lines only, `[Instrumental]` fallback), `lm_cfg_scale: 2.0`, `bpm` = job tempo, duration from bars (cap 480 s). Turbo 8 steps; base/SFT 64 steps + ADG. |
 | Cover (style ref) | Strength 0.55, clamped 0.35–0.7. Thinking off (ACE skips the LM for cover anyway). |
-| Repaint / extend | Primitive only (R-1): `RenderJob.edit = {kind:'repaint', source, startSec, endSec}`. `endSec` past the source = extend. **No UI yet.** |
-| Caption | `buildAceCaption`: genre-aware, short tags (genre, drums, bass, energy, "polished club mix"), no BPM, no guitar unless the guitar layer is on or the user typed it. |
-| Tempo | A setting, 70–200 (`clampProductBpm`). Genres set the default: DnB 174, dubstep 140, half-time 170, jungle 165. |
+| Repaint / extend | `RenderJob.edit = {kind:'repaint', source, startSec, endSec}` (R-1); `endSec` past the source = extend. Used by the song map (R-2, A-1). |
+| Caption | `buildAceCaption` (P-1): a paragraph in ACE example style — genre + energy (or section role), drums + bass, arrangement narrative from the song map, deduped extras, "polished and club-ready, with no vocals". No BPM; no guitar unless the layer is on or typed. |
+| Tempo | A setting, 70–200 (`clampProductBpm`). Genres set the default: DnB 174, dubstep 140, half-time 170, jungle 165, trap 140. Default length 96 bars (cap 128). |
 | Home UI | Genre row → style presets → style text → song shape → Generate / Vary → waveform + compact Play/Stop → song map → More. |
-| Song map edits | **Studio take** (R-2, `6aede3d`): the selected section gets **Redo** (ACE repaint of that bar range) and **+8 / +16** on the last section (repaint past the end); **Undo edit** steps back through `takeHistory` without rendering; Generate / Vary start a new take. **Sketch** keeps Expand / Repeat / ×2, which re-render the whole song. |
+| Song map edits | **Studio take** (R-2, `6aede3d`): the selected section gets **Redo** / **Redo as…** (epic drop, build-up, breakdown, dubstep/trap/jungle/half-time switch, own words; ACE repaint of that bar range) and **+8 / +16** on the last section (repaint past the end); **Undo edit** steps back through `takeHistory` without rendering; Generate / Vary start a new take. **Sketch** keeps Expand / Repeat / ×2, which re-render the whole song. |
 | Header chip | Labels the backend of the buffer you hear, not the last probe. |
 
 **Sketch** (`OfflineStubBackend`) is the CPU fallback. It honors the tempo. Its
@@ -63,11 +63,11 @@ Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
 
 | # | Ticket | What |
 |---|---|---|
-| 2 | R-3 | Downbeat detection so the bar grid lines up with the take |
-| 3 | E-1 | Arrangement editor on the take: insert, delete, duplicate, move, resize sections, extend anywhere (splice + seam repaint), undo. Absorbs R-4 and A-2. |
-| 4 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins |
-| 5 | UI-7 | Skin pass (after the editor settles) |
-| 6 | R-5 | Mastering (matched loudness across blocks) |
+| 1 | R-3 | Downbeat detection so the bar grid lines up with the take |
+| 2 | E-1 | Arrangement editor on the take: insert, delete, duplicate, move, resize sections, extend anywhere (splice + seam repaint), undo. Absorbs R-4 and A-2. |
+| 3 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins |
+| 4 | UI-7 | Skin pass (after the editor settles) |
+| 5 | R-5 | Mastering (matched loudness across blocks) |
 
 Open, unscheduled: S-5 (cover strength listening A/B), `05` (extract; base-model
 only), `07` (raw samples).
