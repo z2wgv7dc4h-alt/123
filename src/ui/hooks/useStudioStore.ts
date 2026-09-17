@@ -47,6 +47,7 @@ import { HELP } from '../lib/helpCopy';
 import { formatStudioError } from '@/core/uiMessages';
 import { saveResumeDraft } from '../lib/resumeDraft';
 import { songShapeById, type SongShapeId } from '../lib/songShapes';
+import { planTakeEdit, type TakeEditRequest } from '../lib/takeEdit';
 import {
   expandSection,
   repeatSection,
@@ -277,6 +278,8 @@ export interface StudioState {
     /** Real breakbeat loop under drops (Sketch). Opt-OUT: defaults on. */
     realBreak: boolean;
   };
+  /** Earlier versions of the current Studio take (newest last). Not persisted. */
+  takeHistory: RenderResult[];
   setProductTier: (t: ProductTier) => void;
   setSeed: (n: number) => void;
   setKeepSeed: (v: boolean) => void;
@@ -301,9 +304,12 @@ export interface StudioState {
   exclusiveSolo: (id: StemId) => void;
   setGainDb: (id: StemId, db: number) => void;
   resetMix: () => void;
-  generate: (opts?: { variation?: 'again' | 'vary' }) => Promise<void>;
+  generate: (opts?: { variation?: 'again' | 'vary'; edit?: TakeEditRequest }) => Promise<void>;
   generateAgain: () => Promise<void>;
   vary: () => Promise<void>;
+  redoSection: (index: number) => Promise<void>;
+  extendLastSection: (index: number, deltaBars: number) => Promise<void>;
+  undoTakeEdit: () => Promise<void>;
   play: () => Promise<void>;
   stop: () => void;
   /** Seek preview playhead 0..1 (waveform scrub / section jump). */
@@ -490,6 +496,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   warnings: [],
   result: null,
   previousResult: null,
+  takeHistory: [],
   loopRegion: null,
   waveformZoom: false,
   abFlashback: false,
@@ -953,7 +960,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     // Anti-samey: plain Generate rolls a new seed unless Keep-seed is on.
     // Again keeps seed; Vary already set a fresh seed (+ chaos nudge).
     // Also preserve seed when sections are edited (Expand/Repeat/etc) for same-song behavior
-    if (!opts?.variation && !s0.keepSeed && !s0.editedSections) {
+    if (!opts?.variation && !s0.keepSeed && !s0.editedSections && !opts?.edit) {
       const buf = new Uint32Array(1);
       if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
         crypto.getRandomValues(buf);
@@ -984,6 +991,22 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       /* keep prior aceHasGpu */
     }
     const s = get();
+    // R-2: edits act on the Studio take you are hearing; never re-roll the song.
+    let editPlan: ReturnType<typeof planTakeEdit> = null;
+    if (opts?.edit) {
+      const studioLive = s.productTier === 'studio' && s.aceHasGpu;
+      editPlan = s.result && studioLive ? planTakeEdit(s.result, opts.edit) : null;
+      if (!editPlan) {
+        pushToast(
+          !studioLive || !s.result
+            ? 'Section edits need a Studio (GPU) take — Generate on Studio first'
+            : 'Extend works on the last section for now',
+          'warn',
+          4200,
+        );
+        return;
+      }
+    }
     // Studio/ACE without GPU: fail-soft to Sketch audio — never soft-pass as live Studio
     if ((s.backendId.startsWith('ace-step') && !s.aceHasGpu) || (s.productTier === 'studio' && !s.aceHasGpu)) {
       if (s.backendId.startsWith('ace-step')) {
@@ -1092,14 +1115,17 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       try {
         result = await backend.render({
           jobId,
-          seed: s.seed,
+          seed: editPlan?.seed ?? s.seed,
           songShape: live.songShape,
           genre: live.genre,
-          sectionsOverride: live.editedSections ?? undefined,
+          ...(editPlan
+            ? { sectionsOverride: undefined }
+            : { sectionsOverride: live.editedSections ?? undefined }),
           // User tempo (no 174 lock).
-          bpm: clampProductBpm(live.bpm || DEFAULT_BPM),
+          bpm: editPlan?.bpm ?? clampProductBpm(live.bpm || DEFAULT_BPM),
           bpmTolerance: 2,
-          durationBars: bars,
+          durationBars: editPlan?.structureRef.bars ?? bars,
+          ...(editPlan ? { structureRef: editPlan.structureRef, edit: editPlan.edit } : {}),
           sampleRateHz: DEFAULT_SAMPLE_RATE,
           bitDepth: DEFAULT_BIT_DEPTH,
           channels: 2,
@@ -1108,8 +1134,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           lora: s.loraPackId ? [{ packId: s.loraPackId, scale: 0.7 }] : undefined,
           stemSchemaVersion: 'v0',
           // Belt-and-suspenders: never send styleReference without explicit ownership attest
-          styleReference:
-            s.vibe && s.ownerConfirmed
+          styleReference: editPlan
+            ? undefined
+            : s.vibe && s.ownerConfirmed
               ? {
                   ...(s.vibeFile ? { file: s.vibeFile } : {}),
                   intensity: s.vibeIntensity,
@@ -1150,6 +1177,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       set({
         result,
         previousResult: preserved.result ?? get().previousResult,
+        takeHistory: opts?.edit && preserved.result ? [...preserved.takeHistory, preserved.result] : [],
         loopRegion: null,
         waveformZoom: false,
         abFlashback: false,
@@ -1191,7 +1219,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       } catch {
         /* private storage */
       }
-      if (opts?.variation === 'vary') {
+      if (opts?.edit) {
+        pushToast(
+          opts.edit.kind === 'redo' ? 'Section redone — hit Play' : `Extended +${opts.edit.deltaBars} bars — hit Play`,
+          'success',
+        );
+      } else if (opts?.variation === 'vary') {
         pushToast('New variation ready — hit Play', 'success');
       } else if (opts?.variation === 'again') {
         pushToast('Generated again — hit Play', 'success');
@@ -1231,6 +1264,37 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     set({ seed: buf[0]! >>> 0, chaos: nextChaos });
     varyDiversityApplied = true;
     await get().generate({ variation: 'vary' });
+  },
+
+  redoSection: (index) => get().generate({ edit: { kind: 'redo', sectionIndex: index } }),
+
+  extendLastSection: (index, deltaBars) =>
+    get().generate({ edit: { kind: 'extend', sectionIndex: index, deltaBars } }),
+
+  undoTakeEdit: async () => {
+    const { takeHistory, mixer, busy } = get();
+    if (busy || !takeHistory.length) return;
+    const prev = takeHistory[takeHistory.length - 1]!;
+    set({
+      result: prev,
+      takeHistory: takeHistory.slice(0, -1),
+      bars: prev.structure?.bars ?? get().bars,
+      editedSections: null,
+      loopRegion: null,
+      abFlashback: false,
+      flowStep: 'generated',
+    });
+    previewPlayer.clearStemCache();
+    previewPlayer.onState = (ps) => set({ previewState: ps });
+    try {
+      await loadPreviewFromMixer(prev, mixer);
+      previewPlayer.setAuthoritativeDuration(prev.stems.find((x) => x.id === 'mix')?.durationSec);
+      pushToast('Undid last edit — hit Play', 'info', 2400);
+    } catch (e) {
+      const msg = formatStudioError(e instanceof Error ? e.message : String(e));
+      set({ error: msg });
+      pushToast(msg, 'error', 0);
+    }
   },
 
   play: async () => {

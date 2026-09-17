@@ -6,6 +6,7 @@ import { barsToDurationSec, formatDurationMmSs, sectionClickRatio } from '../lib
 import { DEFAULT_BPM } from '@/core/types';
 import { retailStructureLabel } from '../lib/retailLabels';
 import { totalBarsOf } from '../lib/structureEdit';
+import { isStudioTake } from '../lib/takeEdit';
 
 const SECTION_CLASS: Record<string, string> = {
   intro: 'seg-intro',
@@ -68,6 +69,12 @@ export function SectionTimeline() {
   const editedSections = useStudioStore((s) => s.editedSections);
   const seekPreview = useStudioStore((s) => s.seekPreview);
   const previewState = useStudioStore((s) => s.previewState);
+  const redoSection = useStudioStore((s) => s.redoSection);
+  const extendLastSection = useStudioStore((s) => s.extendLastSection);
+  const undoTakeEdit = useStudioStore((s) => s.undoTakeEdit);
+  const takeHistory = useStudioStore((s) => s.takeHistory);
+
+  const studioTake = isStudioTake(result);
 
   const renderedBars = result?.structure?.bars ?? 0;
   const sections = editedSections ?? result?.structure?.sections;
@@ -178,6 +185,18 @@ export function SectionTimeline() {
     <div className="timeline timeline-interactive" role="list" aria-label={`Arrangement ${bars} bars`}>
       <div className="timeline-head">
         <span className="label-with-tip-text">Arrangement map</span>
+        {studioTake && (
+          <>
+            <span className="pill tiny" title="Each edit makes a new version of this take">
+              Take v{takeHistory.length + 1}
+            </span>
+            {takeHistory.length > 0 && (
+              <button type="button" className="btn tiny ghost" disabled={busy} onClick={() => void undoTakeEdit()}>
+                Undo edit
+              </button>
+            )}
+          </>
+        )}
         {editedSections && (
           <span className="pill tiny" title="Section lengths edited — Generate again to hear">
             {renderedBars > 0 && bars !== renderedBars
@@ -187,7 +206,9 @@ export function SectionTimeline() {
         )}
       </div>
       <p className="hint timeline-drag-hint">
-        Select a section for Expand / Repeat / ×2 · or drag its right edge · then Generate again
+        {studioTake
+          ? 'Select a section · Redo regenerates just that part · Extend grows the last section · the rest stays'
+          : 'Select a section for Expand / Repeat / ×2 · or drag its right edge · then Generate again'}
       </p>
       <div
         className="timeline-track"
@@ -234,34 +255,75 @@ export function SectionTimeline() {
               </span>
               {selectedIndex === index && (
                 <div className="timeline-seg-actions">
-                  <button
-                    type="button"
-                    className="btn tiny ghost"
-                    disabled={busy}
-                    title="Expand +8 bars — arrangement applies on next Generate"
-                    onClick={() => expandSectionAt(index, 8)}
-                  >
-                    Expand
-                  </button>
-                  <button
-                    type="button"
-                    className="btn tiny ghost"
-                    disabled={busy}
-                    title="Duplicate this section after itself — arrangement applies on next Generate"
-                    onClick={() => repeatSectionAt(index)}
-                  >
-                    Repeat
-                  </button>
-                  {s.name === 'drop' && (
-                    <button
-                      type="button"
-                      className="btn tiny ghost timeline-drop-x2"
-                      disabled={busy || bars + s.lengthBars > 64}
-                      title="Double this drop — arrangement applies on next Generate"
-                      onClick={() => expandSectionAt(index, s.lengthBars)}
-                    >
-                      ×2
-                    </button>
+                  {studioTake ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn tiny ghost"
+                        disabled={busy}
+                        title="Regenerate only this section on the take (ACE repaint)"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void redoSection(index);
+                        }}
+                      >
+                        Redo
+                      </button>
+                      {[8, 16].map((n) => {
+                        const isLast = index === sections.length - 1;
+                        return (
+                          <button
+                            key={n}
+                            type="button"
+                            className="btn tiny ghost"
+                            disabled={busy || !isLast}
+                            title={
+                              isLast
+                                ? `Grow this section by ${n} bars (ACE extends the take)`
+                                : 'Extend in the middle comes with R-4 — select the last section'
+                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void extendLastSection(index, n);
+                            }}
+                          >
+                            +{n}
+                          </button>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn tiny ghost"
+                        disabled={busy}
+                        title="Expand +8 bars — arrangement applies on next Generate"
+                        onClick={() => expandSectionAt(index, 8)}
+                      >
+                        Expand
+                      </button>
+                      <button
+                        type="button"
+                        className="btn tiny ghost"
+                        disabled={busy}
+                        title="Duplicate this section after itself — arrangement applies on next Generate"
+                        onClick={() => repeatSectionAt(index)}
+                      >
+                        Repeat
+                      </button>
+                      {s.name === 'drop' && (
+                        <button
+                          type="button"
+                          className="btn tiny ghost timeline-drop-x2"
+                          disabled={busy || bars + s.lengthBars > 64}
+                          title="Double this drop — arrangement applies on next Generate"
+                          onClick={() => expandSectionAt(index, s.lengthBars)}
+                        >
+                          ×2
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               )}

@@ -1,0 +1,178 @@
+/**
+ * R-2 Studio take edits — Redo section (repaint), Extend last section, Undo edit.
+ * Pure planning tests + real store behavior with the ACE backend mocked.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RenderResult, StructureMap } from '../core/types';
+import {
+  secondsPerBar,
+  sectionWindowSec,
+  extendStructure,
+  planTakeEdit,
+} from '../ui/lib/takeEdit';
+import { useStudioStore } from '../ui/hooks/useStudioStore';
+import { aceStepBackend } from '../core/backends';
+import { previewPlayer } from '../core/audio';
+
+vi.mock('../core/audio', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../core/audio')>();
+  return {
+    ...orig,
+    loadPreviewFromMixer: vi.fn(async () => {}),
+    acquireRenderWakeLock: vi.fn(async () => {}),
+    releaseRenderWakeLock: vi.fn(async () => {}),
+    startRenderHeartbeat: vi.fn(() => ({ stop: () => {} })),
+  };
+});
+
+const sections = [
+  { name: 'intro' as const, startBar: 0, lengthBars: 8 },
+  { name: 'drop' as const, startBar: 8, lengthBars: 16 },
+  { name: 'outro' as const, startBar: 24, lengthBars: 8 },
+];
+
+function structureOf(secs: StructureMap['sections'], bars: number): StructureMap {
+  return {
+    version: 'hard-grid-v0',
+    bpm: 140,
+    bars,
+    ppq: 480,
+    samplesPerBar: 1,
+    snapPolicy: 'hard',
+    sampleRateHz: 48000,
+    sections: secs.map((s) => ({ ...s })),
+    drumRole: {} as StructureMap['drumRole'],
+    drums: [],
+    bassRole: {} as StructureMap['bassRole'],
+    energyCurve: [],
+    keyRoot: 'A',
+    seed: 5,
+  };
+}
+
+const baseStructure = structureOf(sections, 32);
+const mixBlob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
+
+const fakeStudioResult = {
+  jobId: 'take1',
+  seed: 5,
+  bpmMeasured: 140,
+  backendId: 'ace-step-1.5',
+  stems: [{ id: 'mix', blob: mixBlob }],
+  warnings: [],
+  waveformPeaks: [],
+  structure: baseStructure,
+  manifest: {},
+} as unknown as RenderResult;
+
+describe('takeEdit pure planning', () => {
+  it('secondsPerBar + sectionWindowSec use 0-based bars', () => {
+    expect(secondsPerBar(174)).toBeCloseTo(1.37931, 5);
+    const winStruct = structureOf(
+      [
+        { name: 'intro', startBar: 0, lengthBars: 16 },
+        { name: 'drop', startBar: 16, lengthBars: 8 },
+      ],
+      24,
+    );
+    const w = sectionWindowSec(winStruct, 1, 174);
+    expect(w).not.toBeNull();
+    expect(w!.startSec).toBeCloseTo((16 * 240) / 174, 5);
+    expect(w!.endSec).toBeCloseTo((24 * 240) / 174, 5);
+  });
+
+  it('extendStructure grows one section, shifts later ones, grows total bars', () => {
+    const out = extendStructure(baseStructure, 1, 8);
+    expect(out.sections[1]!.lengthBars).toBe(24);
+    expect(out.sections[2]!.startBar).toBe(32);
+    expect(out.bars).toBe(40);
+    expect(baseStructure.sections[1]!.lengthBars).toBe(16);
+  });
+
+  it('planTakeEdit redo repaints the section window on the take', () => {
+    const plan = planTakeEdit(fakeStudioResult, { kind: 'redo', sectionIndex: 1 });
+    expect(plan).not.toBeNull();
+    expect(plan!.edit.kind).toBe('repaint');
+    expect(plan!.edit.startSec).toBeCloseTo((8 * 240) / 140, 5);
+    expect(plan!.edit.endSec).toBeCloseTo((24 * 240) / 140, 5);
+    expect(plan!.edit.source).toBe(mixBlob);
+    expect(plan!.seed).toBe(5);
+    expect(plan!.bpm).toBe(140);
+    expect(plan!.structureRef).toBe(baseStructure);
+  });
+
+  it('planTakeEdit extend only matches the last section', () => {
+    const plan = planTakeEdit(fakeStudioResult, { kind: 'extend', sectionIndex: 2, deltaBars: 16 });
+    expect(plan).not.toBeNull();
+    expect(plan!.edit.startSec).toBeCloseTo((31 * 240) / 140, 5);
+    expect(plan!.edit.endSec).toBeCloseTo((48 * 240) / 140, 5);
+    expect(plan!.structureRef.bars).toBe(48);
+    expect(planTakeEdit(fakeStudioResult, { kind: 'extend', sectionIndex: 1, deltaBars: 8 })).toBeNull();
+  });
+
+  it('planTakeEdit refuses a non-Studio (Sketch) result', () => {
+    const sketch = { ...fakeStudioResult, backendId: 'offline-stub' } as RenderResult;
+    expect(planTakeEdit(sketch, { kind: 'redo', sectionIndex: 1 })).toBeNull();
+  });
+});
+
+describe('take edit store actions', () => {
+  let renderSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(aceStepBackend, 'probe').mockResolvedValue({
+      hasGpu: true,
+      backend: 'ace-step-1.5',
+      notes: [],
+      checkpoint: 'acestep-v15-turbo',
+    });
+    renderSpy = vi
+      .spyOn(aceStepBackend, 'render')
+      .mockImplementation(async (job) => ({ ...fakeStudioResult, jobId: job.jobId, structure: job.structureRef! }) as RenderResult);
+    // Fake 3-byte blob can't decode; the store's preview load must still succeed.
+    vi.spyOn(previewPlayer, 'loadMix').mockResolvedValue();
+    useStudioStore.setState({
+      productTier: 'studio',
+      aceHasGpu: true,
+      backendId: 'ace-step-1.5',
+      busy: false,
+      result: fakeStudioResult,
+      takeHistory: [],
+      keepSeed: false,
+      editedSections: null,
+      vibe: null,
+      ownerConfirmed: false,
+      previousResult: null,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('redoSection renders a repaint edit, then undo restores the take without a render', async () => {
+    await useStudioStore.getState().redoSection(1);
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    const job = renderSpy.mock.calls[0]![0] as {
+      edit: { kind: string; startSec: number; endSec: number };
+      seed: number;
+    };
+    expect(job.edit.kind).toBe('repaint');
+    expect(job.edit.startSec).toBeCloseTo((8 * 240) / 140, 5);
+    expect(job.edit.endSec).toBeCloseTo((24 * 240) / 140, 5);
+    expect(job.seed).toBe(fakeStudioResult.seed);
+    expect(useStudioStore.getState().takeHistory.length).toBe(1);
+
+    await useStudioStore.getState().undoTakeEdit();
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    expect(useStudioStore.getState().result).toBe(fakeStudioResult);
+    expect(useStudioStore.getState().takeHistory.length).toBe(0);
+  });
+
+  it('redoSection on a Sketch take warns and never renders', async () => {
+    useStudioStore.setState({ result: { ...fakeStudioResult, backendId: 'offline-stub' } as RenderResult });
+    await useStudioStore.getState().redoSection(1);
+    expect(renderSpy).not.toHaveBeenCalled();
+  });
+});
