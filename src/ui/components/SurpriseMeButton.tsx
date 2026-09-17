@@ -1,4 +1,3 @@
-import { DEFAULT_BPM } from '@/core/types';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { buildSurpriseParams, type RandomUint32 } from '../lib/genreTemplates';
 import { SONG_SHAPES } from '../lib/songShapes';
@@ -12,13 +11,14 @@ type Props = {
 };
 
 /**
- * More-only Surprise Me — new seed + allowlisted genre template, 174 BPM locked.
+ * More-only Surprise Me — new seed + allowlisted genre template, template genre + tempo.
  * Never on the Generate / Play / Export primary row.
  */
 export function SurpriseMeButton({ rng, pickIndex }: Props = {}) {
   const busy = useStudioStore((s) => s.busy);
   const setSeed = useStudioStore((s) => s.setSeed);
   const setBpm = useStudioStore((s) => s.setBpm);
+  const setGenre = useStudioStore((s) => s.setGenre);
   const setEnergy = useStudioStore((s) => s.setEnergy);
   const setDarkness = useStudioStore((s) => s.setDarkness);
   const setChaos = useStudioStore((s) => s.setChaos);
@@ -37,7 +37,8 @@ export function SurpriseMeButton({ rng, pickIndex }: Props = {}) {
         : SONG_SHAPES[Math.floor(Math.random() * SONG_SHAPES.length)]!;
     setSeed(p.seed);
     setSongShape(shapePick.id);
-    setBpm(DEFAULT_BPM);
+    setGenre(p.genre);
+    setBpm(p.bpm);
     setEnergy(jitter(p.energy));
     setDarkness(jitter(p.darkness));
     setChaos(jitter(p.chaos));
@@ -53,15 +54,14 @@ export function SurpriseMeButton({ rng, pickIndex }: Props = {}) {
         <HelpTip text={HELP.surpriseMe} ariaLabel="About Surprise Me" />
       </h2>
       <p className="hint">
-        Fresh seed + song shape + genre template. Tempo stays locked near 174. Genre words only — no artist
-        names.
+        Fresh seed + song shape + genre template (sets its genre and tempo). Genre words only — no artist names.
       </p>
       <span className="transport-btn-wrap">
         <button
           type="button"
           className="btn ghost"
           disabled={!canRun}
-          title="Roll a fresh original Sketch near 174 BPM (CPU)" 
+          title="Roll a fresh original from a random genre template"
           onClick={onSurprise}
         >
           Surprise me
@@ -71,3 +71,4 @@ export function SurpriseMeButton({ rng, pickIndex }: Props = {}) {
     </section>
   );
 }
+

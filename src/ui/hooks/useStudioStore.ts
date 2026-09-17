@@ -6,6 +6,8 @@ import {
   DEFAULT_DESCRIPTORS,
   DEFAULT_SAMPLE_RATE,
   clampProductBpm,
+  GENRES,
+  type GenreId,
   type ProductTier,
   type FlowStep,
   type MixerState,
@@ -262,6 +264,8 @@ export interface StudioState {
   mixerAnnounce: string;
   /** Arrangement preset chips. */
   songShape: SongShapeId;
+  /** Genre for captions; setGenre also applies its default tempo. */
+  genre: GenreId;
   /** User-expanded/repeated sections — fed into next Generate as sectionsOverride. */
   editedSections: Section[] | null;
   /** Simple Mode texture layers (generative guitar/solo/etc). */
@@ -309,6 +313,7 @@ export interface StudioState {
   /** #57 HelpPanel open. */
   setHelpOpen: (open: boolean) => void;
   setSongShape: (id: SongShapeId) => void;
+  setGenre: (id: GenreId) => void;
   expandSectionAt: (index: number, deltaBars?: number) => void;
   repeatSectionAt: (index: number) => void;
   setSectionLengthAt: (index: number, lengthBars: number) => void;
@@ -509,6 +514,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   helpOpen: false,
   mixerAnnounce: '',
   songShape: 'classic',
+  genre: 'dnb',
   editedSections: null,
   layers: { guitar: false, solo: false, vocalish: false, extraDrums: false, realBreak: true },
 
@@ -836,6 +842,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     pushToast(`${shape.label} · ${shape.bars} bars`, 'info', 2200);
   },
 
+  setGenre: (id) => {
+    const bpm = GENRES[id].defaultBpm;
+    set((s) => {
+      const next = { ...s, genre: id, bpm };
+      return { genre: id, bpm, paramsDirty: s.result ? computeParamsDirty(s.lastRenderFingerprint, next) : s.paramsDirty };
+    });
+  },
+
   expandSectionAt: (index, deltaBars = 8) => {
     const { result, editedSections } = get();
     const base = editedSections ?? result?.structure?.sections;
@@ -1080,6 +1094,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           jobId,
           seed: s.seed,
           songShape: live.songShape,
+          genre: live.genre,
           sectionsOverride: live.editedSections ?? undefined,
           // User tempo (no 174 lock).
           bpm: clampProductBpm(live.bpm || DEFAULT_BPM),
@@ -1581,6 +1596,7 @@ if (import.meta.hot) {
       bars: saved.bars as number,
       bpm: saved.bpm as number,
       promptText: saved.promptText as string,
+      genre: ((saved.genre as GenreId) in GENRES ? (saved.genre as GenreId) : 'dnb'),
       backendId: saved.backendId as string,
       paramsDirty: saved.paramsDirty as boolean,
       lastRenderFingerprint: saved.lastRenderFingerprint as StudioState['lastRenderFingerprint'],
@@ -1609,6 +1625,7 @@ if (import.meta.hot) {
       bars: s.bars,
       bpm: s.bpm,
       promptText: s.promptText,
+      genre: s.genre,
       backendId: s.backendId,
       paramsDirty: s.paramsDirty,
       lastRenderFingerprint: s.lastRenderFingerprint,

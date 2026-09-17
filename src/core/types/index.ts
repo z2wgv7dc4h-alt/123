@@ -149,6 +149,8 @@ export interface LoRAPack {
 export interface RenderJob {
   /** Arrangement preset (intro length, breakdown, etc.). */
   songShape?: SongShapeId;
+  /** Genre for captions (ACE) — tempo is job.bpm. Absent = dnb. */
+  genre?: GenreId;
   /** Expanded/repeated sections from interactive timeline. */
   sectionsOverride?: Section[];
   jobId: string;
@@ -358,6 +360,13 @@ export function clampProductBpm(n: number): number {
   if (!Number.isFinite(n)) return DEFAULT_BPM;
   return Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(n)));
 }
+export type GenreId = 'dnb' | 'dubstep' | 'halftime' | 'jungle';
+export const GENRES: Record<GenreId, { label: string; defaultBpm: number }> = {
+  dnb: { label: 'Drum & bass', defaultBpm: 174 },
+  dubstep: { label: 'Dubstep', defaultBpm: 140 },
+  halftime: { label: 'Half-time', defaultBpm: 170 },
+  jungle: { label: 'Jungle', defaultBpm: 165 },
+};
 /** 64 bars @174 ≈ 88 s: ACE needs room for build + drop (32 bars = 44 s was too short). */
 export const DEFAULT_BARS = 64;
 export const DEFAULT_PPQ = 480;

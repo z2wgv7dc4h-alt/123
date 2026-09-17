@@ -3,6 +3,8 @@
  * Vibe-only tags; no artist names. Guitar/solo when layers on = honesty tags, not stem claims.
  */
 
+import type { GenreId } from '../types';
+
 export type AceCaptionLayers = {
   guitar?: boolean;
   solo?: boolean;
@@ -19,6 +21,8 @@ export type AceCaptionInput = {
   userText?: string;
   descriptors?: string[];
   songShape?: string;
+  /** Genre for captions — tempo is the job's bpm. Absent = dnb. */
+  genre?: GenreId;
   /** Vary seed — 0 keeps the first in-band phrase (tests). */
   seed?: number;
 };
@@ -67,6 +71,39 @@ export function chaosWords(chaos: number, seed = 0): string {
   return pickBand(['chaotic chopped amen breaks, dense percussion', 'chaotic jungle amen breaks, dense percussion'], seed);
 }
 
+function wobbleBassWords(darkness: number, seed = 0): string {
+  const d = clamp01(darkness);
+  if (d < 0.34) return pickBand(['deep wobble bass', 'rolling wobble bass'], seed);
+  if (d < 0.67) return pickBand(['heavy wobble bass, metallic growls', 'heavy growl bass, wobble'], seed);
+  return pickBand(['dark growling wobble bass, screeching mid bass', 'dark metallic growl bass, heavy wobble'], seed);
+}
+
+function jungleBassWords(darkness: number, seed = 0): string {
+  const d = clamp01(darkness);
+  if (d < 0.34) return pickBand(['warm deep sub bass', 'round deep sub bass'], seed);
+  if (d < 0.67) return pickBand(['rolling sub bass', 'deep rolling sub bass'], seed);
+  return pickBand(['dark rumbling sub bass', 'dark heavy sub bass'], seed);
+}
+
+type GenreCaption = {
+  lead: string;
+  halfTime: boolean;
+  drums: (chaos: number, seed: number) => string;
+  bass: (darkness: number, seed: number) => string;
+};
+
+export const GENRE_CAPTIONS: Record<GenreId, GenreCaption> = {
+  dnb: { lead: 'drum and bass, instrumental', halfTime: false, drums: chaosWords, bass: darknessWords },
+  dubstep: { lead: 'dubstep, instrumental', halfTime: true, drums: () => 'half-time drums, snare on 3', bass: wobbleBassWords },
+  halftime: { lead: 'halftime drum and bass, instrumental', halfTime: true, drums: () => 'half-time breakbeat, snare on 3', bass: darknessWords },
+  jungle: {
+    lead: 'jungle, instrumental',
+    halfTime: false,
+    drums: (c) => (clamp01(c) < 0.34 ? 'rolling amen breaks' : 'chopped amen breaks, rapid break edits'),
+    bass: jungleBassWords,
+  },
+};
+
 /**
  * Build ACE sidecar prompt.text from knobs (+ optional layers / user text).
  * Always includes energy/darkness/chaos words so Vary + knob changes alter the caption.
@@ -89,11 +126,13 @@ export function buildAceCaption(input: AceCaptionInput): string {
   const pushPhrases = (text: string) => text.split(',').forEach(pushDeduped);
 
   // ACE musicians guide: short caption = genre, instruments, one mood, production.
-  const halfTime = HALF_TIME_SHAPES.has(input.songShape ?? '');
-  pushPhrases('drum and bass, instrumental');
-  pushPhrases(halfTime ? 'heavy half-time drums' : chaosWords(chaos, seed));
-  pushPhrases(darknessWords(darkness, seed));
-  pushPhrases('tight punchy drums, sub bass');
+  const genre: GenreId = input.genre ?? 'dnb';
+  const g = GENRE_CAPTIONS[genre];
+  const shapeHalfTime = HALF_TIME_SHAPES.has(input.songShape ?? '');
+  pushPhrases(g.lead);
+  pushPhrases(genre === 'dnb' && shapeHalfTime ? 'heavy half-time drums' : g.drums(chaos, seed));
+  pushPhrases(g.bass(darkness, seed));
+  pushPhrases(genre === 'dnb' ? 'tight punchy drums, sub bass' : 'tight punchy drums, heavy sub bass');
   pushPhrases(energyWords(energy, seed));
   pushPhrases('polished club mix');
 
@@ -102,8 +141,8 @@ export function buildAceCaption(input: AceCaptionInput): string {
     if (!guitarOn && legacy.has(phrase.trim().toLowerCase())) return;
     const t = phrase.trim().toLowerCase();
     if (/\b\d+\s*bpm\b/.test(t)) return;
-    const halfTimeShape = input.songShape === 'half-time-drop' || input.songShape === 'dubstep';
-    if (!halfTimeShape && /half-time|dubstep|snare on 3/.test(t)) return;
+    const halfTimeOk = shapeHalfTime || g.halfTime;
+    if (!halfTimeOk && /half-time|dubstep|snare on 3/.test(t)) return;
     pushDeduped(phrase);
   };
   const user = input.userText?.trim();

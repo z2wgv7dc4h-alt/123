@@ -275,6 +275,7 @@ export class AceStepBackend implements AudioBackend {
       userText: job.prompt.text,
       descriptors: job.prompt.descriptors,
       songShape: job.songShape,
+      genre: job.genre,
       seed: job.seed,
     });
     // Snapshot for Status chrome — the payload actually posted, not a claim.
@@ -282,7 +283,13 @@ export class AceStepBackend implements AudioBackend {
     const thinking = srcAudioBase64 ? false : ACE_THINKING;
     const acePayload = {
       thinking,
-      captionFamily: /drum and bass|dnb/i.test(caption) ? 'DnB' : 'other',
+      captionFamily: caption.startsWith('dubstep')
+        ? 'Dubstep'
+        : caption.startsWith('jungle')
+          ? 'Jungle'
+          : /drum and bass|dnb/i.test(caption)
+            ? 'DnB'
+            : 'other',
       steps: sampler.inferenceSteps,
       model: checkpoint ?? ACE_DEFAULT_CHECKPOINT,
     };

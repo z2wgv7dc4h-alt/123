@@ -76,7 +76,7 @@ describe('App process order (one layout)', () => {
 
   it('SimpleWant placeholder is exact preset-picker hint string', () => {
     expect(wantSrc).toContain(
-      'placeholder="e.g. neurofunk drum and bass, growling reese bass, tight snare"',
+      'placeholder="e.g. neurofunk drum and bass, growling reese · or dubstep, wobble bass"',
     );
   });
 

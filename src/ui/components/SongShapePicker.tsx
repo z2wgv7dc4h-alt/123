@@ -1,11 +1,10 @@
-import { DEFAULT_BPM } from '@/core/types';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { SONG_SHAPES, type SongShapeId } from '../lib/songShapes';
 import { barsToDurationSec, formatDurationMmSs } from '../lib/barPosition';
 
 const LENGTH_PRESETS = [32, 48, 64] as const;
 
-function shapeSubtitle(bars: number, bpm = DEFAULT_BPM): string {
+function shapeSubtitle(bars: number, bpm: number): string {
   const sec = barsToDurationSec(bars, bpm);
   return `${bars} bars · ~${formatDurationMmSs(sec)}`;
 }
@@ -17,6 +16,7 @@ export function SongShapePicker() {
   const bars = useStudioStore((s) => s.bars);
   const setBars = useStudioStore((s) => s.setBars);
   const busy = useStudioStore((s) => s.busy);
+  const bpm = useStudioStore((s) => s.bpm);
 
   return (
     <section className="song-shape-picker panel" aria-label="Song shape">
@@ -27,7 +27,7 @@ export function SongShapePicker() {
       <div className="song-shape-chips" role="radiogroup" aria-label="Song shape">
         {SONG_SHAPES.map((s) => {
           const on = songShape === s.id;
-          const sub = shapeSubtitle(s.bars);
+          const sub = shapeSubtitle(s.bars, bpm);
           return (
             <button
               key={s.id}
@@ -57,14 +57,14 @@ export function SongShapePicker() {
               className={`btn tiny${on ? ' on' : ' ghost'}`}
               disabled={busy}
               aria-pressed={on}
-              title={`${n} bars · ~${formatDurationMmSs(barsToDurationSec(n, DEFAULT_BPM))} — applies on next Generate`}
+              title={`${n} bars · ~${formatDurationMmSs(barsToDurationSec(n, bpm))} — applies on next Generate`}
               onClick={() => setBars(n)}
             >
               {n}
             </button>
           );
         })}
-        <span className="song-length-meta meta">{shapeSubtitle(bars)}</span>
+        <span className="song-length-meta meta">{shapeSubtitle(bars, bpm)}</span>
       </div>
     </section>
   );

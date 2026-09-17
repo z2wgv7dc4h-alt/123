@@ -16,6 +16,7 @@ export type SongShape = {
   bars: number;
 };
 
+// 'dubstep' shape retired from the picker: Dubstep is now a genre at 140 BPM.
 export const SONG_SHAPES: readonly SongShape[] = [
   {
     id: 'classic',
@@ -44,19 +45,13 @@ export const SONG_SHAPES: readonly SongShape[] = [
   {
     id: 'half-time-drop',
     label: 'Half-time drop',
-    blurb: 'Snare on 3 · heavy drop energy at 174',
-    bars: 48,
-  },
-  {
-    id: 'dubstep',
-    label: 'Dubstep feel',
-    blurb: 'Half-time snare on 3 · wobble reese at 174',
+    blurb: 'Snare on 3 · heavy half-time drop',
     bars: 48,
   },
   {
     id: 'trap-bounce',
     label: 'Trap bounce',
-    blurb: 'Fat 808s · rolling hats · still 174 DnB',
+    blurb: 'Fat 808s · rolling hats · bouncy drop',
     bars: 32,
   },
 ] as const;

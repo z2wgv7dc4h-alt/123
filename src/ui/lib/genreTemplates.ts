@@ -3,9 +3,13 @@
  * Genre descriptors only — never artist, band, or track names.
  */
 
+import type { GenreId } from '@/core/types';
+
 export type GenreTemplate = {
   id: string;
   label: string;
+  genre: GenreId;
+  bpm: number;
   /** Freeform style text (pass-through on Generate). */
   promptText: string;
   energy: number;
@@ -19,7 +23,9 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'liquid-glow',
     label: 'Liquid glow',
-    promptText: 'liquid drum and bass, warm pads, rolling amens, deep sub, 174 bpm',
+    genre: 'dnb',
+    bpm: 174,
+    promptText: 'liquid drum and bass, warm pads, rolling amens, deep sub',
     energy: 0.55,
     darkness: 0.35,
     chaos: 0.2,
@@ -27,7 +33,9 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'neuro-pressure',
     label: 'Neuro pressure',
-    promptText: 'neurofunk pressure, reese bass, tight breaks, dark atmosphere, 174 bpm',
+    genre: 'dnb',
+    bpm: 174,
+    promptText: 'neurofunk pressure, reese bass, tight breaks, dark atmosphere',
     energy: 0.85,
     darkness: 0.7,
     chaos: 0.35,
@@ -35,7 +43,9 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'jump-up',
     label: 'Jump-up bounce',
-    promptText: 'jump up bounce, wobble bass, energetic dancefloor, gated stabs, 174 bpm',
+    genre: 'dnb',
+    bpm: 174,
+    promptText: 'jump up bounce, wobble bass, energetic dancefloor, gated stabs',
     energy: 0.9,
     darkness: 0.4,
     chaos: 0.45,
@@ -43,7 +53,9 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'halftime-weight',
     label: 'Half-time weight',
-    promptText: 'half-time break, heavy drums, distorted supersaw, rock-dnb crossover, 174 bpm',
+    genre: 'halftime',
+    bpm: 170,
+    promptText: 'halftime drum and bass, heavy half-time drums, distorted supersaw, massive reese bass',
     energy: 0.8,
     darkness: 0.55,
     chaos: 0.3,
@@ -51,7 +63,9 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'techstep-grid',
     label: 'Techstep grid',
-    promptText: 'techstep grid, cold atmosphere, precise hats, industrial bass, 174 bpm',
+    genre: 'dnb',
+    bpm: 174,
+    promptText: 'techstep grid, cold atmosphere, precise hats, industrial bass',
     energy: 0.7,
     darkness: 0.65,
     chaos: 0.25,
@@ -59,7 +73,9 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'roller-groove',
     label: 'Roller groove',
-    promptText: 'roller groove, deep bass, subtle fills, late-night energy, 174 bpm',
+    genre: 'dnb',
+    bpm: 174,
+    promptText: 'roller groove, deep bass, subtle fills, late-night energy',
     energy: 0.65,
     darkness: 0.5,
     chaos: 0.22,
@@ -67,7 +83,9 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'dancefloor-rush',
     label: 'Dancefloor rush',
-    promptText: 'energetic dancefloor drum and bass, aggressive transient drums, bright lead, 174 bpm',
+    genre: 'dnb',
+    bpm: 174,
+    promptText: 'energetic dancefloor drum and bass, aggressive transient drums, bright lead',
     energy: 0.88,
     darkness: 0.3,
     chaos: 0.4,
@@ -75,6 +93,8 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
   {
     id: 'festival-anthem',
     label: 'Festival anthem',
+    genre: 'dnb',
+    bpm: 174,
     promptText: 'festival drum and bass, huge supersaw synth leads, heavy distorted guitars, massive reese bass, punchy breakbeat drums, long riser build, anthemic stadium drop, loud polished master',
     energy: 0.9,
     darkness: 0.4,
@@ -82,9 +102,21 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
     songShape: 'double-drop',
   },
   {
+    id: 'dubstep-drop',
+    label: 'Dubstep drop',
+    genre: 'dubstep',
+    bpm: 140,
+    promptText: 'dubstep, heavy wobble bass, metallic growl bass, half-time drums, massive drop, loud polished master',
+    energy: 0.9,
+    darkness: 0.7,
+    chaos: 0.4,
+  },
+  {
     id: 'forest-fog',
     label: 'Forest fog',
-    promptText: 'atmospheric jungle, organic breaks, misty pads, soft sub, 174 bpm',
+    genre: 'jungle',
+    bpm: 165,
+    promptText: 'atmospheric jungle, organic breaks, misty pads, soft sub',
     energy: 0.5,
     darkness: 0.45,
     chaos: 0.28,
@@ -112,7 +144,7 @@ export function pickGenreTemplate(
   return GENRE_TEMPLATES[i]!;
 }
 
-/** Build Surprise Me params: new seed + template knobs; BPM stays product default. */
+/** Build Surprise Me params: new seed + template knobs + template genre/tempo. */
 export function buildSurpriseParams(opts?: {
   rng?: RandomUint32;
   pickIndex?: (n: number) => number;
@@ -123,26 +155,30 @@ export function buildSurpriseParams(opts?: {
   energy: number;
   darkness: number;
   chaos: number;
+  genre: GenreId;
   templateId: string;
 } {
   const template = pickGenreTemplate(opts?.pickIndex);
   return {
     seed: randomUint32(opts?.rng),
-    bpm: 174,
+    bpm: template.bpm,
     promptText: template.promptText,
     energy: template.energy,
     darkness: template.darkness,
     chaos: template.chaos,
+    genre: template.genre,
     templateId: template.id,
   };
 }
 
-/** Params a preset click applies. Seed and BPM untouched; no generate. */
+/** Params a preset click applies. Seed untouched; no generate. */
 export function templateParams(id: string): {
   promptText: string;
   energy: number;
   darkness: number;
   chaos: number;
+  genre: GenreId;
+  bpm: number;
   songShape?: GenreTemplate['songShape'];
 } | null {
   const t = GENRE_TEMPLATES.find((g) => g.id === id);
@@ -152,6 +188,8 @@ export function templateParams(id: string): {
     energy: t.energy,
     darkness: t.darkness,
     chaos: t.chaos,
+    genre: t.genre,
+    bpm: t.bpm,
     ...(t.songShape ? { songShape: t.songShape } : {}),
   };
 }

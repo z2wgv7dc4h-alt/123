@@ -68,7 +68,7 @@ export default function App() {
             </span>
           </div>
           <h1>{studioLive ? 'DnB Studio' : 'DnB Sketch'}</h1>
-          <p className="tagline">Original drum &amp; bass · 174 BPM · files stay local</p>
+          <p className="tagline">Original bass music · DnB · dubstep · files stay local</p>
         </div>
       </header>
 

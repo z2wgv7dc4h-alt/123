@@ -8,7 +8,7 @@ export const HELP = {
   ownerCheck:
     'What: Your “I own this file” OK. When: Check before a drop attaches. What happens: Required before the file is used. Audio goes to your local GPU only.',
   vibeIntensity:
-    'What: How strongly your upload steers the result. When: After a Style Ref is attached. What happens: Low = light touch; High = stronger. Tempo stays ~174.',
+    'What: How strongly your upload steers the result. When: After a Style Ref is attached. What happens: Low = light touch; High = stronger. Tempo follows Genre.',
   energyNudge:
     'What: Fine-tunes how hard the drop hits. When: After vibe is applied; before next Generate. What happens: Higher = more drive. Applies on next Generate.',
   darknessNudge:
@@ -16,7 +16,7 @@ export const HELP = {
   hashPill:
     'What: Private session tag for the attached file. When: A Style Ref is on. What happens: Shows which upload is active — nothing uploads.',
   generate:
-    'What: Builds a new drum & bass sketch here. When: Click Generate (G) anytime. What happens: Kick/snare/hats/bass near 174 BPM — original, not a clone.',
+    'What: Builds a new bass-music sketch. When: Click Generate (G) anytime. What happens: Kick/snare/hats/bass at your genre tempo — original, not a clone.',
   play:
     'What: Hear the mix preview in this browser. When: After Generate (Space). What happens: You listen; Space again stops, or Play again replays when it ends.',
   stop:
@@ -80,7 +80,7 @@ export const HELP = {
   arrangement:
     'What: Knobs that change how the next sketch feels. When: Move a slider, then Regenerate or Vary. What happens: Mute/solo do not need Regenerate — knobs do.',
   bpmPower:
-    'What: Tempo stays near 174 (classic drum & bass). When: Only change if you want 170–176. What happens: Layout still locks measured tempo near 174 on render.',
+    'What: Song tempo. When: Before Generate. What happens: 174 = drum & bass, 140 = dubstep, 85 = half-time. Applies on next Generate.',
   backendSelect:
     'What: Chooses Sketch vs Studio engine. When: Under More. What happens: Sketch is ready now; Studio needs your local GPU setup.',
   loraPack:
@@ -278,7 +278,7 @@ export type HelpKey = keyof typeof HELP;
 /** Tiny plain-English glossary for noobs — UI may link; keep in sync with docs/GLOSSARY.md. */
 export const GLOSSARY_BLURBS = {
   styleRef: 'Your own file as a reference. Sketch biases mood; Studio conditions on the audio. Optional.',
-  generate: 'Build an original ~174 BPM browser sketch. Shortcut G.',
+  generate: 'Build an original browser sketch at your genre tempo. Shortcut G.',
   play: 'Hear the mix preview in this browser. Shortcut Space.',
   exportZip: 'Download dry tracks at 16|24-bit (+ mix_as_heard if remixed). Shortcut E.',
   exportBitDepth: 'Sketch export WAV depth: 16 (default) or 24-bit — not Studio.',
@@ -288,8 +288,8 @@ export const GLOSSARY_BLURBS = {
   browserSketch: 'Sketch = CPU sound you hear now. Studio GPU later is not live here.',
   productSketch: 'Sketch product — CPU/browser now, 16-bit.',
   productStudio: 'Studio product — GPU/ACE later; gated until live.',
-  bpm174: 'Song layout stays about 174 BPM (DnB).',
-  why174: 'Why ~174? Classic energetic DnB tempo — layout stays locked here.',
+  bpm174: 'Genre tempo: DnB 174, dubstep 140, half-time 170, jungle 165.',
+  why174: 'Why 174? Classic DnB tempo — dubstep sits at 140, jungle 165.',
   rehear: 'Hit Play again after stem tweaks — no Generate.',
   playDisabled: 'Play locked until you Generate.',
   exportDisabled: 'Export locked until you Generate.',
