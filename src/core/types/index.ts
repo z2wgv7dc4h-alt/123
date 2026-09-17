@@ -1,4 +1,4 @@
-/** Phase 0+ shared contracts — structure owns the 174 BPM hard grid; backends render audio only. */
+/** Phase 0+ shared contracts — structure owns the hard grid at the job's BPM; backends render audio only. */
 
 export type DrumRole = 'kick' | 'snare' | 'hats' | 'break' | 'perc';
 export type SectionName = 'intro' | 'build' | 'drop' | 'break' | 'breakdown' | 'outro';
@@ -350,7 +350,14 @@ export interface MixerState {
 /** Retail product path — Sketch = CPU/browser now; Studio = GPU/ACE when live. */
 export type ProductTier = 'sketch' | 'studio';
 
+/** Default tempo only — not a lock. 174 DnB, 140 dubstep, etc. */
 export const DEFAULT_BPM = 174;
+export const BPM_MIN = 70;
+export const BPM_MAX = 200;
+export function clampProductBpm(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_BPM;
+  return Math.max(BPM_MIN, Math.min(BPM_MAX, Math.round(n)));
+}
 /** 64 bars @174 ≈ 88 s: ACE needs room for build + drop (32 bars = 44 s was too short). */
 export const DEFAULT_BARS = 64;
 export const DEFAULT_PPQ = 480;
@@ -431,7 +438,7 @@ export interface StyleReferenceProvenance {
 
 /**
  * Vibe Mirror v0 — local analysis of a user-owned upload.
- * estimatedBpm is display-only; StructureEngine BPM stays 174.
+ * estimatedBpm is display-only; BPM is the user's tempo setting; style refs do not change it.
  */
 export interface VibeProfile {
   estimatedBpm: number | null;
@@ -444,7 +451,7 @@ export interface VibeProfile {
   fileName: string;
 }
 
-/** Mapped arrangement knobs from a VibeProfile (BPM excluded — always 174). */
+/** Mapped arrangement knobs from a VibeProfile (BPM is the user's tempo setting; style refs do not change it). */
 export interface VibeParamMap {
   energy: number;
   darkness: number;

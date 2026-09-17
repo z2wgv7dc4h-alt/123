@@ -2,6 +2,7 @@ import { useStudioStore } from '../hooks/useStudioStore';
 import { HELP } from '../lib/helpCopy';
 import { HelpTip, LabelWithTip } from './HelpTip';
 import { pushToast } from '../lib/toasts';
+import { BPM_MIN, BPM_MAX } from '@/core/types';
 
 export function ParamPanel() {
   const seed = useStudioStore((s) => s.seed);
@@ -12,6 +13,7 @@ export function ParamPanel() {
   const chaos = useStudioStore((s) => s.chaos);
   const promptText = useStudioStore((s) => s.promptText);
   const setSeed = useStudioStore((s) => s.setSeed);
+  const setBpm = useStudioStore((s) => s.setBpm);
   const keepSeed = useStudioStore((s) => s.keepSeed);
   const setKeepSeed = useStudioStore((s) => s.setKeepSeed);
   const setBars = useStudioStore((s) => s.setBars);
@@ -30,7 +32,7 @@ export function ParamPanel() {
         <HelpTip text={HELP.paramsVsMixer} ariaLabel="Knobs vs mute solo" />
       </h2>
       <p className="hint">
-        Nudge the sketch feel. Tempo stays about 174. Knobs apply on next Generate (not live).
+        Tempo and knobs apply on next Generate (not live).
       </p>
       {paramsDirty && (
         <p className="regen-inline-hint" role="status">
@@ -41,11 +43,20 @@ export function ParamPanel() {
         </p>
       )}
 
-      {/* Generate always renders at DEFAULT_BPM — show the lock, not a fake input. */}
-      <p className="bpm-pill-row" aria-label="Tempo">
-        <span className="bpm-pill">174 BPM</span>
-        <HelpTip text={HELP.bpmLock} ariaLabel="About BPM lock" />
-      </p>
+      <label className="bpm-row">
+        <LabelWithTip tip={HELP.bpmLock} tipLabel="About tempo">
+          Tempo (BPM)
+        </LabelWithTip>
+        <input
+          type="number"
+          min={BPM_MIN}
+          max={BPM_MAX}
+          step={1}
+          value={bpm}
+          title="174 drum & bass · 140 dubstep · 85 half-time"
+          onChange={(e) => setBpm(Number(e.target.value))}
+        />
+      </label>
 
       <div className="seed-row">
         <label>

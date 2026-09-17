@@ -5,6 +5,7 @@ import {
   DEFAULT_BIT_DEPTH,
   DEFAULT_DESCRIPTORS,
   DEFAULT_SAMPLE_RATE,
+  clampProductBpm,
   type ProductTier,
   type FlowStep,
   type MixerState,
@@ -547,7 +548,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setKeepSeed: (v) => set({ keepSeed: Boolean(v) }),
   setBpm: (n) =>
     set((s) => {
-      const bpm = Math.max(170, Math.min(176, Math.round(n)));
+      const bpm = clampProductBpm(n);
       const next = { ...s, bpm };
       return { bpm, paramsDirty: s.result ? computeParamsDirty(s.lastRenderFingerprint, next) : s.paramsDirty };
     }),
@@ -638,7 +639,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         ...prior,
         vibe,
         vibeBusy: false,
-        bpm: DEFAULT_BPM,
         energy: mapped.energy,
         darkness: mapped.darkness,
         chaos: mapped.chaos,
@@ -647,7 +647,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       set({
         vibe,
         vibeBusy: false,
-        bpm: DEFAULT_BPM,
         energy: mapped.energy,
         darkness: mapped.darkness,
         chaos: mapped.chaos,
@@ -673,7 +672,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       const next = {
         ...st,
         vibe: null,
-        bpm: DEFAULT_BPM,
         energy: 0.75,
         darkness: 0.45,
         chaos: 0.25,
@@ -681,7 +679,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       };
       return {
         vibe: null,
-        bpm: DEFAULT_BPM,
         energy: 0.75,
         darkness: 0.45,
         chaos: 0.25,
@@ -1084,8 +1081,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           seed: s.seed,
           songShape: live.songShape,
           sectionsOverride: live.editedSections ?? undefined,
-          // StructureEngine authority — always product BPM
-          bpm: DEFAULT_BPM,
+          // User tempo (no 174 lock).
+          bpm: clampProductBpm(live.bpm || DEFAULT_BPM),
           bpmTolerance: 2,
           durationBars: bars,
           sampleRateHz: DEFAULT_SAMPLE_RATE,
@@ -1129,7 +1126,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       mixerUndoSnapshot = null; // #42 clears on Generate
       // mixerUndoAvailable cleared in set() below
       const dirty = computeMixerDirty(get().mixer);
-      const fp = snapshotRenderFingerprint({ ...get(), bpm: DEFAULT_BPM });
+      const fp = snapshotRenderFingerprint(get());
       const preserved = get();
       // Generate → ready before canPlay (never idle after successful load).
       const psAfter = previewPlayer.state;
@@ -1141,7 +1138,6 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         loopRegion: null,
         waveformZoom: false,
         abFlashback: false,
-        bpm: DEFAULT_BPM,
         warnings: [...(preserved.warnings), ...result.warnings],
         busy: false,
         flowStep: 'generated',

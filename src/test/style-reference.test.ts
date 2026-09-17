@@ -319,6 +319,6 @@ describe('style reference: OfflineStub bias is meaningful', () => {
     const styledMix = styled.stems.find((s) => s.id === 'mix')!;
     expect(styledMix.blob?.size).toBeGreaterThan(1000);
     expect(base.waveformPeaks).not.toEqual(styled.waveformPeaks);
-    expect(styled.bpmMeasured).toBe(174);
+    expect(styled.bpmMeasured).toBe(172);
   }, 30_000);
 });

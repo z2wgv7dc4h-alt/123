@@ -52,7 +52,7 @@ describe('honesty: WAV header', () => {
   });
 });
 
-describe('honesty: OfflineStub caps + BPM lock', () => {
+describe('honesty: OfflineStub caps + tempo', () => {
   it('legoStems is false (no LEGO extract/repaint on CPU stub)', () => {
     expect(offlineStubBackend.capabilities.legoStems).toBe(false);
     expect(offlineStubBackend.capabilities.extract).toBe(false);
@@ -60,11 +60,11 @@ describe('honesty: OfflineStub caps + BPM lock', () => {
     expect(offlineStubBackend.capabilities.requiresGpu).toBe(false);
   });
 
-  it('BPM lock recomputes samplesPerBar when job BPM is far off', async () => {
+  it('honors the job BPM (no 174 lock) and recomputes samplesPerBar', async () => {
     const result = await offlineStubBackend.render({
-      jobId: 'test_bpm_lock',
+      jobId: 'test_bpm_unlock',
       seed: 99,
-      bpm: 120, // outside ±2 of 174
+      bpm: 140,
       bpmTolerance: 2,
       durationBars: 16,
       sampleRateHz: 48000,
@@ -73,10 +73,10 @@ describe('honesty: OfflineStub caps + BPM lock', () => {
       prompt: { descriptors: ['test'], energy: 0.5, darkness: 0.4 },
       stemSchemaVersion: 'v0',
     });
-    expect(result.bpmMeasured).toBe(174);
-    expect(result.structure?.bpm).toBe(174);
-    const expectedSpb = Math.round((60 / 174) * 4 * 48000);
-    expect(result.structure?.samplesPerBar).toBe(expectedSpb);
+    expect(result.structure?.bpm).toBe(140);
+    expect(result.bpmMeasured).toBe(140);
+    expect(result.structure?.samplesPerBar).toBe(Math.round((60 / 140) * 4 * 48000));
+    expect(result.warnings.join('\n')).toMatch(/Real break loop off at 140 BPM/);
     expect(result.manifest.structureVersion).toBe('hard-grid-v0');
     expect(result.stems.some((s) => s.id === 'mix' && s.blob)).toBe(true);
   });

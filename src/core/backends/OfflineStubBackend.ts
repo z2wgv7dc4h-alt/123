@@ -10,6 +10,7 @@ import {
   DEFAULT_BIT_DEPTH,
   DEFAULT_BPM,
   DEFAULT_SAMPLE_RATE,
+  clampProductBpm,
   type AudioBackend,
   type BackendCaps,
   type EnergyPoint,
@@ -748,7 +749,7 @@ export class OfflineStubBackend implements AudioBackend {
     const styleRef = job.styleReference;
     const styleIntensity = styleRef ? Math.min(1, Math.max(0, styleRef.intensity)) : 0;
 
-    const bpm = DEFAULT_BPM;
+    const bpm = clampProductBpm(job.bpm || DEFAULT_BPM);
     const energy =
       styleRef && styleIntensity > 0
         ? Math.min(
@@ -787,12 +788,6 @@ export class OfflineStubBackend implements AudioBackend {
         songShape: job.songShape,
         sectionsOverride: job.sectionsOverride,
       }));
-
-    if (Math.abs(structure.bpm - DEFAULT_BPM) > 2) {
-      const lockedBpm = DEFAULT_BPM;
-      const samplesPerBar = Math.round((60 / lockedBpm) * 4 * sr);
-      structure = { ...structure, bpm: lockedBpm, samplesPerBar };
-    }
 
     // Pattern-family stem balance nudge (audible Vary without style ref)
     const family = structure.patternFamily ?? 'amen';
@@ -987,7 +982,9 @@ export class OfflineStubBackend implements AudioBackend {
     // separate stem, doesn't touch any tested per-stem bus). See
     // buildRealBreakBus for rationale/sourcing.
     // Opt-OUT layer: absent means on, since this shipped as always-on.
-    const realBreakGain = job.layers?.realBreak === false ? 0 : REAL_BREAK_GAIN;
+    // Break loops are cut at 174 BPM; far from that they would be pitch-shifted.
+    const breakTempoOk = Math.abs(structure.bpm - DEFAULT_BPM) <= 6;
+    const realBreakGain = job.layers?.realBreak === false || !breakTempoOk ? 0 : REAL_BREAK_GAIN;
     const realBreak = await buildRealBreakBus(
       family,
       structure.sections,
@@ -1053,8 +1050,8 @@ export class OfflineStubBackend implements AudioBackend {
 
     const midiBlob = structureToMidiBlob(structure);
     const warnings: string[] = [];
-    if (Math.abs(structure.bpm - DEFAULT_BPM) > 0.01) {
-      warnings.push(`BPM locked to structure ${structure.bpm} (target ${DEFAULT_BPM} ±2)`);
+    if (!breakTempoOk && job.layers?.realBreak !== false) {
+      warnings.push(`Real break loop off at ${structure.bpm} BPM (loops are cut at ${DEFAULT_BPM})`);
     }
     warnings.push(
       'Browser-sketch quality — not production timbre (Studio GPU pending); sketch ≠ Studio',

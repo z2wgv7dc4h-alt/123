@@ -38,7 +38,7 @@ export const HELP = {
   studioGated:
     'What: Studio locked until local GPU is online. When: You open Studio without GPU. What happens: You still get Sketch audio — upgrade is honest.',
   bpmLock:
-    'What: Song tempo stays about 174 (classic drum & bass). When: Always on Generate. What happens: Upload may show another BPM — we do not force the song to match.',
+    'What: Song tempo. When: Before Generate. What happens: 174 = drum & bass, 140 = dubstep, 85 = half-time. Applies on next Generate.',
   energy:
     'What: How hard the drop hits. When: Move the slider, then Again or Vary. What happens: Higher = more drive. Mute/solo do not need this — only knobs do.',
   darkness:
