@@ -47,7 +47,7 @@ import { HELP } from '../lib/helpCopy';
 import { formatStudioError } from '@/core/uiMessages';
 import { saveResumeDraft } from '../lib/resumeDraft';
 import { songShapeById, type SongShapeId } from '../lib/songShapes';
-import { planTakeEdit, type TakeEditRequest } from '../lib/takeEdit';
+import { planTakeEdit, type SectionStyle, type TakeEditRequest } from '../lib/takeEdit';
 import {
   expandSection,
   repeatSection,
@@ -307,7 +307,7 @@ export interface StudioState {
   generate: (opts?: { variation?: 'again' | 'vary'; edit?: TakeEditRequest }) => Promise<void>;
   generateAgain: () => Promise<void>;
   vary: () => Promise<void>;
-  redoSection: (index: number) => Promise<void>;
+  redoSection: (index: number, style?: SectionStyle) => Promise<void>;
   extendLastSection: (index: number, deltaBars: number) => Promise<void>;
   undoTakeEdit: () => Promise<void>;
   play: () => Promise<void>;
@@ -1117,7 +1117,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           jobId,
           seed: editPlan?.seed ?? s.seed,
           songShape: live.songShape,
-          genre: live.genre,
+          genre: editPlan?.style?.genre ?? live.genre,
+          sectionRole: editPlan?.style?.role,
           ...(editPlan
             ? { sectionsOverride: undefined }
             : { sectionsOverride: live.editedSections ?? undefined }),
@@ -1129,7 +1130,9 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           sampleRateHz: DEFAULT_SAMPLE_RATE,
           bitDepth: DEFAULT_BIT_DEPTH,
           channels: 2,
-          prompt,
+          prompt: editPlan?.style?.words
+            ? { ...prompt, text: [editPlan.style.words, prompt.text].filter(Boolean).join(', ') }
+            : prompt,
           layers: { ...live.layers },
           lora: s.loraPackId ? [{ packId: s.loraPackId, scale: 0.7 }] : undefined,
           stemSchemaVersion: 'v0',
@@ -1220,8 +1223,14 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         /* private storage */
       }
       if (opts?.edit) {
+        const styled = opts.edit.kind === 'redo' ? opts.edit.style : undefined;
+        const styleBits = [styled?.genre, styled?.role].filter(Boolean).join(' ');
         pushToast(
-          opts.edit.kind === 'redo' ? 'Section redone — hit Play' : `Extended +${opts.edit.deltaBars} bars — hit Play`,
+          styleBits
+            ? `Section redone as ${styleBits} — hit Play`
+            : opts.edit.kind === 'redo'
+              ? 'Section redone — hit Play'
+              : `Extended +${opts.edit.deltaBars} bars — hit Play`,
           'success',
         );
       } else if (opts?.variation === 'vary') {
@@ -1266,7 +1275,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     await get().generate({ variation: 'vary' });
   },
 
-  redoSection: (index) => get().generate({ edit: { kind: 'redo', sectionIndex: index } }),
+  redoSection: (index, style) =>
+    get().generate({ edit: { kind: 'redo', sectionIndex: index, ...(style ? { style } : {}) } }),
 
   extendLastSection: (index, deltaBars) =>
     get().generate({ edit: { kind: 'extend', sectionIndex: index, deltaBars } }),

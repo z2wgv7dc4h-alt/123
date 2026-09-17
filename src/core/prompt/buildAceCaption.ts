@@ -3,7 +3,7 @@
  * Vibe-only tags; no artist names. Guitar/solo when layers on = honesty tags, not stem claims.
  */
 
-import type { GenreId } from '../types';
+import type { GenreId, SectionRole } from '../types';
 
 export type AceCaptionLayers = {
   guitar?: boolean;
@@ -23,6 +23,8 @@ export type AceCaptionInput = {
   songShape?: string;
   /** Genre for captions — tempo is the job's bpm. Absent = dnb. */
   genre?: GenreId;
+  /** Section-focused caption (Redo / arrangement blocks). Absent = whole-song caption. */
+  sectionRole?: SectionRole;
   /** Vary seed — 0 keeps the first in-band phrase (tests). */
   seed?: number;
 };
@@ -85,6 +87,13 @@ function jungleBassWords(darkness: number, seed = 0): string {
   return pickBand(['dark rumbling sub bass', 'dark heavy sub bass'], seed);
 }
 
+function trapBassWords(darkness: number, seed = 0): string {
+  const d = clamp01(darkness);
+  if (d < 0.34) return pickBand(['deep 808 bass', 'round 808 bass, long sub'], seed);
+  if (d < 0.67) return pickBand(['heavy 808 glides', 'distorted 808 bass, glides'], seed);
+  return pickBand(['dark distorted 808 bass', 'dark heavy 808 slides'], seed);
+}
+
 type GenreCaption = {
   lead: string;
   halfTime: boolean;
@@ -102,6 +111,16 @@ export const GENRE_CAPTIONS: Record<GenreId, GenreCaption> = {
     drums: (c) => (clamp01(c) < 0.34 ? 'rolling amen breaks' : 'chopped amen breaks, rapid break edits'),
     bass: jungleBassWords,
   },
+  trap: { lead: 'trap, instrumental', halfTime: true, drums: () => 'rolling hi-hats, hard snare on 3, 808 kicks', bass: trapBassWords },
+};
+
+export const ROLE_WORDS: Record<SectionRole, string> = {
+  intro: 'atmospheric intro, sparse drums, filtered',
+  build: 'rising build-up, snare roll, riser fx, filter sweep, tension',
+  drop: 'massive epic drop, full energy, heavy impact',
+  breakdown: 'stripped-back breakdown, atmospheric pads, no heavy drums',
+  outro: 'outro, drums fading out, sparse',
+  switch: 'genre switch section, contrasting groove',
 };
 
 /**
@@ -130,7 +149,12 @@ export function buildAceCaption(input: AceCaptionInput): string {
   const g = GENRE_CAPTIONS[genre];
   const shapeHalfTime = HALF_TIME_SHAPES.has(input.songShape ?? '');
   pushPhrases(g.lead);
-  pushPhrases(genre === 'dnb' && shapeHalfTime ? 'heavy half-time drums' : g.drums(chaos, seed));
+  const role = input.sectionRole;
+  if (role) pushPhrases(ROLE_WORDS[role]);
+  // A breakdown drops the drum pattern tags; every other role keeps them.
+  if (role !== 'breakdown') {
+    pushPhrases(genre === 'dnb' && shapeHalfTime ? 'heavy half-time drums' : g.drums(chaos, seed));
+  }
   pushPhrases(g.bass(darkness, seed));
   pushPhrases(genre === 'dnb' ? 'tight punchy drums, sub bass' : 'tight punchy drums, heavy sub bass');
   pushPhrases(energyWords(energy, seed));

@@ -6,7 +6,7 @@ import { barsToDurationSec, formatDurationMmSs, sectionClickRatio } from '../lib
 import { DEFAULT_BPM } from '@/core/types';
 import { retailStructureLabel } from '../lib/retailLabels';
 import { totalBarsOf } from '../lib/structureEdit';
-import { isStudioTake } from '../lib/takeEdit';
+import { isStudioTake, REDO_PRESETS } from '../lib/takeEdit';
 
 const SECTION_CLASS: Record<string, string> = {
   intro: 'seg-intro',
@@ -90,6 +90,8 @@ export function SectionTimeline() {
   const [playheadRatio, setPlayheadRatio] = useState(0);
   // UI-7: Expand / Repeat / ×2 apply only to the selected section.
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [redoPresetId, setRedoPresetId] = useState('auto');
+  const [redoWords, setRedoWords] = useState('');
 
   useEffect(() => {
     setSelectedIndex(null);
@@ -254,17 +256,38 @@ export function SectionTimeline() {
                 {SECTION_HINT[s.name] ?? 'Section'}
               </span>
               {selectedIndex === index && (
-                <div className="timeline-seg-actions">
+                <div className="timeline-seg-actions" onClick={(e) => e.stopPropagation()}>
                   {studioTake ? (
                     <>
+                      <select
+                        className="redo-preset"
+                        aria-label="Redo as"
+                        value={redoPresetId}
+                        disabled={busy}
+                        onChange={(e) => setRedoPresetId(e.target.value)}
+                      >
+                        {REDO_PRESETS.map((p) => (
+                          <option key={p.id} value={p.id}>{p.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        className="redo-words"
+                        type="text"
+                        placeholder="own words (optional)"
+                        aria-label="Redo words"
+                        value={redoWords}
+                        disabled={busy}
+                        onChange={(e) => setRedoWords(e.target.value)}
+                      />
                       <button
                         type="button"
                         className="btn tiny ghost"
                         disabled={busy}
                         title="Regenerate only this section on the take (ACE repaint)"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void redoSection(index);
+                        onClick={() => {
+                          const preset = REDO_PRESETS.find((p) => p.id === redoPresetId)?.style ?? {};
+                          const words = redoWords.trim();
+                          void redoSection(index, { ...preset, ...(words ? { words } : {}) });
                         }}
                       >
                         Redo

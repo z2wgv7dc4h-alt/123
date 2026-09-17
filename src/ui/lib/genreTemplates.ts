@@ -112,6 +112,16 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
     chaos: 0.4,
   },
   {
+    id: 'trap-heat',
+    label: 'Trap heat',
+    genre: 'trap',
+    bpm: 140,
+    promptText: 'trap, heavy 808 bass, rolling hi-hats, dark melody, hard hitting drop, loud polished master',
+    energy: 0.85,
+    darkness: 0.6,
+    chaos: 0.35,
+  },
+  {
     id: 'forest-fog',
     label: 'Forest fog',
     genre: 'jungle',

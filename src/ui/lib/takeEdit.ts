@@ -1,7 +1,9 @@
-import type { RenderJob, RenderResult, StructureMap } from '@/core/types';
+import type { GenreId, RenderJob, RenderResult, SectionRole, StructureMap } from '@/core/types';
+
+export type SectionStyle = { role?: SectionRole; genre?: GenreId; words?: string };
 
 export type TakeEditRequest =
-  | { kind: 'redo'; sectionIndex: number }
+  | { kind: 'redo'; sectionIndex: number; style?: SectionStyle }
   | { kind: 'extend'; sectionIndex: number; deltaBars: number };
 
 export type TakeEditPlan = {
@@ -9,7 +11,26 @@ export type TakeEditPlan = {
   structureRef: StructureMap;
   seed: number;
   bpm: number;
+  style?: SectionStyle;
 };
+
+/** Map structure section names to caption roles. */
+export function roleForSectionName(name: string): SectionRole {
+  if (name === 'break' || name === 'breakdown') return 'breakdown';
+  if (name === 'intro' || name === 'build' || name === 'drop' || name === 'outro') return name;
+  return 'drop';
+}
+
+export const REDO_PRESETS: ReadonlyArray<{ id: string; label: string; style: SectionStyle }> = [
+  { id: 'auto', label: 'Same part', style: {} },
+  { id: 'epic-drop', label: 'Epic drop', style: { role: 'drop' } },
+  { id: 'build-up', label: 'Build-up', style: { role: 'build' } },
+  { id: 'breakdown', label: 'Breakdown', style: { role: 'breakdown' } },
+  { id: 'dubstep-switch', label: 'Dubstep switch', style: { role: 'switch', genre: 'dubstep' } },
+  { id: 'trap-switch', label: 'Trap switch', style: { role: 'switch', genre: 'trap' } },
+  { id: 'halftime-switch', label: 'Half-time switch', style: { role: 'switch', genre: 'halftime' } },
+  { id: 'jungle-switch', label: 'Jungle switch', style: { role: 'switch', genre: 'jungle' } },
+];
 
 export function secondsPerBar(bpm: number): number {
   return 240 / bpm;
@@ -58,7 +79,9 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
   if (req.kind === 'redo') {
     const w = sectionWindowSec(structure, req.sectionIndex, bpm);
     if (!w) return null;
-    return { edit: { kind: 'repaint', source, ...w }, structureRef: structure, seed: result.seed, bpm };
+    const sec = structure.sections[req.sectionIndex]!;
+    const style: SectionStyle = { ...req.style, role: req.style?.role ?? roleForSectionName(sec.name) };
+    return { edit: { kind: 'repaint', source, ...w }, structureRef: structure, seed: result.seed, bpm, style };
   }
   const last = structure.sections.length - 1;
   if (req.sectionIndex !== last || req.deltaBars <= 0) return null;
