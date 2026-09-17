@@ -74,9 +74,9 @@ describe('App process order (one layout)', () => {
     expect([...appSrc.matchAll(/<TransportBar \/>/g)]).toHaveLength(1);
   });
 
-  it('SimpleWant placeholder is exact vibe string with unicode ellipsis', () => {
+  it('SimpleWant placeholder is exact preset-picker hint string', () => {
     expect(wantSrc).toContain(
-      'placeholder="Describe the vibe (e.g. rock DnB, bright drops…)"',
+      'placeholder="e.g. neurofunk drum and bass, growling reese bass, tight snare"',
     );
   });
 

@@ -1,5 +1,5 @@
 /**
- * Allowlisted genre / mood templates for Surprise Me.
+ * Allowlisted genre templates for the style preset picker and Surprise Me.
  * Genre descriptors only — never artist, band, or track names.
  */
 
@@ -11,6 +11,8 @@ export type GenreTemplate = {
   energy: number;
   darkness: number;
   chaos: number;
+  /** Song shape this style wants (e.g. long builds need double-drop). */
+  songShape?: 'classic' | 'long-intro' | 'breakdown' | 'double-drop';
 };
 
 export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
@@ -77,6 +79,7 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
     energy: 0.9,
     darkness: 0.4,
     chaos: 0.3,
+    songShape: 'double-drop',
   },
   {
     id: 'forest-fog',
@@ -131,5 +134,24 @@ export function buildSurpriseParams(opts?: {
     darkness: template.darkness,
     chaos: template.chaos,
     templateId: template.id,
+  };
+}
+
+/** Params a preset click applies. Seed and BPM untouched; no generate. */
+export function templateParams(id: string): {
+  promptText: string;
+  energy: number;
+  darkness: number;
+  chaos: number;
+  songShape?: GenreTemplate['songShape'];
+} | null {
+  const t = GENRE_TEMPLATES.find((g) => g.id === id);
+  if (!t) return null;
+  return {
+    promptText: t.promptText,
+    energy: t.energy,
+    darkness: t.darkness,
+    chaos: t.chaos,
+    ...(t.songShape ? { songShape: t.songShape } : {}),
   };
 }
