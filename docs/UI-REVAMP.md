@@ -49,13 +49,13 @@ On Sketch, the edit buttons are disabled with an honest "Studio only" label.
 | # | Ticket | Depends on |
 |---|---|---|
 | ✓ | R-2 Redo / Extend last section / Undo edit on the Studio take (`6aede3d`). No separate "Keep take" button: edits act on the Studio result you hear. | R-1 |
-| 1 | A-1 section roles in captions, "Redo as…" (role / genre / own words), trap genre | R-2 |
+| ✓ | A-1 section roles, "Redo as…" presets + own words, trap genre (`acf9bf1`) | R-2 |
+| 1 | P-1 prompt v2: paragraph captions, structure-tag lyrics, 96-bar default, 128-bar / 480 s caps | A-1 |
 | 2 | R-3 downbeat detection: bar grid aligned to the take | R-2 |
-| 3 | A-2 arrangement builder (same tempo): blocks with role + genre, one render, per-block repaint | A-1, R-3 |
-| 4 | A-3 tempo blocks: per-block BPM, `reference_audio` continuity, transition joins | A-2 |
-| 5 | R-4 duplicate / move sections with seam repaint | R-3 |
-| 6 | UI-7 skin pass (glass, one accent, icons, fewer `?`) | A-3, R-4 |
-| 7 | R-5 mastering stage (loudness matched across blocks) | — |
+| 3 | E-1 arrangement editor on the take: insert / delete / duplicate / move / resize / extend anywhere, undo (absorbs R-4 and A-2) | P-1, R-3 |
+| 4 | A-3 tempo blocks: per-block BPM, `reference_audio` continuity, transition joins | E-1 |
+| 5 | UI-7 skin pass (glass, one accent, icons, fewer `?`) | E-1 |
+| 6 | R-5 mastering stage (loudness matched across blocks) | — |
 
 **Switch-ups**: same-tempo genre switches (DnB → half-time dubstep/trap feel)
 are section repaints and sound like one track. Tempo switches (174 → 140) are
