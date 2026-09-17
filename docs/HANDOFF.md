@@ -59,11 +59,10 @@ ACE renders one BPM per call, so switches come in two kinds:
   a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
 
 Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
-(bridge survives ACE `"N/A"` metas after repaint). Redo verified by the user.
+(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default). User verified Redo, clearer builds, no vocals.
 
 | # | Ticket | What |
 |---|---|---|
-| 1 | P-1 | Prompt v2: paragraph captions (ACE example style), song-map structure tags back in lyrics, default 96 bars, caps 128 bars / 480 s |
 | 2 | R-3 | Downbeat detection so the bar grid lines up with the take |
 | 3 | E-1 | Arrangement editor on the take: insert, delete, duplicate, move, resize sections, extend anywhere (splice + seam repaint), undo. Absorbs R-4 and A-2. |
 | 4 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins |
