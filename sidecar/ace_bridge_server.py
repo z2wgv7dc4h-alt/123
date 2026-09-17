@@ -7,6 +7,7 @@ Returns mixWavBase64 so the browser can play without file:// access.
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
 import subprocess
@@ -15,6 +16,7 @@ import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
+import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
@@ -96,6 +98,25 @@ def clamp_cover_strength(value: object) -> float:
     except (TypeError, ValueError):
         return COVER_STRENGTH_DEFAULT
     return max(COVER_STRENGTH_MIN, min(COVER_STRENGTH_MAX, num))
+
+
+def safe_float(value: object, fallback: float) -> float:
+    """ACE metas can be 'N/A' (LM skipped on repaint/cover) — never crash on them."""
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return fallback
+    return num if num == num and num > 0 else fallback  # NaN / <=0 → fallback
+
+
+def wav_duration_sec(data: bytes) -> float | None:
+    """Real length of the returned audio (extend makes it longer than the plan)."""
+    try:
+        with wave.open(io.BytesIO(data), "rb") as w:
+            rate = w.getframerate()
+            return w.getnframes() / float(rate) if rate else None
+    except Exception:
+        return None
 
 
 def format_payload_note(dit_model: str, payload: dict) -> str:
@@ -622,8 +643,9 @@ class Handler(BaseHTTPRequestHandler):
             audio_bytes = download_bytes(audio_url)
             b64 = base64.b64encode(audio_bytes).decode("ascii")
             mix_url = cache_mix(job_id, audio_bytes, "wav")
-            bpm_measured = float(metas.get("bpm") or bpm) if isinstance(metas, dict) else float(bpm)
-            duration_out = float(metas.get("duration") or duration_sec) if isinstance(metas, dict) else duration_sec
+            metas = metas if isinstance(metas, dict) else {}
+            bpm_measured = safe_float(metas.get("bpm"), float(bpm))
+            duration_out = wav_duration_sec(audio_bytes) or safe_float(metas.get("duration"), float(duration_sec))
 
             stem_ids = ["mix", "drums", "bass", "kick", "snare", "hats"]
             stems = [

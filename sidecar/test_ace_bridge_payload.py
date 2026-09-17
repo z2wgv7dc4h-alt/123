@@ -120,6 +120,21 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertIs(c["thinking"], False)
         self.assertIs(bridge.apply_source_task(base, {}), base)
 
+    def test_safe_float_handles_na_from_repaint_metas(self):
+        self.assertEqual(bridge.safe_float("N/A", 174.0), 174.0)
+        self.assertEqual(bridge.safe_float(None, 88.0), 88.0)
+        self.assertEqual(bridge.safe_float("140", 174.0), 140.0)
+        self.assertEqual(bridge.safe_float(float("nan"), 1.0), 1.0)
+
+    def test_wav_duration_reads_real_length(self):
+        import io, wave
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(2); w.setsampwidth(2); w.setframerate(48000)
+            w.writeframes(b"\x00\x00\x00\x00" * 48000 * 3)
+        self.assertAlmostEqual(bridge.wav_duration_sec(buf.getvalue()), 3.0, places=3)
+        self.assertIsNone(bridge.wav_duration_sec(b"not a wav"))
+
     def test_fallback_prompt_has_no_guitar_or_rock(self):
         p = bridge.build_render_payload({"checkpointId": "acestep-v15-base"})
         self.assertNotIn("guitar", p["prompt"].lower())
