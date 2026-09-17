@@ -186,7 +186,7 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
       off ACE skipped the LM and produced audio with no arrangement plan.
     - use_cot_caption=False / use_cot_language=False: the LM must not rewrite
       our concrete DnB caption or invent sung words.
-    - lyrics is exactly [Instrumental] — ACE is_instrumental() only matches that.
+    - lyrics = structure tags from the browser (tags only), [Instrumental] fallback.
     - base/SFT: 64 steps + use_adg; turbo: 8 steps, no ADG (ignored there).
     - bpm/duration come from the browser plan when sent (174 default).
     """
@@ -212,7 +212,7 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
     # plan did not carry them.
     bpm = int(float(req.get("bpm") or structure_ref.get("bpm") or 174))
     duration_bars = int(req.get("durationBars") or structure_ref.get("bars") or 16)
-    duration_sec = max(10.0, min(240.0, duration_bars * 4 * 60.0 / max(bpm, 1)))
+    duration_sec = max(10.0, min(480.0, duration_bars * 4 * 60.0 / max(bpm, 1)))
     seed = int(req.get("seed") or 42)
     model = str(req.get("checkpointId") or model_default or configured_dit_model())
     turbo = is_turbo_model(model)
@@ -220,9 +220,9 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
 
     return {
         "prompt": prompt,
-        # MUST be exactly [Instrumental]: ACE is_instrumental() only matches that
-        # string; section tags made ACE plan a vocal song (nonsense output).
-        "lyrics": "[Instrumental]",
+        # Song-map structure tags from the browser (ACE's documented timeline control).
+        # is_instrumental() is not read by generation — see docs/ACE-NOTES.md.
+        "lyrics": sanitize_tag_lyrics(req.get("lyrics")),
         "thinking": True,
         "use_cot_caption": False,
         "use_cot_language": False,
@@ -263,6 +263,14 @@ _SECTION_LYRIC_TAG = {
     "breakdown": "[Breakdown]",
     "outro": "[Outro]",
 }
+
+
+def sanitize_tag_lyrics(text: object) -> str:
+    """Structure tags only ([Intro - atmospheric] …) — never words ACE could sing."""
+    lines = [ln.strip() for ln in str(text or "").splitlines()]
+    kept = [ln for ln in lines if ln == "" or (ln.startswith("[") and ln.endswith("]"))]
+    out = "\n".join(kept).strip()
+    return out or "[Instrumental]"
 
 
 def build_section_lyrics(structure_ref: object) -> str:
@@ -477,7 +485,7 @@ class Handler(BaseHTTPRequestHandler):
             if smi:
                 notes.append("nvidia-smi visible")
             notes.append("Bridge maps DnB /render â†’ release_task + query_result + /v1/audio")
-            notes.append("Instrumental DnB; LM thinking plans the track, caption/CoT rewrite off; lyrics = section map")
+            notes.append("Instrumental DnB; LM thinking plans the track, caption/CoT rewrite off; lyrics = song-map structure tags")
             json_response(
                 self,
                 200,

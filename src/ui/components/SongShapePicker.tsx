@@ -2,7 +2,7 @@ import { useStudioStore } from '../hooks/useStudioStore';
 import { SONG_SHAPES, type SongShapeId } from '../lib/songShapes';
 import { barsToDurationSec, formatDurationMmSs } from '../lib/barPosition';
 
-const LENGTH_PRESETS = [32, 48, 64] as const;
+const LENGTH_PRESETS = [32, 48, 64, 96, 128] as const;
 
 function shapeSubtitle(bars: number, bpm: number): string {
   const sec = barsToDurationSec(bars, bpm);

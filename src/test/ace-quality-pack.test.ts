@@ -26,13 +26,13 @@ describe('buildAceCaption quality pack', () => {
   it('default caption is concrete DnB, no guitar, no bpm poetry', () => {
     const cap = buildAceCaption({ ...knobs, userText: STARTER });
     expect(cap).not.toMatch(/guitar|rock/i);
-    expect(cap).toMatch(/^drum and bass, instrumental/);
+    expect(cap).toMatch(/^An instrumental drum and bass track/);
     expect(cap).toMatch(/reese|growl/i);
     expect(cap).toMatch(/amen|two-step/i);
     expect(cap).toMatch(/tight punchy drums/);
     expect(cap).not.toMatch(/bpm/i);
     expect(cap).not.toMatch(/mood|controlled fills|jump up|precise breakbeat/i);
-    expect(cap.split(', ').length).toBeLessThanOrEqual(12);
+    expect(cap).toMatch(/no vocals\.$/);
   });
 
   it('strips bpm, stray shape words and rock from user text', () => {
@@ -46,7 +46,7 @@ describe('buildAceCaption quality pack', () => {
   });
 
   it('default length leaves room for build and drop; festival template keeps its sound words', () => {
-    expect(DEFAULT_BARS).toBe(64);
+    expect(DEFAULT_BARS).toBe(96);
     expect((DEFAULT_BARS * 4 * 60) / 174).toBeGreaterThan(80);
     const t = GENRE_TEMPLATES.find((g) => g.id === 'festival-anthem');
     expect(t).toBeTruthy();

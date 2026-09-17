@@ -32,24 +32,11 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertIs(p["use_cot_caption"], False)
         self.assertIs(p["use_cot_language"], False)
 
-    def test_lyrics_are_exactly_instrumental(self):
-        p = bridge.build_render_payload(
-            {
-                "structureRef": {
-                    "sections": [
-                        {"name": "intro"},
-                        {"name": "build"},
-                        {"name": "drop"},
-                        {"name": "breakdown"},
-                        {"name": "outro"},
-                    ]
-                }
-            }
-        )
-        self.assertEqual(p["lyrics"], "[Instrumental]")
-        for word in ("sing", "vocal", "lyric", "la "):
-            self.assertNotIn(word, p["lyrics"].lower())
+    def test_lyrics_are_structure_tags_only(self):
+        p = bridge.build_render_payload({"lyrics": "[Intro - atmospheric]\n\nsing this line\n[Drop - explosive]"})
+        self.assertEqual(p["lyrics"], "[Intro - atmospheric]\n\n[Drop - explosive]")
         self.assertEqual(bridge.build_render_payload({})["lyrics"], "[Instrumental]")
+        self.assertEqual(bridge.build_render_payload({"lyrics": "only words"})["lyrics"], "[Instrumental]")
 
     def test_bpm_and_duration_come_from_the_plan(self):
         p = bridge.build_render_payload(

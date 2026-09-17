@@ -372,8 +372,8 @@ export const GENRES: Record<GenreId, { label: string; defaultBpm: number }> = {
 };
 /** What a section is for — drives caption words on render and on Redo. */
 export type SectionRole = 'intro' | 'build' | 'drop' | 'breakdown' | 'outro' | 'switch';
-/** 64 bars @174 ≈ 88 s: ACE needs room for build + drop (32 bars = 44 s was too short). */
-export const DEFAULT_BARS = 64;
+/** 96 bars ≈ 2:12 at 174 / 2:44 at 140 — ACE examples run 140–240 s. */
+export const DEFAULT_BARS = 96;
 export const DEFAULT_PPQ = 480;
 export const DEFAULT_SAMPLE_RATE = 48000 as const;
 export const DEFAULT_BIT_DEPTH = 16 as const; // OfflineAudioContext render; Sketch export may re-encode 24 via encodeWav

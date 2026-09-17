@@ -1,6 +1,8 @@
 export { scrubArtistNames } from './scrubArtistNames';
 export {
   buildAceCaption,
+  buildAceLyrics,
+  arrangementSentence,
   buildAceTags,
   energyWords,
   darknessWords,

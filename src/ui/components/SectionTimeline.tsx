@@ -339,7 +339,7 @@ export function SectionTimeline() {
                         <button
                           type="button"
                           className="btn tiny ghost timeline-drop-x2"
-                          disabled={busy || bars + s.lengthBars > 64}
+                          disabled={busy || bars + s.lengthBars > 128}
                           title="Double this drop — arrangement applies on next Generate"
                           onClick={() => expandSectionAt(index, s.lengthBars)}
                         >

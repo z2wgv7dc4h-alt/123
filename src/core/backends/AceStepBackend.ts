@@ -16,7 +16,7 @@ import type {
 import { buildExportManifest } from '../export/manifest.ts';
 import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
 import { structureToMidiBlob } from '../midi/exportMidi.ts';
-import { buildAceCaption, buildAceTags } from '../prompt';
+import { buildAceCaption, buildAceLyrics, buildAceTags } from '../prompt';
 
 const CAPS: BackendCaps = {
   fullSong: true,
@@ -277,6 +277,7 @@ export class AceStepBackend implements AudioBackend {
       songShape: job.songShape,
       genre: job.genre,
       sectionRole: job.sectionRole,
+      sections: job.sectionRole ? undefined : structure.sections.map((s) => s.name),
       seed: job.seed,
     });
     // Snapshot for Status chrome — the payload actually posted, not a claim.
@@ -284,11 +285,11 @@ export class AceStepBackend implements AudioBackend {
     const thinking = srcAudioBase64 ? false : ACE_THINKING;
     const acePayload = {
       thinking,
-      captionFamily: caption.startsWith('dubstep')
+      captionFamily: job.genre === 'dubstep'
         ? 'Dubstep'
-        : caption.startsWith('trap')
+        : job.genre === 'trap'
           ? 'Trap'
-          : caption.startsWith('jungle')
+          : job.genre === 'jungle'
             ? 'Jungle'
             : /drum and bass|dnb/i.test(caption)
               ? 'DnB'
@@ -340,6 +341,8 @@ export class AceStepBackend implements AudioBackend {
                   audioCoverStrength: clampCoverStrength(job.styleReference?.coverStrength),
                 }
               : {}),
+          // ACE lyrics = timeline: song-map structure tags, no words.
+          lyrics: buildAceLyrics(structure.sections.map((s) => s.name)),
           prompt: {
             text: caption,
             tags: buildAceTags({

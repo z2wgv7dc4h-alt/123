@@ -18,12 +18,12 @@ const knobs = { energy: 0.9, darkness: 0.7, chaos: 0.4 };
 
 describe('genre captions', () => {
   it('default (no genre) still starts DnB', () => {
-    expect(buildAceCaption({ ...knobs })).toMatch(/^drum and bass, instrumental/);
+    expect(buildAceCaption({ ...knobs })).toMatch(/^An instrumental drum and bass track/);
   });
 
   it('dubstep leads with dubstep, wobble and half-time snare', () => {
     const cap = buildAceCaption({ ...knobs, genre: 'dubstep' });
-    expect(cap.startsWith('dubstep, instrumental')).toBe(true);
+    expect(cap.startsWith('An instrumental dubstep track')).toBe(true);
     expect(cap).toMatch(/wobble/);
     expect(cap).toMatch(/half-time drums, snare on 3/);
     expect(cap).not.toMatch(/drum and bass|two-step|reese/);
@@ -37,14 +37,14 @@ describe('genre captions', () => {
 
   it('halftime leads with halftime drum and bass, snare on 3', () => {
     const cap = buildAceCaption({ ...knobs, genre: 'halftime' });
-    expect(cap.startsWith('halftime drum and bass')).toBe(true);
+    expect(cap.startsWith('An instrumental halftime drum and bass track')).toBe(true);
     expect(cap).toMatch(/snare on 3/);
     expect(cap).not.toMatch(/two-step/);
   });
 
   it('jungle leads with jungle and amen breaks', () => {
     const cap = buildAceCaption({ ...knobs, genre: 'jungle' });
-    expect(cap.startsWith('jungle, instrumental')).toBe(true);
+    expect(cap.startsWith('An instrumental jungle track')).toBe(true);
     expect(cap).toMatch(/amen/);
   });
 });
@@ -124,7 +124,7 @@ describe('ACE payload genre', () => {
 
     const sent = body as unknown as Record<string, unknown>;
     const text = (sent.prompt as { text: string }).text;
-    expect(text.startsWith('dubstep, instrumental')).toBe(true);
+    expect(text.startsWith('An instrumental dubstep track')).toBe(true);
     expect(sent.bpm).toBe(140);
     expect(result.acePayload?.captionFamily).toBe('Dubstep');
   });

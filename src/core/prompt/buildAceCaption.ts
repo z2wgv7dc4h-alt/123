@@ -25,6 +25,8 @@ export type AceCaptionInput = {
   genre?: GenreId;
   /** Section-focused caption (Redo / arrangement blocks). Absent = whole-song caption. */
   sectionRole?: SectionRole;
+  /** Song-map section names in order — drives the arrangement sentence (whole-song captions only). */
+  sections?: readonly string[];
   /** Vary seed — 0 keeps the first in-band phrase (tests). */
   seed?: number;
 };
@@ -123,81 +125,139 @@ export const ROLE_WORDS: Record<SectionRole, string> = {
   switch: 'genre switch section, contrasting groove',
 };
 
+const GENRE_NAMES: Record<GenreId, string> = {
+  dnb: 'drum and bass',
+  dubstep: 'dubstep',
+  halftime: 'halftime drum and bass',
+  jungle: 'jungle',
+  trap: 'trap',
+};
+
+const ROLE_NOUN: Record<SectionRole, string> = {
+  intro: 'intro',
+  build: 'build-up',
+  drop: 'drop',
+  breakdown: 'breakdown',
+  outro: 'outro',
+  switch: 'section',
+};
+
+function joinList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/** Arrangement narrative from the song map, in ACE's example-caption style. */
+export function arrangementSentence(sectionNames: readonly string[]): string {
+  const clauses: string[] = [];
+  let drops = 0;
+  for (const name of sectionNames) {
+    if (name === 'intro') clauses.push('opens with an atmospheric filtered intro');
+    else if (name === 'build') clauses.push('rises through a build-up of snare rolls and risers');
+    else if (name === 'drop') clauses.push(drops++ === 0 ? 'explodes into a massive drop' : 'hits another full-energy drop');
+    else if (name === 'break' || name === 'breakdown') clauses.push('strips back for a breakdown with atmospheric pads');
+    else if (name === 'outro') clauses.push('ends with a sparse outro');
+  }
+  return clauses.length ? `The arrangement ${joinList(clauses)}.` : '';
+}
+
+const LYRIC_TAG: Record<string, string> = {
+  intro: '[Intro - atmospheric]',
+  build: '[Build - rising tension]',
+  drop: '[Drop - explosive]',
+  break: '[Breakdown - stripped back]',
+  breakdown: '[Breakdown - stripped back]',
+  outro: '[Outro - fade out]',
+};
+
+/** ACE lyrics = temporal script. Structure tags only, never words to sing. */
+export function buildAceLyrics(sectionNames: readonly string[]): string {
+  const tags = sectionNames.map((n) => LYRIC_TAG[n]).filter((t): t is string => Boolean(t));
+  return tags.length ? tags.join('\n\n') : '[Instrumental]';
+}
+
 /**
- * Build ACE sidecar prompt.text from knobs (+ optional layers / user text).
- * Always includes energy/darkness/chaos words so Vary + knob changes alter the caption.
- *
- * Order: genre -> drums -> bass -> energy -> production. Guitar/rock only when the layer is on or typed. Shape tags only for the selected shape.
+ * ACE caption as a short paragraph, matching ACE's shipped examples
+ * (docs/ACE-NOTES.md "Captions and lyrics"): genre + energy or section role,
+ * drums + bass, arrangement narrative, extras, mix. No BPM. Guitar/rock only
+ * when the layer is on or typed. Shape words only for the selected shape.
  */
 export function buildAceCaption(input: AceCaptionInput): string {
   const energy = clamp01(input.energy);
   const darkness = clamp01(input.darkness);
   const chaos = clamp01(input.chaos ?? 0.25);
   const guitarOn = Boolean(input.layers?.guitar || input.layers?.solo);
-
   const seed = input.seed ?? 0;
-  const parts: string[] = [];
-  // Substring dedup: a phrase already covered by a queued part is skipped.
-  const pushDeduped = (phrase: string) => {
-    const t = phrase.trim();
-    if (t && !parts.some((p) => p.toLowerCase().includes(t.toLowerCase()))) parts.push(t);
-  };
-  const pushPhrases = (text: string) => text.split(',').forEach(pushDeduped);
 
-  // ACE musicians guide: short caption = genre, instruments, one mood, production.
   const genre: GenreId = input.genre ?? 'dnb';
   const g = GENRE_CAPTIONS[genre];
+  const name = GENRE_NAMES[genre];
   const shapeHalfTime = HALF_TIME_SHAPES.has(input.songShape ?? '');
-  pushPhrases(g.lead);
   const role = input.sectionRole;
-  if (role) pushPhrases(ROLE_WORDS[role]);
-  // A breakdown drops the drum pattern tags; every other role keeps them.
-  if (role !== 'breakdown') {
-    pushPhrases(genre === 'dnb' && shapeHalfTime ? 'heavy half-time drums' : g.drums(chaos, seed));
+  const drums = genre === 'dnb' && shapeHalfTime ? 'heavy half-time drums' : g.drums(chaos, seed);
+  const bass = g.bass(darkness, seed);
+
+  const sentences: string[] = [];
+  sentences.push(
+    role
+      ? `An instrumental ${name} ${ROLE_NOUN[role]} — ${ROLE_WORDS[role]}.`
+      : `An instrumental ${name} track with ${energyWords(energy, seed)}.`,
+  );
+  if (role === 'breakdown') {
+    sentences.push(`It strips back to ${bass} and atmospheric pads.`);
+  } else {
+    const sub = /\bsub\b|808/.test(bass) ? '' : ' and a deep sub bass';
+    sentences.push(`It is driven by ${drums} and ${bass}, with tight punchy drums${sub}.`);
   }
-  pushPhrases(g.bass(darkness, seed));
-  pushPhrases(genre === 'dnb' ? 'tight punchy drums, sub bass' : 'tight punchy drums, heavy sub bass');
-  pushPhrases(energyWords(energy, seed));
-  pushPhrases('polished club mix');
+  if (!role && input.sections?.length) {
+    const arrangement = arrangementSentence(input.sections);
+    if (arrangement) sentences.push(arrangement);
+  }
+
+  // Extras (user words, layers, shape) — skip anything the paragraph already says.
+  // A phrase counts as said when it, or its last two words, already appear
+  // ("rolling reese bass" is covered by "heavy reese bass").
+  const extras: string[] = [];
+  const alreadySaid = (phrase: string) => {
+    const text = [...sentences, ...extras].join(' ').toLowerCase();
+    const p = phrase.toLowerCase();
+    const tail = p.split(/\s+/).filter(Boolean).slice(-2).join(' ');
+    return text.includes(p) || (tail.length > 0 && text.includes(tail));
+  };
+  const addExtra = (phrase: string) => {
+    const t = phrase.trim();
+    if (t && !alreadySaid(t)) extras.push(t);
+  };
+  const addExtras = (text: string) => text.split(',').forEach(addExtra);
+
+  // Shape words first: they are the deliberate pick, so a loose user phrase
+  // ("snare on 3") must not shadow the shape's full phrasing.
+  const shape = input.songShape;
+  if (shape === 'dubstep') addExtras('half-time snare, wobble growl bass, dubstep-influenced drop');
+  else if (shape === 'half-time-drop') addExtras('half-time snare on 3, heavy weighted drop, rolling reese movement');
+  else if (shape === 'trap-bounce') addExtras('fat 808 glide bass, rolling bounce hats, punchy trap-flavored dnb');
 
   const legacy = new Set<string>(LEGACY_STARTER_GUITAR_PHRASES);
-  const pushUser = (phrase: string) => {
-    if (!guitarOn && legacy.has(phrase.trim().toLowerCase())) return;
+  const halfTimeOk = shapeHalfTime || g.halfTime;
+  const addUser = (phrase: string) => {
     const t = phrase.trim().toLowerCase();
+    if (!t) return;
+    if (!guitarOn && legacy.has(t)) return;
     if (/\b\d+\s*bpm\b/.test(t)) return;
-    const halfTimeOk = shapeHalfTime || g.halfTime;
     if (!halfTimeOk && /half-time|dubstep|snare on 3/.test(t)) return;
-    pushDeduped(phrase);
+    addExtra(phrase);
   };
-  const user = input.userText?.trim();
-  if (user) user.split(',').forEach(pushUser);
-  for (const d of input.descriptors ?? []) String(d ?? '').split(',').forEach(pushUser);
+  input.userText?.split(',').forEach(addUser);
+  for (const d of input.descriptors ?? []) String(d ?? '').split(',').forEach(addUser);
 
-  if (input.layers?.guitar) {
-    pushPhrases('rock-dnb crossover, original rock-dnb guitar riffs, distorted rhythm guitar');
-  }
-  if (input.layers?.solo) {
-    pushPhrases('original lead guitar solo, expressive rock-dnb crossover lead');
-  }
-  if (input.layers?.vocalish) {
-    pushPhrases('vocal-ish synth texture, chopped pad vocalese, no lyrics');
-  }
-  if (input.layers?.extraDrums) {
-    pushPhrases('extra breakbeat layers, dense percussion fills');
-  }
+  if (input.layers?.guitar) addExtras('rock-dnb crossover, original rock-dnb guitar riffs, distorted rhythm guitar');
+  if (input.layers?.solo) addExtras('original lead guitar solo, expressive rock-dnb crossover lead');
+  if (input.layers?.vocalish) addExtras('vocal-ish synth texture, chopped pad vocalese');
+  if (input.layers?.extraDrums) addExtras('extra breakbeat layers, dense percussion fills');
 
-  const shape = input.songShape;
-  if (shape === 'dubstep') {
-    pushPhrases('half-time snare, wobble growl bass, dubstep-influenced drop');
-  } else if (shape === 'half-time-drop') {
-    pushPhrases('half-time snare on 3, heavy weighted drop, rolling reese movement');
-  } else if (shape === 'trap-bounce') {
-    pushPhrases('fat 808 glide bass, rolling bounce hats, punchy trap-flavored dnb');
-  }
-
-  // No BPM in caption: tempo goes in the ACE bpm field.
-
-  return parts.join(', ');
+  if (extras.length) sentences.push(`It also features ${joinList(extras)}.`);
+  sentences.push('The mix is polished and club-ready, with no vocals.');
+  return sentences.join(' ');
 }
 
 /** Tags array for ACE payload — includes guitar/solo honesty tags when layers on. */

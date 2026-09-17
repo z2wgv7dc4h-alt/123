@@ -47,7 +47,7 @@ describe('section role captions', () => {
 
   it('trap genre leads trap with 808s and hi-hats', () => {
     const cap = buildAceCaption({ energy: 0.9, darkness: 0.6, chaos: 0.3, genre: 'trap' });
-    expect(cap.startsWith('trap, instrumental')).toBe(true);
+    expect(cap.startsWith('An instrumental trap track')).toBe(true);
     expect(cap).toMatch(/808/);
     expect(cap).toMatch(/hi-hats/);
     expect(cap).not.toMatch(/drum and bass|two-step/);
@@ -55,12 +55,13 @@ describe('section role captions', () => {
 
   it('dubstep + drop role keeps the genre lead then the role words', () => {
     const cap = buildAceCaption({ energy: 0.9, darkness: 0.5, chaos: 0.2, genre: 'dubstep', sectionRole: 'drop' });
-    expect(cap.startsWith('dubstep, instrumental, massive epic drop')).toBe(true);
+    expect(cap.startsWith('An instrumental dubstep drop — massive epic drop')).toBe(true);
   });
 
   it('no role keeps the previous whole-song caption', () => {
     const cap = buildAceCaption({ energy: 0.9, darkness: 0.5, chaos: 0.2, seed: 0 });
-    expect(cap.startsWith('drum and bass, instrumental, controlled two-step')).toBe(true);
+    expect(cap.startsWith('An instrumental drum and bass track')).toBe(true);
+    expect(cap).toMatch(/driven by controlled two-step/);
   });
 });
 
@@ -245,7 +246,7 @@ describe('ACE payload section role + trap', () => {
 
     const sent = body as unknown as Record<string, unknown>;
     const text = (sent.prompt as { text: string }).text;
-    expect(text.startsWith('trap, instrumental, massive epic drop')).toBe(true);
+    expect(text.startsWith('An instrumental trap drop — massive epic drop')).toBe(true);
     expect(result.acePayload?.captionFamily).toBe('Trap');
   });
 });

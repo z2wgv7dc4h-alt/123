@@ -1,6 +1,6 @@
 import type { Section, StructureMap } from '@/core/types';
 
-const MAX_BARS = 64;
+const MAX_BARS = 128;
 const MIN_SECTION = 4;
 
 /** Snap bar counts to multiples of 4 (arrangement grid). */

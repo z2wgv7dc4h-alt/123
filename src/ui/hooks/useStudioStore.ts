@@ -103,7 +103,7 @@ function clampGain(db: number): number {
 }
 
 function clampBars(n: number): number {
-  return Math.max(16, Math.min(64, Math.round(n / 4) * 4));
+  return Math.max(16, Math.min(128, Math.round(n / 4) * 4));
 }
 
 /** True when mute/solo/non-zero gain would remix away from the dry glued mix. */
@@ -866,7 +866,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     }
     const out = expandSection(base, index, deltaBars);
     if (!out) {
-      pushToast('Could not expand (min 4 / max 64 bars)', 'warn', 2800);
+      pushToast('Could not expand (min 4 / max 128 bars)', 'warn', 2800);
       return;
     }
     // Pending arrangement only — do not patch result.structure (player stays on rendered WAV).
@@ -884,7 +884,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (!base?.length) return;
     const out = repeatSection(base, index);
     if (!out) {
-      pushToast('No room to repeat (max 64 bars)', 'warn', 2800);
+      pushToast('No room to repeat (max 128 bars)', 'warn', 2800);
       return;
     }
     // Pending arrangement only — do not patch result.structure (player stays on rendered WAV).

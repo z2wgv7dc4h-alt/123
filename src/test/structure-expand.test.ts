@@ -74,14 +74,14 @@ describe('structureEdit APIs (section length math)', () => {
     expect(patch.sections[0]!.lengthBars).toBe(expanded!.sections[0]!.lengthBars);
   });
 
-  it('expandSection clamps at 64 bars and refuses shrink below MIN_SECTION', () => {
+  it('expandSection clamps at 128 bars and refuses shrink below MIN_SECTION', () => {
     const long: Section[] = [
-      { name: 'intro', startBar: 0, lengthBars: 32 },
-      { name: 'drop', startBar: 32, lengthBars: 32 },
+      { name: 'intro', startBar: 0, lengthBars: 64 },
+      { name: 'drop', startBar: 64, lengthBars: 64 },
     ];
     const clamped = expandSection(long, 0, 8);
     expect(clamped).not.toBeNull();
-    expect(clamped!.bars).toBe(64);
+    expect(clamped!.bars).toBe(128);
     const tiny = sampleSections();
     expect(expandSection(tiny, 3, -8)).toBeNull();
   });
