@@ -58,15 +58,17 @@ ACE renders one BPM per call, so switches come in two kinds:
   the previous block as ACE `reference_audio` for palette continuity; join with
   a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
 
+Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
+(bridge survives ACE `"N/A"` metas after repaint). Redo verified by the user.
+
 | # | Ticket | What |
 |---|---|---|
-| 1 | A-1 | Section roles (build / drop / breakdown / switch) in captions, "Redo as…" (role, genre, own words), trap genre |
+| 1 | P-1 | Prompt v2: paragraph captions (ACE example style), song-map structure tags back in lyrics, default 96 bars, caps 128 bars / 480 s |
 | 2 | R-3 | Downbeat detection so the bar grid lines up with the take |
-| 3 | A-2 | Arrangement builder, same tempo: lay out blocks, generate once, repaint each block with its role/genre |
-| 4 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins, per-block tempo on the song map |
-| 5 | R-4 | Duplicate / move sections with seam repaint; extend in the middle |
-| 6 | UI-7 | Skin pass (after the editor settles) |
-| 7 | R-5 | Mastering (matched loudness across blocks) |
+| 3 | E-1 | Arrangement editor on the take: insert, delete, duplicate, move, resize sections, extend anywhere (splice + seam repaint), undo. Absorbs R-4 and A-2. |
+| 4 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins |
+| 5 | UI-7 | Skin pass (after the editor settles) |
+| 6 | R-5 | Mastering (matched loudness across blocks) |
 
 Open, unscheduled: S-5 (cover strength listening A/B), `05` (extract; base-model
 only), `07` (raw samples).
