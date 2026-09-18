@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
-BRIDGE_BUILD = "2026-09-18-prompt-sampler"
+BRIDGE_BUILD = "2026-09-18-lora"
 
 # Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
 # bridge never auto-installs it. Without it /stems returns 501 + install hint.
@@ -223,6 +223,126 @@ INFER_METHOD_DEFAULT = "ode"
 def normalize_infer_method(value: object) -> str:
     method = str(value or "").strip().lower()
     return method if method in INFER_METHODS else INFER_METHOD_DEFAULT
+
+
+# LoRA adapters live as directories on the GPU PC. The bridge lists them and
+# loads/scales/unloads through ACE's /v1/lora/* endpoints. Each adapter's base
+# model is read from its config so a 2B adapter cannot be loaded on the XL DiT.
+DEFAULT_LORA_DIR = os.path.join(
+    os.path.expanduser("~"), "Documents", "ACE-Step-1.5", "checkpoints", "loras"
+)
+LORA_SCALE_DEFAULT = 0.7
+LORA_SCALE_MIN = 0.0
+LORA_SCALE_MAX = 1.0
+_ADAPTER_BASE_KEYS = ("base_model_name_or_path", "base_model", "baseModel", "_name_or_path")
+
+
+def lora_dir() -> str:
+    return os.environ.get("ACE_LORA_DIR") or DEFAULT_LORA_DIR
+
+
+def read_lora_base(adapter_dir: str) -> str | None:
+    """Base model named by an adapter's config, if the trainer wrote one."""
+    for fname in ("adapter_config.json", "config.json"):
+        try:
+            with open(os.path.join(adapter_dir, fname), "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except Exception:
+            continue
+        if isinstance(data, dict):
+            for key in _ADAPTER_BASE_KEYS:
+                val = data.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+    return None
+
+
+def lora_family(base: str | None) -> str | None:
+    """2B vs XL DiT family. v1.5 non-XL (base/sft/turbo) are all 2B."""
+    s = str(base or "").lower()
+    if not s:
+        return None
+    return "xl" if "xl" in s else "2b"
+
+
+def lora_model_mismatch(base: str | None, loaded_model: str | None) -> str | None:
+    fam = lora_family(base)
+    loaded_fam = lora_family(loaded_model)
+    if base and fam and loaded_fam and fam != loaded_fam:
+        return f"switch Studio model to {base} first"
+    return None
+
+
+def list_loras(directory: str | None = None) -> list[dict]:
+    root = directory or lora_dir()
+    if not os.path.isdir(root):
+        return []
+    out: list[dict] = []
+    for name in sorted(os.listdir(root)):
+        path = os.path.join(root, name)
+        if not os.path.isdir(path):
+            continue
+        out.append(
+            {
+                "id": name,
+                "label": name,
+                "path": os.path.realpath(path),
+                "baseModel": read_lora_base(path),
+            }
+        )
+    return out
+
+
+def build_loras_response(directory: str | None = None) -> tuple[int, dict]:
+    root = directory or lora_dir()
+    return 200, {"loras": list_loras(root), "dir": root}
+
+
+def clamp_lora_scale(value: object) -> float:
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return LORA_SCALE_DEFAULT
+    if num != num:  # NaN
+        return LORA_SCALE_DEFAULT
+    return max(LORA_SCALE_MIN, min(LORA_SCALE_MAX, num))
+
+
+def resolve_lora_path(raw: object, directory: str) -> str | None:
+    """Only adapters inside the configured LoRA dir may be loaded."""
+    if not raw:
+        return None
+    candidate = os.path.realpath(str(raw))
+    root = os.path.realpath(directory)
+    if candidate != root and not candidate.startswith(root + os.sep):
+        return None
+    return candidate
+
+
+def build_lora_load(req: dict, loaded_model: str | None, directory: str,
+                    post) -> tuple[int, dict]:
+    """Load + scale an adapter on ACE. `post(path, body)` is injectable for tests."""
+    real = resolve_lora_path(req.get("path"), directory)
+    if not real or not os.path.isdir(real):
+        return 400, {"error": "lora_not_found", "message": "Pick a LoRA under ACE_LORA_DIR"}
+    base = read_lora_base(real)
+    mismatch = lora_model_mismatch(base, loaded_model)
+    if mismatch:
+        return 409, {
+            "error": "lora_model_mismatch",
+            "message": mismatch,
+            "baseModel": base,
+            "loadedModel": loaded_model,
+        }
+    scale = clamp_lora_scale(req.get("scale"))
+    post("/v1/lora/load", {"lora_path": real})
+    post("/v1/lora/scale", {"lora_scale": scale})
+    return 200, {"ok": True, "path": real, "baseModel": base, "scale": scale}
+
+
+def build_lora_off(post) -> tuple[int, dict]:
+    post("/v1/lora/unload", {})
+    return 200, {"ok": True}
 
 
 def clamp_repaint_strength(value: object) -> float:
@@ -720,6 +840,11 @@ class Handler(BaseHTTPRequestHandler):
                 },
             )
             return
+        if path == "/loras":
+            # Local adapter dirs only — no ACE needed to list.
+            status, body = build_loras_response()
+            json_response(self, status, body)
+            return
         if path.startswith("/mix/"):
             job_id = urllib.parse.unquote(path[len("/mix/") :])
             entry = _MIX_CACHE.get(job_id)
@@ -749,6 +874,38 @@ class Handler(BaseHTTPRequestHandler):
                 return
             # Demucs is local — no ACE/GPU health gate here.
             status, body = build_stems_response(req)
+            json_response(self, status, body)
+            return
+        if path in ("/lora", "/lora/off"):
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                req = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            except Exception:
+                json_response(self, 400, {"error": "bad_json"})
+                return
+            if not ace_health_ok():
+                json_response(
+                    self,
+                    503,
+                    {
+                        "error": "gpu_required",
+                        "message": "Start ACE API first (acestep-api on :8001), then this bridge",
+                        "hasGpu": False,
+                    },
+                )
+                return
+
+            def ace_post(suffix: str, body: dict):
+                return http_json("POST", f"{ACE_API}{suffix}", body, timeout=30)
+
+            try:
+                if path == "/lora":
+                    status, body = build_lora_load(req, loaded_dit_model(), lora_dir(), ace_post)
+                else:
+                    status, body = build_lora_off(ace_post)
+            except Exception as e:  # noqa: BLE001 - surface any ACE failure
+                json_response(self, 502, {"error": "upstream_error", "message": str(e)})
+                return
             json_response(self, status, body)
             return
         if path != "/render":

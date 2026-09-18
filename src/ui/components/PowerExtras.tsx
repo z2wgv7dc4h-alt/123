@@ -1,11 +1,18 @@
 import { backendRegistry } from '@/core/registry';
+import { getAceSidecarBase } from '@/core/backends';
 import type { Coherence, SamplerMethod } from '@/core/types';
-import { listLoraPacks, loraNotes, useStudioStore } from '../hooks/useStudioStore';
-import { loraPackManager } from '@/core/lora';
-import { useMemo, useState } from 'react';
+import { loraNotes, useStudioStore } from '../hooks/useStudioStore';
+import { useEffect, useMemo, useState } from 'react';
 import { HELP } from '../lib/helpCopy';
 import { retailCapLabel, retailCapState } from '../lib/retailLabels';
 import { HelpTip } from './HelpTip';
+
+type LoraOption = {
+  id: string;
+  label?: string;
+  path: string;
+  baseModel?: string | null;
+};
 
 // Which one is "in use" comes from the GPU server's probe (aceCheckpoint),
 // never from this list. Order = quality preference.
@@ -35,8 +42,10 @@ const STUDIO_MODELS = [
 export function PowerExtras() {
   const backendId = useStudioStore((s) => s.backendId);
   const setBackendId = useStudioStore((s) => s.setBackendId);
-  const loraPackId = useStudioStore((s) => s.loraPackId);
-  const setLoraPackId = useStudioStore((s) => s.setLoraPackId);
+  const loraPath = useStudioStore((s) => s.loraPath);
+  const setLoraPath = useStudioStore((s) => s.setLoraPath);
+  const loraScale = useStudioStore((s) => s.loraScale);
+  const setLoraScale = useStudioStore((s) => s.setLoraScale);
   const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
   const aceCheckpoint = useStudioStore((s) => s.aceCheckpoint);
   const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
@@ -47,11 +56,43 @@ export function PowerExtras() {
   const setCoherence = useStudioStore((s) => s.setCoherence);
   const sampler = useStudioStore((s) => s.sampler);
   const setSampler = useStudioStore((s) => s.setSampler);
-  const [trainMsg, setTrainMsg] = useState<string | null>(null);
+  const [loras, setLoras] = useState<LoraOption[]>([]);
+  const [loraNote, setLoraNote] = useState<string | null>(null);
   const backends = backendRegistry.list();
-  const packs = listLoraPacks();
   const active = useMemo(() => backends.find((b) => b.id === backendId) ?? backends[0], [backends, backendId]);
   const caps = active?.capabilities;
+
+  // List real adapter dirs from the bridge (ACE_LORA_DIR); fail soft when down.
+  useEffect(() => {
+    let cancelled = false;
+    if (!aceHasGpu) {
+      setLoras([]);
+      setLoraNote(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await fetch(`${getAceSidecarBase()}/loras`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as { loras?: LoraOption[] };
+        if (cancelled) return;
+        setLoras(Array.isArray(data?.loras) ? data.loras : []);
+        setLoraNote(
+          data?.loras?.length
+            ? 'Applies before Generate only when changed.'
+            : 'No adapters found — drop LoRAs in ACE_LORA_DIR on the GPU PC.',
+        );
+      } catch {
+        if (!cancelled) {
+          setLoras([]);
+          setLoraNote('LoRA list unavailable — bridge not reachable.');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [aceHasGpu]);
 
   return (
     <section className="panel section-accent-power">
@@ -217,57 +258,44 @@ export function PowerExtras() {
         ))}
       </div>
 
-      <details className="style-pack-train">
-        <summary>Style packs · preview stub</summary>
+      <details className="lora-adapter">
+        <summary>LoRA adapter (Studio GPU)</summary>
 
         <label>
           <span className="label-with-tip">
-            <span className="label-with-tip-text">Style pack</span>
-            <HelpTip text={HELP.loraPack} ariaLabel="About style packs" />
+            <span className="label-with-tip-text">LoRA</span>
+            <HelpTip text={HELP.loraPack} ariaLabel="About LoRA adapters" />
           </span>
           <select
-            value={loraPackId ?? ''}
-            onChange={(e) => setLoraPackId(e.target.value || null)}
-            title="Early style packs — full training when Studio GPU training exists"
+            value={loraPath ?? ''}
+            onChange={(e) => setLoraPath(e.target.value || null)}
+            disabled={!aceHasGpu}
+            title="Adapter dirs under ACE_LORA_DIR on the GPU PC (2B vs XL must match the loaded DiT)"
           >
             <option value="">None</option>
-            {packs.map((p) => (
-              <option key={p.packId} value={p.packId}>
-                {p.name} [{p.status}]
+            {loras.map((l) => (
+              <option key={l.path} value={l.path}>
+                {(l.label ?? l.id) + (l.baseModel ? ` · ${l.baseModel}` : '')}
               </option>
             ))}
           </select>
         </label>
 
-        <span
-          className="label-with-tip"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-        >
-          <button
-            type="button"
-            className="btn ghost"
-            disabled={!loraPackId}
-            title="Training needs Studio GPU later — you’ll get a clear message until then"
-            onClick={() => {
-              if (!loraPackId) return;
-              setTrainMsg(null);
-              void loraPackManager.requestTrain(loraPackId).catch((e: Error) => setTrainMsg(e.message));
-            }}
-          >
-            Request style-pack train (GPU)
-          </button>
-          <HelpTip text={HELP.loraPack} ariaLabel="About style-pack training" />
-        </span>
-        {trainMsg && (
-          <p className="warn" role="status">
-            Not available yet: {trainMsg}
-          </p>
-        )}
-        {!trainMsg && (
-          <p className="hint">
-            Training needs Studio GPU later — you’ll get a clear message until then.
-          </p>
-        )}
+        <label className="lora-scale">
+          <span>Scale · {loraScale.toFixed(2)}</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={loraScale}
+            disabled={!loraPath}
+            onChange={(e) => setLoraScale(Number(e.target.value))}
+            title="LoRA strength 0-1 (default 0.7) — applied before Generate"
+          />
+        </label>
+
+        {loraNote && <p className="hint">{loraNote}</p>}
       </details>
 
       <details>

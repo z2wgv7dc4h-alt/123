@@ -3,8 +3,10 @@
     python -m unittest sidecar/test_ace_bridge_payload.py
 """
 import base64
+import json
 import os
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -347,6 +349,109 @@ class StemsEndpointTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["stems"], fake)
         self.assertEqual(body["model"], bridge.DEMUCS_MODEL)
+
+
+class LoraEndpointsTest(unittest.TestCase):
+    @staticmethod
+    def _make_adapter(root: str, name: str, base: str | None = None) -> str:
+        path = os.path.join(root, name)
+        os.makedirs(path, exist_ok=True)
+        if base is not None:
+            with open(os.path.join(path, "adapter_config.json"), "w", encoding="utf-8") as fh:
+                json.dump({"base_model_name_or_path": base}, fh)
+        return path
+
+    @staticmethod
+    def _recorder():
+        calls: list[tuple[str, dict]] = []
+
+        def post(path: str, body: dict) -> None:
+            calls.append((path, body))
+
+        return calls, post
+
+    def test_list_loras_reads_adapter_config_base(self):
+        with tempfile.TemporaryDirectory() as root:
+            self._make_adapter(root, "dnb-a", "acestep-v15-turbo")
+            self._make_adapter(root, "dnb-b")
+            with open(os.path.join(root, "notes.txt"), "w", encoding="utf-8") as fh:
+                fh.write("not an adapter")
+            loras = bridge.list_loras(root)
+            self.assertEqual([x["id"] for x in loras], ["dnb-a", "dnb-b"])
+            self.assertEqual(loras[0]["baseModel"], "acestep-v15-turbo")
+            self.assertIsNone(loras[1]["baseModel"])
+            status, body = bridge.build_loras_response(root)
+            self.assertEqual(status, 200)
+            self.assertEqual(body["dir"], root)
+            self.assertEqual(len(body["loras"]), 2)
+
+    def test_lora_family_and_mismatch(self):
+        self.assertEqual(bridge.lora_family("acestep-v15-xl-turbo"), "xl")
+        self.assertEqual(bridge.lora_family("acestep-v15-turbo"), "2b")
+        self.assertIsNone(bridge.lora_family(None))
+        self.assertIsNone(
+            bridge.lora_model_mismatch("acestep-v15-turbo", "acestep-v15-base")
+        )
+        self.assertEqual(
+            bridge.lora_model_mismatch("acestep-v15-base", "acestep-v15-xl-turbo"),
+            "switch Studio model to acestep-v15-base first",
+        )
+
+    def test_lora_load_calls_ace_load_and_scale(self):
+        with tempfile.TemporaryDirectory() as root:
+            adapter = self._make_adapter(root, "dnb-a", "acestep-v15-turbo")
+            calls, post = self._recorder()
+            status, body = bridge.build_lora_load(
+                {"path": adapter, "scale": 0.8}, "acestep-v15-turbo", root, post
+            )
+            self.assertEqual(status, 200)
+            self.assertTrue(body["ok"])
+            self.assertEqual(body["scale"], 0.8)
+            self.assertEqual(calls[0][0], "/v1/lora/load")
+            self.assertTrue(calls[0][1]["lora_path"].endswith("dnb-a"))
+            self.assertEqual(calls[1], ("/v1/lora/scale", {"lora_scale": 0.8}))
+
+    def test_lora_load_409_on_family_mismatch_and_no_ace_calls(self):
+        with tempfile.TemporaryDirectory() as root:
+            adapter = self._make_adapter(root, "dnb-xl", "acestep-v15-xl-base")
+            calls, post = self._recorder()
+            status, body = bridge.build_lora_load(
+                {"path": adapter, "scale": 0.7}, "acestep-v15-turbo", root, post
+            )
+            self.assertEqual(status, 409)
+            self.assertEqual(body["error"], "lora_model_mismatch")
+            self.assertEqual(body["message"], "switch Studio model to acestep-v15-xl-base first")
+            self.assertEqual(calls, [])
+
+    def test_lora_load_rejects_path_outside_dir(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as other:
+            adapter = self._make_adapter(other, "evil", "acestep-v15-turbo")
+            status, body = bridge.build_lora_load(
+                {"path": adapter}, "acestep-v15-turbo", root, lambda p, b: None
+            )
+            self.assertEqual(status, 400)
+            self.assertEqual(body["error"], "lora_not_found")
+
+    def test_lora_off_calls_unload(self):
+        calls, post = self._recorder()
+        status, body = bridge.build_lora_off(post)
+        self.assertEqual(status, 200)
+        self.assertTrue(body["ok"])
+        self.assertEqual(calls, [("/v1/lora/unload", {})])
+
+    def test_clamp_lora_scale_default_and_clamp(self):
+        self.assertEqual(bridge.clamp_lora_scale(None), 0.7)
+        self.assertEqual(bridge.clamp_lora_scale(0.5), 0.5)
+        self.assertEqual(bridge.clamp_lora_scale(-1), 0.0)
+        self.assertEqual(bridge.clamp_lora_scale(9), 1.0)
+        self.assertEqual(bridge.clamp_lora_scale(float("nan")), 0.7)
+
+    def test_render_payload_never_sends_cover_noise_strength(self):
+        self.assertNotIn("cover_noise_strength", bridge.build_render_payload({}))
+        self.assertNotIn(
+            "cover_noise_strength",
+            bridge.build_render_payload({"coverNoiseStrength": 0.5}),
+        )
 
 
 if __name__ == "__main__":

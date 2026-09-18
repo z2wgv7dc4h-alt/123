@@ -55,6 +55,19 @@ separate process, so it needs `pip install demucs` in the bridge Python and
 does not depend on ACE being loaded. ACE's own `extract` task (ticket `05`,
 base-model only) remains the path for kick/snare-level granularity.
 
+**Never sent**: `cover_noise_strength` — the bridge's render payload omits it
+(cover uses `audio_cover_strength` only). Sending it changes cover drift.
+
+## LoRA
+
+Train on the 2B turbo/base with LoKr on 16 GB (clips, not full tracks); an XL
+LoRA needs the XL DiT. There is no public DnB LoRA as of 2026-09. The bridge
+lists local adapter dirs (`ACE_LORA_DIR`, default
+`%USERPROFILE%\Documents\ACE-Step-1.5\checkpoints\loras`) and loads/scales/
+unloads through ACE's `/v1/lora/{load,scale,unload}`. The adapter's base model
+is read from its config so a 2B adapter on the XL DiT returns 409
+("switch Studio model to &lt;base&gt; first") instead of producing garbage.
+
 ## Gotchas (each one caused real bad output here)
 
 | Gotcha | Evidence | Rule |

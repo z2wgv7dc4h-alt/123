@@ -218,4 +218,27 @@ describe('take edit store actions', () => {
     expect(renderSpy).not.toHaveBeenCalled();
     expect(useStudioStore.getState().result).toBe(fakeStudioResult);
   });
+
+  it('applies the LoRA selection only once while it is unchanged', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(
+      async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    try {
+      useStudioStore.setState({
+        loraPath: '/loras/dnb-a',
+        loraScale: 0.7,
+        appliedLoraPath: null,
+        appliedLoraScale: 0.7,
+      });
+      await useStudioStore.getState().generate();
+      await useStudioStore.getState().generate();
+      const loraCalls = fetchSpy.mock.calls.filter((c) => String(c[0]).includes('/lora'));
+      expect(loraCalls).toHaveLength(1);
+      expect(useStudioStore.getState().appliedLoraPath).toBe('/loras/dnb-a');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

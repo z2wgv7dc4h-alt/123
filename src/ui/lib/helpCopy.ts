@@ -84,7 +84,7 @@ export const HELP = {
   backendSelect:
     'What: Chooses Sketch vs Studio engine. When: Under More. What happens: Sketch is ready now; Studio needs your local GPU setup.',
   loraPack:
-    'What: Optional style packs. When: Under More. What happens: Early packs for experiments; real training comes with Studio GPU later.',
+    'What: Real LoRA adapters from ACE_LORA_DIR. When: Under More. What happens: Pick one + scale; loads onto ACE before Generate, or clears on None.',
   aceModels:
     'What: ACE model sizes on your GPU PC. When: Under More. Turbo = fast Generate now; Base later; XL needs more VRAM. What happens: Weights install outside the browser; this panel only shows status.',
   statusPanel:

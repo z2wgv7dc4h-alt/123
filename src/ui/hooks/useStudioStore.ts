@@ -248,7 +248,13 @@ export interface StudioState {
   abFlashback: boolean;
   previewState: PreviewState;
   mixer: MixerState;
-  loraPackId: string | null;
+  /** Real ACE LoRA adapter path (null = none). Applied before Studio Generate. */
+  loraPath: string | null;
+  /** LoRA adapter scale 0..1 (default 0.7). */
+  loraScale: number;
+  /** Last adapter actually applied to ACE, so Generate only re-applies on change. */
+  appliedLoraPath: string | null;
+  appliedLoraScale: number;
   /** Vibe Mirror v0 — local analysis only; BPM display-only. */
   vibe: VibeProfile | null;
   /** Raw style-ref audio, kept so Studio can do real audio2audio. */
@@ -329,7 +335,8 @@ export interface StudioState {
   setChaos: (n: number) => void;
   setPromptText: (t: string) => void;
   setBackendId: (id: string) => void;
-  setLoraPackId: (id: string | null) => void;
+  setLoraPath: (path: string | null) => void;
+  setLoraScale: (scale: number) => void;
   setOwnerConfirmed: (v: boolean) => void;
   setStyleRefMode: (m: 'cover' | 'reference') => void;
   setMoreOpen: (v: boolean) => void;
@@ -551,7 +558,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   abFlashback: false,
   previewState: 'idle',
   mixer: emptyMixer(),
-  loraPackId: 'rock-dnb-energy-v0',
+  loraPath: null,
+  loraScale: 0.7,
+  appliedLoraPath: null,
+  appliedLoraScale: 0.7,
   vibe: null,
   vibeFile: null,
   vibeBusy: false,
@@ -661,7 +671,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     backendRegistry.setActive(id);
     set({ backendId: id });
   },
-  setLoraPackId: (id) => set({ loraPackId: id }),
+  setLoraPath: (path) => set({ loraPath: path }),
+  setLoraScale: (scale) => set({ loraScale: Math.max(0, Math.min(1, scale)) }),
   setOwnerConfirmed: (v) => set({ ownerConfirmed: v }),
   setStyleRefMode: (m) => set({ styleRefMode: m === 'cover' ? 'cover' : 'reference' }),
   setMoreOpen: (v) => set({ moreOpen: v }),
@@ -1158,6 +1169,55 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
       const live = get();
       const isAcePath = backend.id.startsWith('ace-step');
+
+      // Real ACE LoRA: apply the selection before Generate, but only when it
+      // changed since the last apply (load/scale, or unload when cleared).
+      if (isAcePath) {
+        const desiredPath = live.loraPath;
+        const desiredScale = live.loraScale;
+        const loraChanged =
+          desiredPath !== live.appliedLoraPath ||
+          (desiredPath != null && desiredScale !== live.appliedLoraScale);
+        if (loraChanged) {
+          try {
+            if (!desiredPath) {
+              const res = await fetch(`${getAceSidecarBase()}/lora/off`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}',
+              });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              set({ appliedLoraPath: null, appliedLoraScale: desiredScale });
+            } else {
+              const res = await fetch(`${getAceSidecarBase()}/lora`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: desiredPath, scale: desiredScale }),
+              });
+              if (res.status === 409) {
+                let message = 'LoRA model mismatch';
+                try {
+                  const data = (await res.json()) as { message?: unknown };
+                  if (data?.message) message = String(data.message);
+                } catch {
+                  /* keep default message */
+                }
+                set({ busy: false });
+                pushToast(message, 'warn', 6000);
+                return;
+              }
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              set({ appliedLoraPath: desiredPath, appliedLoraScale: desiredScale });
+            }
+          } catch (e) {
+            const msg = `LoRA apply failed: ${e instanceof Error ? e.message : String(e)}`;
+            set({ busy: false });
+            pushToast(msg, 'warn', 5000);
+            return;
+          }
+        }
+      }
+
       let heartbeat: { stop: () => void } | undefined;
       if (isAcePath) {
         await acquireRenderWakeLock();
@@ -1192,7 +1252,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             ? { ...prompt, text: [editPlan.style.words, prompt.text].filter(Boolean).join(', ') }
             : prompt,
           layers: { ...live.layers },
-          lora: s.loraPackId ? [{ packId: s.loraPackId, scale: 0.7 }] : undefined,
+          lora: live.loraPath ? [{ packId: live.loraPath, scale: live.loraScale }] : undefined,
           stemSchemaVersion: 'v0',
           master: live.masterOn,
           lmTemperature: COHERENCE_LM_TEMPERATURE[live.coherence ?? 'balanced'],
