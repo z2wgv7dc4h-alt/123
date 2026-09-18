@@ -6,10 +6,7 @@ import {
   ACE_GUIDANCE_SCALE,
   ACE_SHIFT,
   ACE_DEFAULT_CHECKPOINT,
-  ACE_DCW_ENABLED,
-  ACE_DCW_MODE,
   ACE_TEXT2MUSIC_BATCH_SIZE,
-  aceDcwEnabled,
   ACE_COVER_STRENGTH,
   ACE_COVER_STRENGTH_MIN,
   ACE_COVER_STRENGTH_MAX,
@@ -138,14 +135,8 @@ describe('AceStepBackend full GPU path', () => {
     expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);
     expect(body.shift).toBe(ACE_SHIFT);
-    // No probe => default XL-turbo, so DCW stays on (base/SFT text2music is off).
+    // No probe => default XL-turbo.
     expect(ACE_DEFAULT_CHECKPOINT).toBe('acestep-v15-xl-turbo');
-    expect(body.dcwEnabled).toBe(true);
-    expect(body.dcwMode).toBe(ACE_DCW_MODE);
-    expect(aceDcwEnabled('acestep-v15-turbo', false)).toBe(ACE_DCW_ENABLED);
-    expect(aceDcwEnabled('acestep-v15-base', true)).toBe(ACE_DCW_ENABLED);
-    expect(aceDcwEnabled('acestep-v15-base', false)).toBe(false);
-    expect(aceDcwEnabled('acestep-v15-sft', false)).toBe(false);
   });
 
   it('plans breakDensity from chaos like Sketch does, not a hardcoded 0.55', async () => {
@@ -246,8 +237,6 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(sentBody?.srcAudioBase64).toBeTruthy();
     expect(sentBody?.srcAudioFileName).toBe('mine.wav');
     expect(sentBody?.audioCoverStrength).toBe(ACE_COVER_STRENGTH);
-    // Cover keeps DCW on (non-turbo text2music is the only path that turns it off).
-    expect(sentBody?.dcwEnabled).toBe(ACE_DCW_ENABLED);
     // Cover plans from the source audio; the LM thinking step must stay off.
     expect(result.acePayload?.thinking).toBe(false);
     // Honesty: only now may the manifest claim ACE consumed the reference.

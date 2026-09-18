@@ -158,7 +158,6 @@ describe('ACE payload quality pack', () => {
     expect(body.inferenceSteps).toBe(64);
     expect(body.inferenceSteps).toBe(ACE_BASE_INFERENCE_STEPS);
     expect(body.useAdg).toBe(true);
-    expect(body.dcwEnabled).toBe(false);
     expect(body.checkpointId).toBe('acestep-v15-base');
     const text = (body.prompt as { text: string }).text;
     expect(text).not.toMatch(/guitar/i);
@@ -186,7 +185,6 @@ describe('ACE payload quality pack', () => {
     expect(body.checkpointId).toBe('acestep-v15-turbo');
     expect(body.inferenceSteps).toBe(8);
     expect(body.useAdg).toBe(false);
-    expect(body.dcwEnabled).toBe(true);
     expect(body.thinking).toBe(true);
     expect(result.acePayload).toEqual({
       thinking: true,
