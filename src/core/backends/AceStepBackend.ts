@@ -13,6 +13,7 @@ import type {
   RenderResult,
   StemFile,
   StemId,
+  MasterReport,
 } from '../types';
 import { buildExportManifest } from '../export/manifest.ts';
 import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
@@ -20,6 +21,8 @@ import { structureToMidiBlob } from '../midi/exportMidi.ts';
 import { buildAceCaption, buildAceLyrics, buildAceTags } from '../prompt';
 import { estimateBarGrid } from '../audio/downbeatGrid';
 import { decodeWavToMono } from '../audio/onsetGrid';
+import { decodeWavChannels, encodeWav } from '../export/wav';
+import { masterStereo } from '../audio/master';
 
 const CAPS: BackendCaps = {
   fullSong: true,
@@ -425,8 +428,18 @@ export class AceStepBackend implements AudioBackend {
       throw new Error('ACE sidecar returned no mixWavBase64 â€” generation produced no audio');
     }
 
-    // R-3: where bar 1 really starts, so section edits land on bar lines.
+    const durationSec =
+      data.stems?.find((s) => s.id === 'mix')?.durationSec ??
+      (structure.samplesPerBar * structure.bars) / job.sampleRateHz;
+    const sr = job.sampleRateHz;
+    const bitDepth = job.bitDepth;
+
+    // R-3: where bar 1 really starts — computed from RAW mix before mastering
     let barGrid: BarGrid | undefined;
+    let masterReport: MasterReport | undefined;
+    let rawMixBlob: Blob | undefined;
+    let activeMixB64 = mixB64;
+
     try {
       const bin = atob(mixB64);
       const bytes = new Uint8Array(bin.length);
@@ -437,16 +450,10 @@ export class AceStepBackend implements AudioBackend {
       barGrid = undefined; // not PCM WAV (or test stub) → edits use offset 0
     }
 
-    const durationSec =
-      data.stems?.find((s) => s.id === 'mix')?.durationSec ??
-      (structure.samplesPerBar * structure.bars) / job.sampleRateHz;
-    const sr = job.sampleRateHz;
-    const bitDepth = job.bitDepth;
-
     const order: StemId[] = ['kick', 'snare', 'hats', 'bass', 'drums', 'mix'];
     const stems: StemFile[] = [];
     for (const id of order) {
-      const fromStem = data.stems?.find((s) => s.id === id)?.wavBase64 || mixB64;
+      const fromStem = data.stems?.find((s) => s.id === id)?.wavBase64 || activeMixB64;
       stems.push(stemFromB64(id, fromStem, durationSec, sr, bitDepth));
     }
 
@@ -469,6 +476,45 @@ export class AceStepBackend implements AudioBackend {
       'Studio ACE (GPU) â€” original generation; not an artist clone',
       'Stem lanes may share mix until ACE lego/extract is wired',
     ];
+
+    // Apply mastering to Studio mix if enabled (default true)
+    if (job.master !== false) {
+      try {
+        const bin = atob(mixB64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const decoded = decodeWavChannels(bytes.buffer);
+        if (decoded.channels.length === 2) {
+          const mastered = masterStereo(decoded.channels[0]!, decoded.channels[1]!, decoded.sampleRate);
+          // Save raw mix for edits
+          rawMixBlob = b64ToBlob(mixB64);
+          // Re-encode mastered audio to 16-bit WAV
+          const masteredWav = encodeWav([mastered.left, mastered.right], sr, 16);
+          const masteredBytes = new Uint8Array(await masteredWav.arrayBuffer());
+          let masteredBinary = '';
+          for (let i = 0; i < masteredBytes.length; i++) {
+            masteredBinary += String.fromCharCode(masteredBytes[i]!);
+          }
+          activeMixB64 = btoa(masteredBinary);
+          masterReport = mastered.report;
+
+          const noteText =
+            `Mastered to -9 LUFS (measured ${mastered.report.lufsAfter.toFixed(1)}, ` +
+            `peak ${mastered.report.peakDbAfter.toFixed(1)} dBFS)`;
+          warnings.push(noteText);
+        }
+      } catch {
+        // Decode/encode failed (test stub, tiny fake WAV, etc.) — skip mastering silently
+        // Keep behaviour exactly as today: no rawMixBlob, no master report
+      }
+    }
+
+    // Re-build stems with active mix (mastered or raw)
+    stems.length = 0;
+    for (const id of order) {
+      const fromStem = data.stems?.find((s) => s.id === id)?.wavBase64 || activeMixB64;
+      stems.push(stemFromB64(id, fromStem, durationSec, sr, bitDepth));
+    }
     const notes = [
       'ACE GPU mix via localhost bridge; structure/MIDI from hard-grid-v0',
       'Stem elementals currently mirror mix (honest â€” not OfflineStub synth)',
@@ -519,6 +565,8 @@ export class AceStepBackend implements AudioBackend {
       midiBlob,
       manifest,
       barGrid,
+      ...(rawMixBlob ? { rawMixBlob } : {}),
+      ...(masterReport ? { master: masterReport } : {}),
     };
   }
 }

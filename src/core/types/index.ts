@@ -213,6 +213,8 @@ export interface RenderJob {
     startSec: number;
     endSec: number;
   };
+  /** Apply loudness mastering to Studio mix (default true). */
+  master?: boolean;
 }
 
 export type StemId = 'kick' | 'snare' | 'hats' | 'perc' | 'bass' | 'mix' | 'drums' | 'other';
@@ -260,6 +262,14 @@ export interface BarGrid {
   bpm: number;
 }
 
+/** Loudness mastering report. */
+export interface MasterReport {
+  lufsBefore: number;
+  lufsAfter: number;
+  peakDbAfter: number;
+  gainDb: number;
+}
+
 export interface RenderResult {
   jobId: string;
   seed: number;
@@ -278,6 +288,10 @@ export interface RenderResult {
   manifest: ExportManifest;
   /** Estimated bar grid of the mix (Studio). Absent = unknown → treat offset as 0. */
   barGrid?: BarGrid;
+  /** Unmastered ACE mix (raw, for edits). Present when mastering was applied. */
+  rawMixBlob?: Blob;
+  /** Loudness mastering report (Studio). Present when mastering was applied. */
+  master?: MasterReport;
 }
 
 /**

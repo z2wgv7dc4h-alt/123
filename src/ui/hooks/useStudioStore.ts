@@ -280,7 +280,10 @@ export interface StudioState {
   };
   /** Earlier versions of the current Studio take (newest last). Not persisted. */
   takeHistory: RenderResult[];
+  /** Apply loudness mastering to Studio (ACE) mixes (default true). */
+  masterOn: boolean;
   setProductTier: (t: ProductTier) => void;
+  setMasterOn: (v: boolean) => void;
   setSeed: (n: number) => void;
   setKeepSeed: (v: boolean) => void;
   setBpm: (n: number) => void;
@@ -511,6 +514,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   aceHasGpu: false,
   aceCheckpoint: null,
   moreOpen: false,
+  masterOn: true,
   exportBitDepth: DEFAULT_BIT_DEPTH,
   flowStep: 'idle',
   mixerDirty: false,
@@ -610,6 +614,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setLoraPackId: (id) => set({ loraPackId: id }),
   setOwnerConfirmed: (v) => set({ ownerConfirmed: v }),
   setMoreOpen: (v) => set({ moreOpen: v }),
+  setMasterOn: (v) => set({ masterOn: Boolean(v) }),
   setExportBitDepth: (d) => set({ exportBitDepth: d === 24 ? 24 : 16 }),
   setVibeIntensity: (n) =>
     set((s) => {
@@ -1136,6 +1141,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           layers: { ...live.layers },
           lora: s.loraPackId ? [{ packId: s.loraPackId, scale: 0.7 }] : undefined,
           stemSchemaVersion: 'v0',
+          master: live.masterOn,
           // Belt-and-suspenders: never send styleReference without explicit ownership attest
           styleReference: editPlan
             ? undefined

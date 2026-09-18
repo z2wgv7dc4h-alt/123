@@ -88,7 +88,8 @@ export function isStudioTake(result: RenderResult | null | undefined): boolean {
 export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEditPlan | null {
   if (!isStudioTake(result)) return null;
   const structure = result.structure!;
-  const source = result.stems.find((s) => s.id === 'mix')!.blob!;
+  // Use rawMixBlob (unmastered) if available, else the mastered mix blob
+  const source = result.rawMixBlob ?? result.stems.find((s) => s.id === 'mix')!.blob!;
   const bpm = result.bpmMeasured || structure.bpm;
   const spb = secondsPerBar(bpm);
   const off = gridOffsetSec(result);

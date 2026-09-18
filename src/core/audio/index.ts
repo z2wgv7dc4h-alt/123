@@ -52,3 +52,5 @@ export {
   measureDropVsIntroRms,
 } from './sectionEnergyRms';
 export type { SectionRmsReport, DropVsIntroRmsReport } from './sectionEnergyRms';
+
+export { integratedLufs, masterStereo } from './master';

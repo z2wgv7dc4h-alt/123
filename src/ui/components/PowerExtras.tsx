@@ -41,6 +41,8 @@ export function PowerExtras() {
   const aceCheckpoint = useStudioStore((s) => s.aceCheckpoint);
   const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
   const setExportBitDepth = useStudioStore((s) => s.setExportBitDepth);
+  const masterOn = useStudioStore((s) => s.masterOn);
+  const setMasterOn = useStudioStore((s) => s.setMasterOn);
   const [trainMsg, setTrainMsg] = useState<string | null>(null);
   const backends = backendRegistry.list();
   const packs = listLoraPacks();
@@ -73,6 +75,16 @@ export function PowerExtras() {
           <option value={16}>16-bit Sketch (default)</option>
           <option value={24}>24-bit Sketch</option>
         </select>
+      </label>
+
+      <label className="master-loudness">
+        <input
+          type="checkbox"
+          checked={masterOn}
+          onChange={(e) => setMasterOn(e.target.checked)}
+          title="Apply loudness mastering (-9 LUFS, -1 dB ceiling) to Studio takes"
+        />
+        <span>Master for loudness (Studio)</span>
       </label>
 
       <div className="backend-badges" aria-label="Audio path badges">
