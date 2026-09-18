@@ -117,10 +117,10 @@ export function clampCoverStrength(value?: number | null): number {
  */
 export const ACE_REDO_BATCH_SIZE = 3;
 /**
- * Generate best-of-4 in one GPU task: the bridge returns every ACE batch
+ * Generate best-of-2 in one GPU task: the bridge returns every ACE batch
  * result file as `candidates`, so the browser picks a take without re-rendering.
  */
-export const ACE_TEXT2MUSIC_BATCH_SIZE = 4;
+export const ACE_TEXT2MUSIC_BATCH_SIZE = 2;
 export const ACE_REPAINT_STRENGTH_DEFAULT = 0.5;
 export function clampRepaintStrength(value?: number | null): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return ACE_REPAINT_STRENGTH_DEFAULT;

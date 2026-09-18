@@ -131,9 +131,9 @@ describe('AceStepBackend full GPU path', () => {
     const body = sentBody as unknown as Record<string, unknown>;
     expect(body.thinking).toBe(true);
     expect(body.inferenceSteps).toBe(8);
-    // Generate = best-of-4: the bridge returns every take as a candidate.
-    expect(ACE_TEXT2MUSIC_BATCH_SIZE).toBe(4);
-    expect(body.batchSize).toBe(4);
+    // Generate = best-of-2: the bridge returns every take as a candidate.
+    expect(ACE_TEXT2MUSIC_BATCH_SIZE).toBe(2);
+    expect(body.batchSize).toBe(2);
     // section map still sent; bridge sets lyrics to exactly [Instrumental].
     expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);
