@@ -61,7 +61,17 @@ export function encodeWav(
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
-/** Decode PCM WAV (16/24-bit LE) → float channels + metadata. */
+/** WAVE_FORMAT_EXTENSIBLE — fmt tag in the SubFormat GUID, not wFormatTag. */
+export const WAVE_FORMAT_EXTENSIBLE = 0xfffe;
+export const WAVE_FORMAT_PCM = 0x0001;
+export const WAVE_FORMAT_IEEE_FLOAT = 0x0003;
+
+/**
+ * Decode WAV → float channels + metadata. Supports 16/24/32-bit integer PCM
+ * (tag 1), 32-bit IEEE float (tag 3, what ACE-Step returns), and
+ * WAVE_FORMAT_EXTENSIBLE (0xFFFE) by reading the SubFormat GUID's first two
+ * bytes as the real tag. Mono or interleaved stereo.
+ */
 export function decodeWavChannels(arrayBuffer: ArrayBuffer): {
   channels: Float32Array[];
   sampleRate: number;
@@ -79,6 +89,7 @@ export function decodeWavChannels(arrayBuffer: ArrayBuffer): {
   let bitDepth = 0;
   let dataOffset = -1;
   let dataSize = 0;
+  let audioFormat = 0;
   while (offset + 8 <= view.byteLength) {
     const id = String.fromCharCode(
       view.getUint8(offset),
@@ -89,9 +100,16 @@ export function decodeWavChannels(arrayBuffer: ArrayBuffer): {
     const size = view.getUint32(offset + 4, true);
     const body = offset + 8;
     if (id === 'fmt ') {
+      let fmtTag = view.getUint16(body, true);
       numChannels = view.getUint16(body + 2, true);
       sampleRate = view.getUint32(body + 4, true);
       bitDepth = view.getUint16(body + 14, true);
+      if (fmtTag === WAVE_FORMAT_EXTENSIBLE && size >= 26) {
+        // cbSize u16, validBits u16, channelMask u32, then SubFormat GUID:
+        // first 2 bytes (LE) hold the real format tag.
+        fmtTag = view.getUint16(body + 24, true);
+      }
+      audioFormat = fmtTag;
     } else if (id === 'data') {
       dataOffset = body;
       dataSize = size;
@@ -102,7 +120,16 @@ export function decodeWavChannels(arrayBuffer: ArrayBuffer): {
   if (!numChannels || !sampleRate || !bitDepth || dataOffset < 0) {
     throw new Error('WAV missing fmt/data');
   }
-  if (bitDepth !== 16 && bitDepth !== 24) {
+
+  const isFloat = audioFormat === WAVE_FORMAT_IEEE_FLOAT;
+  const isPcm = audioFormat === WAVE_FORMAT_PCM;
+  if (!isFloat && !isPcm) {
+    throw new Error(`Unsupported WAV format tag ${audioFormat}`);
+  }
+  if (isFloat && bitDepth !== 32) {
+    throw new Error(`Unsupported float bit depth ${bitDepth}`);
+  }
+  if (isPcm && bitDepth !== 16 && bitDepth !== 24 && bitDepth !== 32) {
     throw new Error(`Unsupported bit depth ${bitDepth}`);
   }
 
@@ -110,23 +137,24 @@ export function decodeWavChannels(arrayBuffer: ArrayBuffer): {
   const frameBytes = bytesPerSample * numChannels;
   const nFrames = Math.floor(dataSize / frameBytes);
   const channels: Float32Array[] = Array.from({ length: numChannels }, () => new Float32Array(nFrames));
+
+  const readSample = (pos: number): number => {
+    if (isFloat) return view.getFloat32(pos, true);
+    if (bitDepth === 16) return view.getInt16(pos, true) / 0x8000;
+    if (bitDepth === 32) return view.getInt32(pos, true) / 0x80000000;
+    const b0 = view.getUint8(pos);
+    const b1 = view.getUint8(pos + 1);
+    const b2 = view.getUint8(pos + 2);
+    let v = b0 | (b1 << 8) | (b2 << 16);
+    if (v & 0x800000) v |= ~0xffffff;
+    return v / 0x800000;
+  };
+
   let o = dataOffset;
   for (let i = 0; i < nFrames; i++) {
     for (let c = 0; c < numChannels; c++) {
-      let s: number;
-      if (bitDepth === 16) {
-        s = view.getInt16(o, true) / 0x8000;
-        o += 2;
-      } else {
-        const b0 = view.getUint8(o);
-        const b1 = view.getUint8(o + 1);
-        const b2 = view.getUint8(o + 2);
-        o += 3;
-        let v = b0 | (b1 << 8) | (b2 << 16);
-        if (v & 0x800000) v |= ~0xffffff;
-        s = v / 0x800000;
-      }
-      channels[c]![i] = s;
+      channels[c]![i] = readSample(o);
+      o += bytesPerSample;
     }
   }
   return { channels, sampleRate, bitDepth };

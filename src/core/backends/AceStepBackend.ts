@@ -122,6 +122,12 @@ export function clampRepaintStrength(value?: number | null): number {
   return Math.min(1, Math.max(0, value));
 }
 
+/** text2music below this many bars renders too short to be useful; clamp it. */
+export const ACE_TEXT2MUSIC_MIN_BARS = 16;
+export function clampText2MusicBars(durationBars: number): number {
+  return Math.max(ACE_TEXT2MUSIC_MIN_BARS, durationBars);
+}
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = '';
@@ -267,10 +273,28 @@ export class AceStepBackend implements AudioBackend {
   }
 
   async render(job: RenderJob): Promise<RenderResult> {
+    // Real audio uploads. `reference` (default) is text2music timbre/mix
+    // guidance via ACE's `reference_audio`; `cover` is real audio2audio that
+    // switches task_type and goes over as `src_audio`. A repaint edit always
+    // uses `src_audio` for the take, and may still carry a reference.
+    const styleAudio = job.styleReference?.file;
+    const styleMode = job.styleReference?.mode ?? 'reference';
+    const editAudio = job.edit?.source;
+    const ownerAttested = Boolean(job.styleReference?.ownerAttested);
+    // text2music = no source audio: no repaint edit and not a cover render.
+    const isText2Music = !editAudio && !(styleMode === 'cover' && styleAudio && ownerAttested);
+    const requestedBars = job.durationBars;
+    const durationBars = isText2Music ? clampText2MusicBars(requestedBars) : requestedBars;
+    if (durationBars !== requestedBars) {
+      console.warn(
+        `ACE text2music durationBars ${requestedBars} < ${ACE_TEXT2MUSIC_MIN_BARS}; clamped to ${durationBars}`,
+      );
+    }
+
     const structure = job.structureRef ?? await structureEngine.plan({
       seed: job.seed,
       bpm: job.bpm,
-      bars: job.durationBars,
+      bars: durationBars,
       energy: job.prompt.energy,
       darkness: job.prompt.darkness,
       chaos: job.prompt.chaos,
@@ -280,15 +304,8 @@ export class AceStepBackend implements AudioBackend {
       sectionsOverride: job.sectionsOverride,
     });
 
-    // Real audio uploads. `reference` (default) is text2music timbre/mix
-    // guidance via ACE's `reference_audio`; `cover` is real audio2audio that
-    // switches task_type and goes over as `src_audio`. A repaint edit always
-    // uses `src_audio` for the take, and may still carry a reference.
-    const styleAudio = job.styleReference?.file;
-    const styleMode = job.styleReference?.mode ?? 'reference';
-    const editAudio = job.edit?.source;
     const styleAudioB64 =
-      styleAudio && job.styleReference?.ownerAttested ? await blobToBase64(styleAudio) : undefined;
+      styleAudio && ownerAttested ? await blobToBase64(styleAudio) : undefined;
     const srcAudioBase64 = editAudio
       ? await blobToBase64(editAudio)
       : styleMode === 'cover'
@@ -344,7 +361,7 @@ export class AceStepBackend implements AudioBackend {
           seed: job.seed,
           bpm: job.bpm,
           bpmTolerance: job.bpmTolerance,
-          durationBars: job.durationBars,
+          durationBars,
           sampleRateHz: job.sampleRateHz,
           bitDepth: job.bitDepth,
           channels: job.channels,
@@ -479,6 +496,10 @@ export class AceStepBackend implements AudioBackend {
       .map((c) => (typeof c?.wavBase64 === 'string' && c.wavBase64 ? b64ToBlob(c.wavBase64) : null))
       .filter((b): b is Blob => b !== null);
 
+    // Decode failures are surfaced, never silent — otherwise R-5 mastering,
+    // R-3 barGrid and E-1 splices quietly no-op on real takes.
+    const decodeWarnings: string[] = [];
+
     // R-3: where bar 1 really starts — computed from RAW mix before mastering
     let barGrid: BarGrid | undefined;
     let masterReport: MasterReport | undefined;
@@ -491,8 +512,9 @@ export class AceStepBackend implements AudioBackend {
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       const decoded = decodeWavToMono(bytes.buffer);
       barGrid = estimateBarGrid(decoded.mono, decoded.sampleRateHz, structure.bpm);
-    } catch {
-      barGrid = undefined; // not PCM WAV (or test stub) → edits use offset 0
+    } catch (e) {
+      barGrid = undefined; // not WAV (or test stub) → edits use offset 0
+      decodeWarnings.push(`Bar grid skipped: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     const order: StemId[] = ['kick', 'snare', 'hats', 'bass', 'drums', 'mix'];
@@ -522,6 +544,7 @@ export class AceStepBackend implements AudioBackend {
     const warnings = [
       payloadLine,
       ...bridgeWarnings,
+      ...decodeWarnings,
       'Studio ACE (GPU) â€” original generation; not an artist clone',
       'Stem lanes may share mix until ACE lego/extract is wired',
     ];
@@ -552,9 +575,10 @@ export class AceStepBackend implements AudioBackend {
             `peak ${mastered.report.peakDbAfter.toFixed(1)} dBFS)`;
           warnings.push(noteText);
         }
-      } catch {
-        // Decode/encode failed (test stub, tiny fake WAV, etc.) — skip mastering silently
-        // Keep behaviour exactly as today: no rawMixBlob, no master report
+      } catch (e) {
+        // Decode/encode failed (test stub, unsupported WAV, etc.) — keep the
+        // raw mix but tell the user, instead of silently skipping mastering.
+        warnings.push(`Mastering skipped: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 

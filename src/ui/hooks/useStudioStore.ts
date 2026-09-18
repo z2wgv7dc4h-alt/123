@@ -18,7 +18,7 @@ import {
   type Section,
 } from '@/core/types';
 import { backendRegistry } from '@/core/registry';
-import { getAceSidecarBase, aceStepBackend } from '@/core/backends';
+import { getAceSidecarBase, aceStepBackend, clampText2MusicBars } from '@/core/backends';
 import {
   previewPlayer,
   audibleStemIds,
@@ -1167,7 +1167,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           // User tempo (no 174 lock).
           bpm: editPlan?.bpm ?? clampProductBpm(live.bpm || DEFAULT_BPM),
           bpmTolerance: 2,
-          durationBars: editPlan?.structureRef.bars ?? bars,
+          durationBars: editPlan?.structureRef.bars ?? clampText2MusicBars(bars),
           ...(editPlan ? { structureRef: editPlan.structureRef, edit: editPlan.edit } : {}),
           sampleRateHz: DEFAULT_SAMPLE_RATE,
           bitDepth: DEFAULT_BIT_DEPTH,

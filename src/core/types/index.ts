@@ -282,6 +282,8 @@ export interface MasterReport {
   lufsAfter: number;
   peakDbAfter: number;
   gainDb: number;
+  /** True when the post-limiter mid/side stereo-width stage ran. */
+  widthApplied: boolean;
 }
 
 export interface RenderResult {

@@ -5,6 +5,7 @@
  */
 import type { DrumRole, StructureMap } from '../types';
 import { onsetEnvelope } from '../styleRef/analyzeAudio';
+import { decodeWavChannels } from '../export/wav';
 
 /** 2.5 ms hop — fine enough for ≤15 ms median without soft-passing. */
 const DEFAULT_HOP_SEC = 0.0025;
@@ -19,75 +20,18 @@ export interface DecodedWav {
   bitDepth: number;
 }
 
-/** Decode PCM WAV (16/24-bit LE, mono or interleaved stereo) → mono + left. */
+/** Decode WAV (16/24/32-bit PCM or 32-bit float, mono or interleaved) → mono + left. */
 export function decodeWavToMono(arrayBuffer: ArrayBuffer): DecodedWav {
-  const view = new DataView(arrayBuffer);
-  if (view.byteLength < 44) throw new Error('WAV too short');
-  const riff = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));
-  const wave = String.fromCharCode(view.getUint8(8), view.getUint8(9), view.getUint8(10), view.getUint8(11));
-  if (riff !== 'RIFF' || wave !== 'WAVE') throw new Error('Not a RIFF/WAVE file');
-
-  let offset = 12;
-  let channels = 0;
-  let sampleRateHz = 0;
-  let bitDepth = 0;
-  let dataOffset = -1;
-  let dataSize = 0;
-  while (offset + 8 <= view.byteLength) {
-    const id = String.fromCharCode(
-      view.getUint8(offset),
-      view.getUint8(offset + 1),
-      view.getUint8(offset + 2),
-      view.getUint8(offset + 3),
-    );
-    const size = view.getUint32(offset + 4, true);
-    const body = offset + 8;
-    if (id === 'fmt ') {
-      channels = view.getUint16(body + 2, true);
-      sampleRateHz = view.getUint32(body + 4, true);
-      bitDepth = view.getUint16(body + 14, true);
-    } else if (id === 'data') {
-      dataOffset = body;
-      dataSize = size;
-      break;
-    }
-    offset = body + size + (size % 2);
-  }
-  if (!channels || !sampleRateHz || !bitDepth || dataOffset < 0) {
-    throw new Error('WAV missing fmt/data');
-  }
-  if (bitDepth !== 16 && bitDepth !== 24) {
-    throw new Error(`Unsupported bit depth ${bitDepth}`);
-  }
-
-  const bytesPerSample = bitDepth / 8;
-  const frameBytes = bytesPerSample * channels;
-  const nFrames = Math.floor(dataSize / frameBytes);
-  const left = new Float32Array(nFrames);
+  const { channels, sampleRate, bitDepth } = decodeWavChannels(arrayBuffer);
+  const nFrames = channels[0]?.length ?? 0;
+  const left = channels[0] ?? new Float32Array(nFrames);
   const mono = new Float32Array(nFrames);
-  let o = dataOffset;
   for (let i = 0; i < nFrames; i++) {
     let sum = 0;
-    for (let c = 0; c < channels; c++) {
-      let s: number;
-      if (bitDepth === 16) {
-        s = view.getInt16(o, true) / 0x8000;
-        o += 2;
-      } else {
-        const b0 = view.getUint8(o);
-        const b1 = view.getUint8(o + 1);
-        const b2 = view.getUint8(o + 2);
-        o += 3;
-        let v = b0 | (b1 << 8) | (b2 << 16);
-        if (v & 0x800000) v |= ~0xffffff;
-        s = v / 0x800000;
-      }
-      if (c === 0) left[i] = s;
-      sum += s;
-    }
-    mono[i] = sum / channels;
+    for (const ch of channels) sum += ch[i]!;
+    mono[i] = sum / channels.length;
   }
-  return { mono, left, sampleRateHz, channels, bitDepth };
+  return { mono, left, sampleRateHz: sampleRate, channels: channels.length, bitDepth };
 }
 
 /** Expected hit times (seconds) from StructureMap hard grid for a drum role. */

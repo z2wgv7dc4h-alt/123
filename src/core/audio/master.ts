@@ -116,9 +116,91 @@ export function integratedLufs(left: Float32Array, right: Float32Array, sampleRa
   return 20 * Math.log10(finalMean) - 0.691;
 }
 
+/** One-pole high-pass (RC), used to keep the width side band out of the bass. */
+function highPassOnePole(input: Float32Array, sampleRate: number, cutoffHz: number): Float32Array {
+  const rc = 1 / (2 * Math.PI * cutoffHz);
+  const dt = 1 / sampleRate;
+  const a = rc / (rc + dt);
+  const out = new Float32Array(input.length);
+  let prevX = 0;
+  let prevY = 0;
+  for (let i = 0; i < input.length; i++) {
+    const x = input[i]!;
+    const y = a * (prevY + x - prevX);
+    prevX = x;
+    prevY = y;
+    out[i] = y;
+  }
+  return out;
+}
+
+/** Side high-pass corner for stereo width — below this the mix stays mono. */
+export const MASTER_WIDTH_SIDE_HP_HZ = 150;
+/** Side-channel gain for the width stage (mild: +25%). */
+export const MASTER_WIDTH_SIDE_GAIN = 1.25;
+
+/**
+ * Mild mid/side width: side is high-passed at 150 Hz (bass stays mono) and
+ * gained x1.25, then recombined. Center content is untouched.
+ */
+function applyStereoWidth(
+  left: Float32Array,
+  right: Float32Array,
+  sampleRate: number,
+): { left: Float32Array; right: Float32Array } {
+  const n = left.length;
+  const mid = new Float32Array(n);
+  const side = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    mid[i] = (left[i]! + right[i]!) * 0.5;
+    side[i] = (left[i]! - right[i]!) * 0.5;
+  }
+  const sideHp = highPassOnePole(side, sampleRate, MASTER_WIDTH_SIDE_HP_HZ);
+  const outL = new Float32Array(n);
+  const outR = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const s = sideHp[i]! * MASTER_WIDTH_SIDE_GAIN;
+    outL[i] = mid[i]! + s;
+    outR[i] = mid[i]! - s;
+  }
+  return { left: outL, right: outR };
+}
+
+/** Look-ahead peak limiter (5 ms lookahead, 60 ms release), stereo-linked. */
+function limitPeak(
+  left: Float32Array,
+  right: Float32Array,
+  sampleRate: number,
+  ceilingLinear: number,
+): { left: Float32Array; right: Float32Array } {
+  const lookAheadSamples = Math.max(1, Math.round((5 * sampleRate) / 1000));
+  const releaseSamples = Math.max(1, Math.round((60 * sampleRate) / 1000));
+  const outL = new Float32Array(left.length);
+  const outR = new Float32Array(right.length);
+  let limiterGain = 1;
+
+  for (let i = 0; i < left.length; i++) {
+    const lookAheadEnd = Math.min(left.length, i + lookAheadSamples);
+    let maxAhead = 0;
+    for (let j = i; j < lookAheadEnd; j++) {
+      maxAhead = Math.max(maxAhead, Math.abs(left[j]!), Math.abs(right[j]!));
+    }
+
+    if (maxAhead > ceilingLinear) {
+      limiterGain = Math.min(ceilingLinear / maxAhead, 1);
+    } else {
+      limiterGain = Math.min(limiterGain + (1 - limiterGain) / releaseSamples, 1);
+    }
+
+    outL[i] = left[i]! * limiterGain;
+    outR[i] = right[i]! * limiterGain;
+  }
+  return { left: outL, right: outR };
+}
+
 /**
  * Master a stereo mix: glue compression → gain to target loudness →
- * look-ahead peak limiter → re-measure; iterative correction if needed.
+ * look-ahead peak limiter → mid/side width → re-limit → re-measure.
  * Defaults: targetLufs -9, ceilingDb -1.
  * Inputs never mutated; output arrays are new.
  * Silence in → silence out, report.gainDb 0.
@@ -143,7 +225,7 @@ export function masterStereo(
     return {
       left: new Float32Array(left),
       right: new Float32Array(right),
-      report: { lufsBefore: 0, lufsAfter: 0, peakDbAfter: ceilingDb, gainDb: 0 },
+      report: { lufsBefore: 0, lufsAfter: 0, peakDbAfter: ceilingDb, gainDb: 0, widthApplied: false },
     };
   }
 
@@ -206,34 +288,17 @@ export function masterStereo(
   }
 
   // Look-ahead peak limiter: 5 ms lookahead, 60 ms release
-  const lookAheadSamples = Math.max(1, Math.round((5 * sampleRate) / 1000));
-  const limiterReleaseSamples = Math.max(1, Math.round((60 * sampleRate) / 1000));
-  const limited = new Float32Array(outL.length);
-  const limited2 = new Float32Array(outR.length);
-  let limiterGain = 1;
+  const limited = limitPeak(outL, outR, sampleRate, ceilingLinear);
 
-  for (let i = 0; i < outL.length; i++) {
-    const lookAheadEnd = Math.min(outL.length, i + lookAheadSamples);
-    let maxAhead = 0;
-    for (let j = i; j < lookAheadEnd; j++) {
-      maxAhead = Math.max(maxAhead, Math.abs(outL[j]!), Math.abs(outR[j]!));
-    }
-
-    if (maxAhead > ceilingLinear) {
-      limiterGain = Math.min(ceilingLinear / maxAhead, 1);
-    } else {
-      limiterGain = Math.min(limiterGain + (1 - limiterGain) / limiterReleaseSamples, 1);
-    }
-
-    limited[i] = outL[i]! * limiterGain;
-    limited2[i] = outR[i]! * limiterGain;
-  }
+  // Mild stereo width after the limiter, then re-limit to the ceiling.
+  const widened = applyStereoWidth(limited.left, limited.right, sampleRate);
+  const relimited = limitPeak(widened.left, widened.right, sampleRate, ceilingLinear);
 
   // Measure final loudness and peak
-  const lufsAfter = integratedLufs(limited, limited2, sampleRate);
+  const lufsAfter = integratedLufs(relimited.left, relimited.right, sampleRate);
   let peakDbAfter = ceilingDb;
-  for (let i = 0; i < limited.length; i++) {
-    const s = Math.max(Math.abs(limited[i]!), Math.abs(limited2[i]!));
+  for (let i = 0; i < relimited.left.length; i++) {
+    const s = Math.max(Math.abs(relimited.left[i]!), Math.abs(relimited.right[i]!));
     if (s > 0) {
       const sDb = 20 * Math.log10(s);
       peakDbAfter = Math.max(peakDbAfter, sDb);
@@ -241,13 +306,14 @@ export function masterStereo(
   }
 
   return {
-    left: limited,
-    right: limited2,
+    left: relimited.left,
+    right: relimited.right,
     report: {
       lufsBefore: Number.isFinite(lufsBefore) ? lufsBefore : 0,
       lufsAfter: Number.isFinite(lufsAfter) ? lufsAfter : 0,
       peakDbAfter: Number.isFinite(peakDbAfter) ? peakDbAfter : ceilingDb,
       gainDb,
+      widthApplied: true,
     },
   };
 }
