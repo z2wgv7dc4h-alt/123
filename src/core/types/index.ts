@@ -192,6 +192,13 @@ export interface RenderJob {
      * (ACE `cover`) instead of reducing the reference to scalar knobs.
      */
     file?: Blob;
+    /**
+     * How Studio should use the file:
+     * - `reference` (default): send it as ACE `reference_audio` on a
+     *   text2music render — timbre/mix guidance, not a remake.
+     * - `cover`: send it as `src_audio` with `taskType: cover` (audio2audio).
+     */
+    mode?: 'cover' | 'reference';
     intensity: number;
     estimatedBpm: number | null;
     energy: number;

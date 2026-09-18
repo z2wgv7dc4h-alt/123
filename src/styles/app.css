@@ -963,6 +963,10 @@ details summary:hover { color: var(--text); }
   outline: none;
   box-shadow: var(--focus);
 }
+.style-ref-mode {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+  margin-bottom: 0.65rem;
+}
 .style-drop-zone:focus-visible {
   outline: none;
   box-shadow: var(--focus);

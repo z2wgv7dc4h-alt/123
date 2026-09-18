@@ -355,14 +355,9 @@ def http_json(method: str, url: str, body: dict | None = None, timeout: float = 
         return resp.status, json.loads(raw) if raw else {}
 
 
-def http_multipart(url: str, fields: dict, file_field: str, filename: str, file_bytes: bytes,
-                   timeout: float = 120.0):
-    """POST multipart/form-data — ACE's /release_task takes a raw Request and
-    accepts uploaded audio as `src_audio` / `reference_audio` file fields
-    (see docs/en/API.md §4.2 "Method B" in the ACE-Step repo). The uploaded
-    file wins over any *_path parameter, so the bridge never has to manage
-    server-side temp paths."""
-    boundary = "----dnbstudio" + uuid.uuid4().hex
+def build_multipart_body(fields: dict, files: list[tuple[str, str, bytes]], boundary: str) -> bytes:
+    """Pure multipart/form-data encoder — one part per field, then one file part
+    per (field, filename, bytes). Kept separate so field names are unit-testable."""
     parts = []
     for key, value in fields.items():
         if value is None:
@@ -370,16 +365,49 @@ def http_multipart(url: str, fields: dict, file_field: str, filename: str, file_
         parts.append(
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"{key}\"\r\n\r\n{value}\r\n".encode("utf-8")
         )
-    parts.append(
-        (
-            f"--{boundary}\r\n"
-            f"Content-Disposition: form-data; name=\"{file_field}\"; filename=\"{filename}\"\r\n"
-            f"Content-Type: application/octet-stream\r\n\r\n"
-        ).encode("utf-8")
-    )
-    parts.append(file_bytes)
-    parts.append(f"\r\n--{boundary}--\r\n".encode("utf-8"))
-    data = b"".join(parts)
+    for file_field, filename, file_bytes in files:
+        parts.append(
+            (
+                f"--{boundary}\r\n"
+                f"Content-Disposition: form-data; name=\"{file_field}\"; filename=\"{filename}\"\r\n"
+                f"Content-Type: application/octet-stream\r\n\r\n"
+            ).encode("utf-8")
+        )
+        parts.append(file_bytes)
+        parts.append(b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+    return b"".join(parts)
+
+
+def collect_upload_files(req: dict) -> list[tuple[str, str, bytes]]:
+    """Audio uploads from a /render body, as ACE file fields:
+    - `src_audio`  = cover / repaint source (drives task_type cover/repaint)
+    - `reference_audio` = text2music timbre/mix guidance (task_type unchanged)
+    Both may be present (repaint with a reference). Decoded here so the field
+    name contract is unit-testable."""
+    files: list[tuple[str, str, bytes]] = []
+    src = req.get("srcAudioBase64")
+    if src:
+        files.append(
+            ("src_audio", str(req.get("srcAudioFileName") or "style-ref.wav"), base64.b64decode(src))
+        )
+    ref = req.get("refAudioBase64")
+    if ref:
+        files.append(
+            ("reference_audio", str(req.get("refAudioFileName") or "style-ref.wav"), base64.b64decode(ref))
+        )
+    return files
+
+
+def http_multipart_files(url: str, fields: dict, files: list[tuple[str, str, bytes]],
+                         timeout: float = 120.0):
+    """POST multipart/form-data with one or more uploaded files. ACE's
+    /release_task takes a raw Request and accepts uploaded audio as `src_audio`
+    / `reference_audio` file fields (see docs/en/API.md §4.2 "Method B"). The
+    uploaded file wins over any *_path parameter, so the bridge never manages
+    server-side temp paths."""
+    boundary = "----dnbstudio" + uuid.uuid4().hex
+    data = build_multipart_body(fields, files, boundary)
     req = urllib.request.Request(
         url,
         data=data,
@@ -392,6 +420,12 @@ def http_multipart(url: str, fields: dict, file_field: str, filename: str, file_
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read().decode("utf-8")
         return resp.status, json.loads(raw) if raw else {}
+
+
+def http_multipart(url: str, fields: dict, file_field: str, filename: str, file_bytes: bytes,
+                   timeout: float = 120.0):
+    """Single-file compatibility wrapper around http_multipart_files."""
+    return http_multipart_files(url, fields, [(file_field, filename, file_bytes)], timeout=timeout)
 
 
 def unwrap(payload: dict):
@@ -614,24 +648,22 @@ class Handler(BaseHTTPRequestHandler):
         bpm = payload["bpm"]
         duration_sec = payload["audio_duration"]
 
-        # Real audio2audio: when the browser sends the user's own style-ref
-        # audio, switch from text2music to ACE's `cover` task and hand the
-        # actual file over as a multipart `src_audio` upload. Without this
-        # the reference is reduced to a few scalar knob nudges and the audio
-        # itself is thrown away.
-        src_audio_b64 = req.get("srcAudioBase64")
-        src_audio_name = str(req.get("srcAudioFileName") or "style-ref.wav")
+        # Real audio uploads:
+        # - `src_audio` (cover/repaint): switches task_type and hands over the file.
+        # - `reference_audio` (text2music): timbre/mix guidance only; task_type and
+        #   thinking are unchanged, so this stays a text2music render.
+        # Both may ride together (repaint from a take + a reference palette).
+        upload_files = collect_upload_files(req)
         try:
-            if src_audio_b64:
+            if req.get("srcAudioBase64"):
                 payload = apply_source_task(payload, req)
+            if upload_files:
                 fields = {k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
                           for k, v in payload.items()}
-                _, released_raw = http_multipart(
+                _, released_raw = http_multipart_files(
                     f"{ACE_API}/release_task",
                     fields,
-                    "src_audio",
-                    src_audio_name,
-                    base64.b64decode(src_audio_b64),
+                    upload_files,
                     timeout=120,
                 )
             else:

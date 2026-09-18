@@ -230,6 +230,7 @@ describe('AceStepBackend audio2audio (cover) path', () => {
   it('sends the raw reference audio when the user attached and attested one', async () => {
     const { sentBody, result } = await renderWith({
       file: new Blob([fakeWav], { type: 'audio/wav' }),
+      mode: 'cover',
       intensity: 0.6,
       estimatedBpm: 172,
       energy: 0.7,
@@ -247,9 +248,46 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(result.manifest.styleReference?.acePathActive).toBe(true);
   });
 
+  it('reference mode sends reference_audio as refAudioBase64, not src_audio', async () => {
+    const { sentBody, result } = await renderWith({
+      file: new Blob([fakeWav], { type: 'audio/wav' }),
+      mode: 'reference',
+      intensity: 0.6,
+      estimatedBpm: 172,
+      energy: 0.7,
+      fileName: 'mine.wav',
+      ownerAttested: true,
+    });
+    expect(sentBody?.refAudioBase64).toBeTruthy();
+    expect(sentBody?.refAudioFileName).toBe('mine.wav');
+    expect(sentBody?.srcAudioBase64).toBeUndefined();
+    expect(sentBody?.audioCoverStrength).toBeUndefined();
+    // text2music path: task_type is not overridden and the LM stays on.
+    expect(sentBody?.taskType).toBeUndefined();
+    expect(result.acePayload?.thinking).toBe(true);
+    expect(result.manifest.styleReference?.acePathActive).toBe(true);
+    expect(result.warnings[0]).toMatch(/reference audio/);
+  });
+
+  it('defaults to reference mode when no mode is set', async () => {
+    const { sentBody, result } = await renderWith({
+      file: new Blob([fakeWav], { type: 'audio/wav' }),
+      intensity: 0.6,
+      estimatedBpm: 172,
+      energy: 0.7,
+      fileName: 'mine.wav',
+      ownerAttested: true,
+    });
+    expect(sentBody?.refAudioBase64).toBeTruthy();
+    expect(sentBody?.srcAudioBase64).toBeUndefined();
+    expect(result.acePayload?.thinking).toBe(true);
+    expect(result.manifest.styleReference?.acePathActive).toBe(true);
+  });
+
   it('default cover strength is 0.55 and overrides clamp to 0.35-0.7', async () => {
     const base = {
       file: new Blob([fakeWav], { type: 'audio/wav' }),
+      mode: 'cover' as const,
       intensity: 0.6,
       estimatedBpm: 172,
       energy: 0.7,
@@ -278,6 +316,7 @@ describe('AceStepBackend audio2audio (cover) path', () => {
   it('never sends audio without ownership attestation', async () => {
     const { sentBody, result } = await renderWith({
       file: new Blob([fakeWav], { type: 'audio/wav' }),
+      mode: 'cover',
       intensity: 0.6,
       estimatedBpm: 172,
       energy: 0.7,
@@ -291,6 +330,7 @@ describe('AceStepBackend audio2audio (cover) path', () => {
   it('stays a plain text2music render when no reference is attached', async () => {
     const { sentBody } = await renderWith();
     expect(sentBody?.srcAudioBase64).toBeUndefined();
+    expect(sentBody?.refAudioBase64).toBeUndefined();
     expect(sentBody?.audioCoverStrength).toBeUndefined();
   });
 
@@ -320,12 +360,24 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     const cover = await backend.render({
       ...base,
       styleReference: {
-        file: new Blob([fakeWav], { type: 'audio/wav' }), intensity: 0.6, estimatedBpm: 172,
+        file: new Blob([fakeWav], { type: 'audio/wav' }), mode: 'cover' as const,
+        intensity: 0.6, estimatedBpm: 172,
         energy: 0.7, fileName: 'mine.wav', ownerAttested: true,
       },
     });
     expect(cover.warnings[0]).toMatch(/^ACE payload · task cover · thinking false · caption DnB/);
     expect(cover.warnings[0]).toMatch(/cover strength 0\.55$/);
+    // Reference mode keeps text2music thinking on and tags the warning.
+    const ref = await backend.render({
+      ...base,
+      styleReference: {
+        file: new Blob([fakeWav], { type: 'audio/wav' }), mode: 'reference' as const,
+        intensity: 0.6, estimatedBpm: 172,
+        energy: 0.7, fileName: 'mine.wav', ownerAttested: true,
+      },
+    });
+    expect(ref.warnings[0]).toMatch(/^ACE payload · task text2music · thinking true · caption DnB/);
+    expect(ref.warnings[0]).toMatch(/reference audio$/);
   });
 
   it('edit.repaint sends the take as source with repaint window; not a style-ref claim', async () => {

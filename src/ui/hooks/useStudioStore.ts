@@ -234,6 +234,8 @@ export interface StudioState {
   vibeBusy: boolean;
   vibeIntensity: number;
   ownerConfirmed: boolean;
+  /** Studio-only: use the reference as text2music guidance or ACE cover. */
+  styleRefMode: 'cover' | 'reference';
   /** Last ACE-Step /probe result — Generate disabled for ACE when false. */
   aceHasGpu: boolean;
   /** DiT checkpoint the last successful probe reported (null = unknown). */
@@ -295,6 +297,7 @@ export interface StudioState {
   setBackendId: (id: string) => void;
   setLoraPackId: (id: string | null) => void;
   setOwnerConfirmed: (v: boolean) => void;
+  setStyleRefMode: (m: 'cover' | 'reference') => void;
   setMoreOpen: (v: boolean) => void;
   setExportBitDepth: (d: 16 | 24) => void;
   setVibeIntensity: (n: number) => void;
@@ -513,6 +516,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   vibeBusy: false,
   vibeIntensity: 0.7,
   ownerConfirmed: false,
+  styleRefMode: 'reference',
   aceHasGpu: false,
   aceCheckpoint: null,
   moreOpen: false,
@@ -615,6 +619,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   },
   setLoraPackId: (id) => set({ loraPackId: id }),
   setOwnerConfirmed: (v) => set({ ownerConfirmed: v }),
+  setStyleRefMode: (m) => set({ styleRefMode: m === 'cover' ? 'cover' : 'reference' }),
   setMoreOpen: (v) => set({ moreOpen: v }),
   setMasterOn: (v) => set({ masterOn: Boolean(v) }),
   setExportBitDepth: (d) => set({ exportBitDepth: d === 24 ? 24 : 16 }),
@@ -1150,6 +1155,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             : s.vibe && s.ownerConfirmed
               ? {
                   ...(s.vibeFile ? { file: s.vibeFile } : {}),
+                  mode: s.styleRefMode,
                   intensity: s.vibeIntensity,
                   estimatedBpm: s.vibe.estimatedBpm,
                   energy: s.vibe.energy,
@@ -1205,6 +1211,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         // Style Ref preserve — generate must not drop attached vibe / ownership
         vibe: preserved.vibe,
         ownerConfirmed: preserved.ownerConfirmed,
+        styleRefMode: preserved.styleRefMode,
         vibeIntensity: preserved.vibeIntensity,
         songShape: preserved.songShape,
         layers: preserved.layers,

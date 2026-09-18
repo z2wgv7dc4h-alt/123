@@ -28,7 +28,7 @@ export function buildStyleReferenceProvenance(
     ownerAttested: ref.ownerAttested,
     acePathActive: ace,
     note: ace
-      ? 'User-owned style reference consumed by ACE-Step sidecar (cover/repaint path).'
+      ? 'User-owned style reference consumed by ACE-Step sidecar (cover / reference_audio path).'
       : `Inspired by YOUR file — original browser-sketch output (not a tempo clone / not Studio stems). Backend: ${opts.backendId}.`,
   };
 }

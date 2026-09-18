@@ -271,14 +271,21 @@ export class AceStepBackend implements AudioBackend {
       sectionsOverride: job.sectionsOverride,
     });
 
-    // Real audio2audio: when the user attached their own audio, send the
-    // actual bytes so ACE can run `cover` against them. Without this the
-    // reference only ever survives as a few scalar knob nudges.
+    // Real audio uploads. `reference` (default) is text2music timbre/mix
+    // guidance via ACE's `reference_audio`; `cover` is real audio2audio that
+    // switches task_type and goes over as `src_audio`. A repaint edit always
+    // uses `src_audio` for the take, and may still carry a reference.
     const styleAudio = job.styleReference?.file;
+    const styleMode = job.styleReference?.mode ?? 'reference';
     const editAudio = job.edit?.source;
+    const styleAudioB64 =
+      styleAudio && job.styleReference?.ownerAttested ? await blobToBase64(styleAudio) : undefined;
     const srcAudioBase64 = editAudio
       ? await blobToBase64(editAudio)
-      : styleAudio && job.styleReference?.ownerAttested ? await blobToBase64(styleAudio) : undefined;
+      : styleMode === 'cover'
+        ? styleAudioB64
+        : undefined;
+    const refAudioBase64 = styleMode === 'reference' ? styleAudioB64 : undefined;
 
     // Only name a checkpoint the server said it has loaded; otherwise the
     // bridge uses ACE's loaded model. Hardcoding base here overrode SFT.
@@ -362,6 +369,14 @@ export class AceStepBackend implements AudioBackend {
                   audioCoverStrength: clampCoverStrength(job.styleReference?.coverStrength),
                 }
               : {}),
+          // Reference mode: text2music timbre/mix guidance, task_type unchanged.
+          // Rides alongside the repaint `src_audio` when both are present.
+          ...(refAudioBase64
+            ? {
+                refAudioBase64,
+                refAudioFileName: job.styleReference?.fileName ?? 'style-ref.wav',
+              }
+            : {}),
           // ACE lyrics = timeline: song-map structure tags, no words.
           lyrics: buildAceLyrics(structure.sections.map((s) => s.name)),
           prompt: {
@@ -484,10 +499,14 @@ export class AceStepBackend implements AudioBackend {
     );
     const stemsShareMixBlob = order.some((id) => id !== 'mix' && !returnedIds.has(id));
 
+    const taskLabel = srcAudioBase64 ? (job.edit ? 'repaint' : 'cover') : 'text2music';
     const payloadLine =
-      `ACE payload · task ${srcAudioBase64 ? 'cover' : 'text2music'} · thinking ${acePayload.thinking} · ` +
+      `ACE payload · task ${taskLabel} · thinking ${acePayload.thinking} · ` +
       `caption ${acePayload.captionFamily} · ${acePayload.steps} steps · ${acePayload.model}` +
-      (srcAudioBase64 ? ` · cover strength ${clampCoverStrength(job.styleReference?.coverStrength)}` : '');
+      (srcAudioBase64 && !job.edit
+        ? ` · cover strength ${clampCoverStrength(job.styleReference?.coverStrength)}`
+        : '') +
+      (refAudioBase64 ? ' · reference audio' : '');
     const bridgeWarnings = (Array.isArray(data.warnings) ? data.warnings.map(String) : []).filter(
       (w) => !/thinking\s*=|rock/i.test(w),
     );
@@ -565,10 +584,9 @@ export class AceStepBackend implements AudioBackend {
       checkpointId: heardCheckpoint,
       bpmMeasured: Number(data.bpmMeasured ?? structure.bpm),
       gpuUsed: true,
-      // Only true when the reference audio was actually sent for a cover
-      // render — a reference that merely exists but was reduced to knob
-      // nudges must not claim the ACE path consumed it.
-      acePathActive: Boolean(srcAudioBase64 && !job.edit),
+      // Only true when the reference audio was actually sent to ACE — either
+      // as `src_audio` (cover, not a take edit) or as `reference_audio`.
+      acePathActive: Boolean((srcAudioBase64 && !job.edit) || refAudioBase64),
       notes,
     });
 

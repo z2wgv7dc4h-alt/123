@@ -2,6 +2,7 @@
 
     python -m unittest sidecar/test_ace_bridge_payload.py
 """
+import base64
 import os
 import sys
 import unittest
@@ -220,6 +221,48 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertEqual(p["inference_steps"], 8)
         self.assertEqual(p["lyrics"], "[Instrumental]")
         self.assertIs(p["use_cot_caption"], False)
+
+    def test_collect_upload_files_uses_reference_audio_field(self):
+        ref_b64 = base64.b64encode(b"REF-AUDIO").decode("ascii")
+        # Reference only → text2music timbre/mix guidance, no src_audio.
+        ref_only = bridge.collect_upload_files(
+            {"refAudioBase64": ref_b64, "refAudioFileName": "mine.wav"}
+        )
+        self.assertEqual(len(ref_only), 1)
+        self.assertEqual(ref_only[0][0], "reference_audio")
+        self.assertEqual(ref_only[0][1], "mine.wav")
+        self.assertEqual(ref_only[0][2], b"REF-AUDIO")
+        # Reference + repaint source → both fields, src_audio first.
+        src_b64 = base64.b64encode(b"TAKE").decode("ascii")
+        both = bridge.collect_upload_files(
+            {
+                "srcAudioBase64": src_b64,
+                "srcAudioFileName": "take.wav",
+                "refAudioBase64": ref_b64,
+                "refAudioFileName": "mine.wav",
+            }
+        )
+        self.assertEqual([f[0] for f in both], ["src_audio", "reference_audio"])
+        self.assertEqual(both[1][2], b"REF-AUDIO")
+        self.assertEqual(bridge.collect_upload_files({}), [])
+
+    def test_build_multipart_body_names_reference_audio_field(self):
+        ref_b64 = base64.b64encode(b"REFBYTES").decode("ascii")
+        files = bridge.collect_upload_files(
+            {"refAudioBase64": ref_b64, "refAudioFileName": "mine.wav"}
+        )
+        body = bridge.build_multipart_body(
+            {"task_type": "text2music", "thinking": "True"}, files, "----testboundary"
+        )
+        self.assertIn(b'name="task_type"', body)
+        self.assertIn(b'name="reference_audio"; filename="mine.wav"', body)
+        self.assertIn(b"REFBYTES", body)
+        # A single-file body still closes correctly.
+        single = bridge.build_multipart_body(
+            {"a": "1"}, [("src_audio", "t.wav", b"X")], "----b"
+        )
+        self.assertTrue(single.endswith(b"------b--\r\n"))
+        self.assertIn(b'name="src_audio"', single)
 
 
 if __name__ == "__main__":

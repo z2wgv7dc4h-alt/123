@@ -16,6 +16,8 @@ export function StyleDropZone() {
   const vibeBusy = useStudioStore((s) => s.vibeBusy);
   const ownerConfirmed = useStudioStore((s) => s.ownerConfirmed);
   const setOwnerConfirmed = useStudioStore((s) => s.setOwnerConfirmed);
+  const styleRefMode = useStudioStore((s) => s.styleRefMode);
+  const setStyleRefMode = useStudioStore((s) => s.setStyleRefMode);
   const attachVibeFile = useStudioStore((s) => s.attachVibeFile);
   const clearVibe = useStudioStore((s) => s.clearVibe);
   const undoVibeKnobs = useStudioStore((s) => s.undoVibeKnobs);
@@ -81,6 +83,27 @@ export function StyleDropZone() {
           text={HELP.ownerCheck}
           ariaLabel="About ownership attestation"
         />
+      </div>
+
+      <div className="style-ref-mode" role="group" aria-label="How Studio uses the reference">
+        <button
+          type="button"
+          className={`btn tiny ${styleRefMode === 'reference' ? 'accent' : 'ghost'}`}
+          aria-pressed={styleRefMode === 'reference'}
+          onClick={() => setStyleRefMode('reference')}
+          title="Use your file as timbre / mix guidance — original arrangement (ACE reference_audio)"
+        >
+          Sound like (reference)
+        </button>
+        <button
+          type="button"
+          className={`btn tiny ${styleRefMode === 'cover' ? 'accent' : 'ghost'}`}
+          aria-pressed={styleRefMode === 'cover'}
+          onClick={() => setStyleRefMode('cover')}
+          title="Remake your file as an ACE cover — closer audio2audio, original output"
+        >
+          Remake it (cover)
+        </button>
       </div>
 
       {!vibe && (
