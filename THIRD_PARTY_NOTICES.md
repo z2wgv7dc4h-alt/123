@@ -10,6 +10,14 @@
 | Zustand | State | MIT |
 | TypeScript | Types | Apache-2.0 |
 | Vitest | Tests | MIT |
+| tsx | Runs `scripts/listening-set.mjs` | MIT |
+
+## Bridge runtime (user-installed, optional)
+
+| Component | Role | License |
+|-----------|------|---------|
+| Demucs v4 (`htdemucs`) | Real stem separation behind bridge `POST /stems` — optional, `pip install demucs` | MIT |
+| PyTorch | Demucs/CUDA backend | BSD-3-Clause |
 
 ## Planned optional (not in Phase 0 bundle)
 

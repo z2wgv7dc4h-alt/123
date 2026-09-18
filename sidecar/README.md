@@ -2,7 +2,7 @@
 
 **Full stack (landed):** official ACE-Step 1.5 API on `127.0.0.1:8001` + DnB bridge on `127.0.0.1:8766` + Vite app. See **`docs/TRY_ACE.md`** and `scripts/windows/*.ps1`.
 
-CUDA stays **off** the browser bundle. The browser talks only to the DnB contract (`/health` · `/probe` · `/render`). The bridge adapts ACE upstream `release_task` / `query_result` / `/v1/audio`.
+CUDA stays **off** the browser bundle. The browser talks only to the DnB contract (`/health` · `/probe` · `/render` · `/stems`). The bridge adapts ACE upstream `release_task` / `query_result` / `/v1/audio`, and runs Demucs locally for `/stems`.
 
 ## Local hardware target
 - GPU: NVIDIA GeForce **RTX 5080**
@@ -18,11 +18,12 @@ CUDA stays **off** the browser bundle. The browser talks only to the DnB contrac
 | Timbre / mix | ACE-Step via bridge (`AceStepBackend.render` → `mixWavBase64` → StemFile blobs) |
 | Preview | Browser Tone/WAV of rendered mix |
 
-`POST /render` is **audio-only**. `structureRef` is a timing hint only — sidecar must **not** invent arrangement/MIDI. Stem lanes may share the ACE mix until LEGO/extract ships (honest warnings in response).
+`POST /render` is **audio-only**. `structureRef` is a timing hint only — sidecar must **not** invent arrangement/MIDI. Stem lanes share the ACE mix; **Split stems (Demucs)** (`POST /stems`) separates real drums/bass/other (ACE-native extract is still pending, ticket `05`).
 
 ## Preferred checkpoints
-1. `acestep-v15-base` — default quality path  
-2. `acestep-v15-xl-base` — higher capacity when VRAM allows  
+1. `acestep-v15-turbo` — **default** (ACE README: Very High, 8 steps)
+2. `acestep-v15-base` / `acestep-v15-sft` — 64 steps + ADG (Medium / High)
+3. `acestep-v15-xl-turbo` — larger, needs more VRAM
 
 Models auto-download on first ACE run. Do not auto-pull multi-GB weights on shared boxes.
 
@@ -61,6 +62,17 @@ curl -s -X POST http://127.0.0.1:8766/render \
   -d '{"jobId":"t","seed":1,"bpm":174,"durationBars":16,"prompt":{"text":"energetic rock drum and bass instrumental"}}'
 ```
 
+Optional uploads (multipart): `srcAudioBase64` rides as `src_audio` for cover /
+repaint (`taskType`, `repaintMode`, `repaintStrength`); `refAudioBase64` rides
+as `reference_audio` for text2music timbre guidance. `batchSize > 1` returns
+`candidates`.
+
+### `POST /stems`
+Real stem separation via Demucs v4 `htdemucs` (GPU when CUDA, else CPU):
+send `{"mixWavBase64":"..."}` and get `{stems:[{id,wavBase64,durationSec}]}` for
+`drums`/`bass`/`other`/`vocals`. **501** + `installHint` when Demucs is absent
+(`pip install demucs`); the bridge never auto-installs. No ACE/GPU health gate.
+
 ## Processes
 
 | File | Role |
@@ -79,7 +91,8 @@ python sidecar/stub_server.py
 Until `/probe` → `hasGpu: true`, registry keeps **OfflineStubBackend** (CPU sketch). OfflineStub must **never** be labeled Studio ACE quality.
 
 ## Legal
-- ACE-Step 1.5 **MIT** — allowed  
+- ACE-Step 1.5 **MIT** — allowed
+- Demucs v4 **MIT** — optional real-stem separation (`pip install demucs`)
 - Personal, non-commercial project: packs/breaks already in-repo are fine. No artist-clone product; no labelling ACE extract as real isolated stems from a track we do not have.
 
 ## Status

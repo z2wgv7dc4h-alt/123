@@ -1,6 +1,6 @@
 # Handoff
 
-**Updated**: 2026-09-18. **Last code commit**: `6377242` (bridge build `2026-09-18-stems-ref-bestof3`; last feature `78f39d5` real stems via Demucs).
+**Updated**: 2026-09-18. **Last code commit**: `522ec58` (listening set script; LUFS K-weighting fix `91ee7cb`).
 Law is `AGENTS.md` + `CLAUDE.md` only. `docs/_archive_*` is not law.
 
 Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
@@ -50,6 +50,14 @@ real break loops are cut at 174, so they switch off more than 6 BPM away.
    script does not auto-install; `/stems` returns 501 with that hint otherwise.
 6. **Any bridge edit needs a stack restart.**
 
+### Listening set (user-run; agents never)
+
+`npm run listen:set` renders 5 fixed prompts (dnb festival, neuro, dubstep 140,
+trap 140, jungle 165) × 2 seeds through the live bridge into
+`exports/listening/<date>/` — one WAV per render plus `report.csv` with
+duration, integrated LUFS and sample peak. Needs the stack up and `tsx` (now a
+devDependency). Override the bridge with `ACE_BRIDGE_URL`.
+
 ## Next, in order
 
 **Product goal (user, 2026-09-17)**: diverse bass music in one track: DnB with
@@ -62,7 +70,7 @@ ACE renders one BPM per call, so switches come in two kinds:
   a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
 
 Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
-(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**), R-3 `4541662` (downbeat bar grid), UI-7 `7dbe475` (skin pass), R-5 `70ba5f7` (loudness master). User verified Redo, clearer builds, no vocals.
+(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**), R-3 `4541662` (downbeat bar grid), UI-7 `7dbe475` (skin pass), R-5 `70ba5f7` (loudness master — actually applies after the K-weighting fix `91ee7cb`), listening set `522ec58` (**npm run listen:set**). User verified Redo, clearer builds, no vocals.
 
 | # | Ticket | What |
 |---|---|---|

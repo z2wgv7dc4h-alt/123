@@ -26,14 +26,14 @@ On the RTX 5080 PC:
 2. Wait for models + bridge `:8766`
 3. Generate uses Studio ACE only when probe `"hasGpu": true`; otherwise Sketch (CPU)
 
-Full honesty table: [docs/_archive_2026-09-16/TRY_ACE.md](docs/_archive_2026-09-16/TRY_ACE.md). ACE stem lanes **share the mix** until LEGO/extract — use Sketch for true stem remix.
+Full honesty table: [docs/_archive_2026-09-16/TRY_ACE.md](docs/_archive_2026-09-16/TRY_ACE.md). ACE stem lanes share the mix until you hit **Split stems (Demucs)** in More, which separates real drums/bass/other; ACE-native extract (ticket `05`) is still pending.
 
 ## Honest backends
 
 | Path | Status |
 |------|--------|
 | **OfflineStub** (Sketch / CPU) | Default until probe `hasGpu: true` — real separate stems. Guitar/Solo/Extra-drums layers work here too (pure CPU synthesis, no GPU needed) — only Vocal-ish is ACE-only. |
-| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on the RTX 5080 (`acestep-v15-base`, cu128) — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md) for the 2026-09-15 verification. Stem lanes share the ACE mix until LEGO/extract. |
+| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on the RTX 5080 — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md). Stem lanes share the ACE mix until **Split stems (Demucs)**. |
 
 ACE/CUDA proven live 2026-09-15: real end-to-end GPU render confirmed via the raw ACE model log (not just the probe endpoint). Two bugs fixed the same day — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md) for details and evidence:
 1. `generate()` could silently fall back to Sketch even with the Studio/GPU badge showing live, due to a redundant internal re-probe in `BackendRegistry.selectBest()` that swallowed errors with no toast. Fixed — Generate now reuses the probe result it already has.
@@ -46,6 +46,8 @@ See `INSTALL.txt`, [docs/_archive_2026-09-16/TRY_ACE.md](docs/_archive_2026-09-1
 **Browser Sketch only:** `npm install` && `npm run dev` — open the printed URL.
 
 **Windows + ACE:** `INSTALL.txt` / `scripts\windows\INSTALL-AND-RUN.ps1` (see [TRY_ACE.md](docs/_archive_2026-09-16/TRY_ACE.md)).
+
+**Listening set (user runs it, against a live stack):** `npm run listen:set` — 5 fixed prompts × 2 seeds through the bridge into `exports/listening/<date>/` (WAVs + `report.csv`: duration, integrated LUFS, sample peak). Needs `tsx` (devDependency) and the ACE stack up.
 
 ## Docs / knowledge
 
@@ -73,13 +75,16 @@ Also: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [LICENSE](LICENSE) (MIT)
 - Style reference (Vibe Mirror v0) with ownership gate
 - Stem mute/solo/gain → remixed Play; remixed Export adds `mix_as_heard.wav`
 - Again / Vary; Simple quick-mute strip; Regen when settings change
+- Studio take edits: per-section **Redo** (strength slider) + best-of-3 **Pick 1 2 3**, Extend, Undo edit
+- Style reference in two modes: **Sound like (reference)** (`reference_audio`) or **Remake it (cover)**
+- **Split stems (Demucs)** → real drums/bass/other with live mute/solo; **npm run listen:set** listening report
 - Surprise Me under More (allowlisted templates)
 - Favorites under More (browser-local save/recall)
 - Git-versioned as of 2026-09-15 (the project had no version control before that)
 
 ## Not shipped yet
 
-- LEGO stem extract/repaint / LoRA train — ACE stems still share the mix until this lands
+- ACE-native stem extract (ticket `05`, base-model only) — **Split stems (Demucs)** already ships; LoRA training
 - Vocal-ish layer stays Studio-only (no CPU synthesis path exists for it, unlike guitar/solo/extra-drums)
 - Composition/style quality (does it actually sound like the target reference artist) — open question pending listening feedback, tracked in docs/_archive_2026-09-16/STATUS.md
 - Tauri desktop **smoke** (src-tauri scaffold is in-tree; optional shell — browser Sketch still primary)
