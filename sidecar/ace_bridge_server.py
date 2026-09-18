@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
-BRIDGE_BUILD = "2026-09-18-finish"
+BRIDGE_BUILD = "2026-09-18-2b-turbo"
 
 # Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
 # bridge never auto-installs it. Without it /stems returns 501 + install hint.
@@ -521,9 +521,10 @@ DEFAULT_PROMPT = (
     "rolling reese bass, sub bass, original composition"
 )
 
-# Studio default DiT: XL-turbo (4B) — best-rated quality; CPU offload keeps it
-# inside 16 GB. Turbo/XL-turbo are both 8-step turbo variants ("turbo" match).
-DEFAULT_DIT_MODEL = "acestep-v15-xl-turbo"
+# Studio default DiT: 2B turbo. Users report the 2B model sounds better than the
+# 4B XL (ACE issue #1063) and it is faster on 16 GB. XL-turbo stays selectable
+# via ACESTEP_CONFIG_PATH. Turbo/XL-turbo are both 8-step turbo variants.
+DEFAULT_DIT_MODEL = "acestep-v15-turbo"
 # ACE docs/en/INFERENCE.md: base/SFT "recommended 32-64", high quality tip is
 # "inference_steps=64 or higher" + use_adg=True. Turbo: "recommended 8".
 BASE_INFERENCE_STEPS = 64

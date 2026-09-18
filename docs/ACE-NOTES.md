@@ -11,15 +11,16 @@ From `README.md` (model tables):
 |---|---|---|---|---|
 | `acestep-v15-base` | 50 | yes | all, incl. extract / lego / complete | Medium |
 | `acestep-v15-sft` | 50 | yes | text2music, cover, repaint | High |
-| `acestep-v15-turbo` | 8 | no | text2music, cover, repaint | **Very High** |
-| `acestep-v15-xl-turbo` | 8 | no | text2music, cover, repaint | **Very High (4B, default)** |
+| `acestep-v15-turbo` | 8 | no | text2music, cover, repaint | **Very High (2B, default)** |
+| `acestep-v15-xl-turbo` | 8 | no | text2music, cover, repaint | Very High (4B, optional) |
 
-**On disk**: base, turbo, xl-turbo (4B, default), LMs 0.6B and 1.7B. **Studio
-uses XL-turbo** with CPU offload to fit 16 GB; `start-ace-stack.ps1` downloads it
-on first run (`huggingface-cli download ACE-Step/acestep-v15-xl-turbo`) and falls
-back to plain turbo with a warning if that fails. XL + offload is slower, so the
-bridge polls for 600 s and the browser render timeout is 660 s. Don't download
-SFT for quality; it is rated below turbo.
+**On disk**: base, turbo (2B), xl-turbo (4B), LMs 0.6B and 1.7B (4B if
+installed). **Studio uses the 2B turbo**: users report 2B sounds better than the
+4B XL (ACE issue **#1063**) and it is faster. XL-turbo stays selectable by
+setting `ACESTEP_CONFIG_PATH=acestep-v15-xl-turbo` before
+`start-ace-stack.ps1`. The start script picks `acestep-5Hz-lm-4B` when the DiT
+is 2B and `checkpoints\acestep-5Hz-lm-4B` exists, else `acestep-5Hz-lm-1.7B`,
+and prints the LM it chose. Don't download SFT for quality; turbo outranks it.
 
 ## What `/release_task` honors over HTTP
 

@@ -18,9 +18,14 @@ type LoraOption = {
 // never from this list. Order = quality preference.
 const STUDIO_MODELS = [
   {
+    id: 'acestep-v15-turbo',
+    label: 'Studio turbo',
+    hint: '2B, default — users report 2B sounds better (ACE #1063)',
+  },
+  {
     id: 'acestep-v15-xl-turbo',
     label: 'Studio XL turbo',
-    hint: '4B, best quality — default',
+    hint: '4B, optional, slower — select via ACESTEP_CONFIG_PATH',
   },
   {
     id: 'acestep-v15-sft',
@@ -31,11 +36,6 @@ const STUDIO_MODELS = [
     id: 'acestep-v15-base',
     label: 'Studio base',
     hint: 'High quality, 64 steps — optional',
-  },
-  {
-    id: 'acestep-v15-turbo',
-    label: 'Studio turbo',
-    hint: 'Fast, 8 steps — only when you pick it',
   },
 ] as const;
 

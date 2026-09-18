@@ -194,12 +194,13 @@ describe('ACE payload quality pack', () => {
     });
   });
 
-  it('unknown checkpoint: no checkpointId sent, xl-turbo sampler', async () => {
+  it('unknown checkpoint: no checkpointId sent, 2B turbo sampler', async () => {
     const { body, result } = await renderAfterProbe(undefined);
     expect(body.checkpointId).toBeUndefined();
     expect(body.inferenceSteps).toBe(8);
     expect(result.checkpointId).toBe('unknown');
-    expect(result.acePayload?.model).toBe('acestep-v15-xl-turbo');
+    expect(result.acePayload?.model).toBe('acestep-v15-turbo');
+    expect(aceSamplerFor('acestep-v15-turbo').inferenceSteps).toBe(8);
     expect(aceSamplerFor('acestep-v15-xl-turbo').inferenceSteps).toBe(8);
     expect(aceSamplerFor('ACE-Step/Ace-Step1.5:acestep-v15-xl-turbo').inferenceSteps).toBe(8);
   });

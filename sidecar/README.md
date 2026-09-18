@@ -21,15 +21,15 @@ CUDA stays **off** the browser bundle. The browser talks only to the DnB contrac
 `POST /render` is **audio-only**. `structureRef` is a timing hint only — sidecar must **not** invent arrangement/MIDI. Stem lanes share the ACE mix; **Split stems (Demucs)** (`POST /stems`) separates real drums/bass/other (ACE-native extract is still pending, ticket `05`).
 
 ## Preferred checkpoints
-1. `acestep-v15-xl-turbo` — **default** (4B, ACE README Very High, 8 steps; CPU
-   offload fits 16 GB). `start-ace-stack.ps1` downloads it on first run and falls
-   back to `acestep-v15-turbo` if the download fails.
-2. `acestep-v15-turbo` — smaller 8-step turbo (Very High)
+1. `acestep-v15-turbo` — **default** (2B, 8 steps; ACE issue **#1063**: users
+   report the 2B model sounds better than the 4B XL, and it is faster on 16 GB).
+2. `acestep-v15-xl-turbo` — optional 4B `Very High`; select via
+   `ACESTEP_CONFIG_PATH=acestep-v15-xl-turbo` (CPU offload fits 16 GB, slower).
 3. `acestep-v15-base` / `acestep-v15-sft` — 64 steps + ADG (Medium / High)
 
-XL + offload is slower: the bridge polls up to 600 s and the browser render
-timeout is 660 s. Models lazy-load on first ACE run; the start script ships the
-one-time XL download (do not auto-pull multi-GB weights on shared boxes).
+The start script picks `acestep-5Hz-lm-4B` when the DiT is 2B and that LM
+checkpoint exists, else `acestep-5Hz-lm-1.7B`, and prints its choice. Models
+lazy-load on first ACE run; the start script does not auto-pull multi-GB weights.
 
 ## Local try path (full stack — not Gradio-primary)
 

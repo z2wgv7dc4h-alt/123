@@ -38,28 +38,23 @@ $env:ACESTEP_USE_FLASH_ATTENTION = "false"
 # the Windows cp1252 console and the XL-turbo download would "fail" instantly.
 $env:PYTHONIOENCODING = "utf-8"
 if (-not $env:ACESTEP_LM_BACKEND) { $env:ACESTEP_LM_BACKEND = "pt" }
-# DiT: XL-turbo (4B) is the default Studio model — ACE README rates turbo and
-# xl-turbo Very High; CPU offload keeps 4B inside 16 GB. Falls back to plain
-# turbo if the XL weights are missing and can't be downloaded.
-if (-not $env:ACESTEP_CONFIG_PATH) { $env:ACESTEP_CONFIG_PATH = "acestep-v15-xl-turbo" }
-$xlDir = Join-Path $aceRoot "checkpoints\acestep-v15-xl-turbo"
-if ($env:ACESTEP_CONFIG_PATH -eq "acestep-v15-xl-turbo" -and -not (Test-Path $xlDir)) {
-  Write-Host "XL-turbo checkpoint missing - downloading acestep-v15-xl-turbo (large 4B model)..." -ForegroundColor Yellow
-  Push-Location $aceRoot
-  try {
-    & uv run huggingface-cli download ACE-Step/acestep-v15-xl-turbo --local-dir checkpoints\acestep-v15-xl-turbo
-    $xlOk = ($LASTEXITCODE -eq 0)
-  } catch {
-    $xlOk = $false
-  } finally {
-    Pop-Location
-  }
-  if (-not $xlOk) {
-    Write-Warning "XL-turbo download failed - falling back to acestep-v15-turbo"
-    $env:ACESTEP_CONFIG_PATH = "acestep-v15-turbo"
+# DiT: 2B turbo is the default Studio model. Users report the 2B model sounds
+# better than the 4B XL (ACE issue #1063) and it is faster on 16 GB.
+# XL-turbo stays selectable by setting ACESTEP_CONFIG_PATH before this script.
+if (-not $env:ACESTEP_CONFIG_PATH) { $env:ACESTEP_CONFIG_PATH = "acestep-v15-turbo" }
+Write-Host "DiT checkpoint: $($env:ACESTEP_CONFIG_PATH)" -ForegroundColor Cyan
+
+# LM: prefer the 4B LM when it is on disk and the DiT is 2B (a 4B DiT pairs with
+# its own LM path if the user set ACESTEP_LM_MODEL_PATH). Otherwise 1.7B.
+if (-not $env:ACESTEP_LM_MODEL_PATH) {
+  $lm4bDir = Join-Path $aceRoot "checkpoints\acestep-5Hz-lm-4B"
+  if (($env:ACESTEP_CONFIG_PATH -notmatch "xl") -and (Test-Path $lm4bDir)) {
+    $env:ACESTEP_LM_MODEL_PATH = "acestep-5Hz-lm-4B"
+  } else {
+    $env:ACESTEP_LM_MODEL_PATH = "acestep-5Hz-lm-1.7B"
   }
 }
-Write-Host "DiT checkpoint: $($env:ACESTEP_CONFIG_PATH)" -ForegroundColor Cyan
+Write-Host "LM checkpoint: $($env:ACESTEP_LM_MODEL_PATH)" -ForegroundColor Cyan
 Write-Host "Starting ACE API on 127.0.0.1:8001 ..." -ForegroundColor Cyan
 $ace = Start-Process -PassThru -NoNewWindow -FilePath "uv" -ArgumentList @("run","acestep-api","--host","127.0.0.1","--port","8001") -WorkingDirectory $aceRoot
 

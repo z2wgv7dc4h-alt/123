@@ -33,7 +33,7 @@ Full honesty table: [docs/_archive_2026-09-16/TRY_ACE.md](docs/_archive_2026-09-
 | Path | Status |
 |------|--------|
 | **OfflineStub** (Sketch / CPU) | Default until probe `hasGpu: true` — real separate stems. Guitar/Solo/Extra-drums layers work here too (pure CPU synthesis, no GPU needed) — only Vocal-ish is ACE-only. |
-| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on the RTX 5080 — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md). Default DiT now **`acestep-v15-xl-turbo`** (4B, CPU offload). Stem lanes share the ACE mix until **Split stems (Demucs)**. |
+| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on the RTX 5080 — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md). Default DiT **`acestep-v15-turbo`** (2B; ACE issue **#1063** — users report 2B sounds better than 4B XL). `acestep-v15-xl-turbo` (4B, CPU offload) stays selectable via `ACESTEP_CONFIG_PATH`. Stem lanes share the ACE mix until **Split stems (Demucs)**. |
 
 ACE/CUDA proven live 2026-09-15: real end-to-end GPU render confirmed via the raw ACE model log (not just the probe endpoint). Two bugs fixed the same day — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md) for details and evidence:
 1. `generate()` could silently fall back to Sketch even with the Studio/GPU badge showing live, due to a redundant internal re-probe in `BackendRegistry.selectBest()` that swallowed errors with no toast. Fixed — Generate now reuses the probe result it already has.

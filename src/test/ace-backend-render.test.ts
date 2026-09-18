@@ -91,7 +91,7 @@ describe('AceStepBackend full GPU path', () => {
     expect(mix?.blob).toBeTruthy();
   });
 
-  it('sends named inference params; xl-turbo default when no probe', async () => {
+  it('sends named inference params; 2B turbo default when no probe', async () => {
     const fakeWav = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]);
     let binary = '';
     fakeWav.forEach((b) => {
@@ -135,8 +135,8 @@ describe('AceStepBackend full GPU path', () => {
     expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);
     expect(body.shift).toBe(ACE_SHIFT);
-    // No probe => default XL-turbo.
-    expect(ACE_DEFAULT_CHECKPOINT).toBe('acestep-v15-xl-turbo');
+    // No probe => default 2B turbo (ACE #1063).
+    expect(ACE_DEFAULT_CHECKPOINT).toBe('acestep-v15-turbo');
   });
 
   it('plans breakDensity from chaos like Sketch does, not a hardcoded 0.55', async () => {

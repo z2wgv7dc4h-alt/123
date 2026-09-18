@@ -23,7 +23,7 @@
 
 | Component | Role | License |
 |-----------|------|---------|
-| ACE-Step 1.5 | GPU generate on RTX 5080 (default DiT `acestep-v15-xl-turbo`) | MIT |
+| ACE-Step 1.5 | GPU generate on RTX 5080 (default DiT `acestep-v15-turbo`) | MIT |
 | Stable Audio 3 | Optional textures | Stability Community License (under USD 1M revenue; register + attribution; optional only) |
 
 See scripts/download-ace-step.md for model download.

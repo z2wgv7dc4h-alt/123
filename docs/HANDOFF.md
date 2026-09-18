@@ -21,8 +21,8 @@ Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
 
 | Piece | State |
 |---|---|
-| DiT | `acestep-v15-xl-turbo` (4B) by default (`start-ace-stack.ps1`, bridge `DEFAULT_DIT_MODEL`), with CPU offload on 16 GB. ACE's non-XL family (base/SFT/turbo) is **2B**; XL-turbo is **4B** — a LoRA must match its family. The start script downloads XL-turbo on first run and falls back to plain turbo with a warning if that fails. ACE README rates turbo/xl-turbo *Very High*, SFT *High*, base *Medium*. The bridge sends ACE's loaded model and ignores the browser's `checkpointId`. |
-| LM | `acestep-5Hz-lm-1.7B`, auto-selected by ACE (a 0.6B LM is also on disk); planner runs on text2music (thinking), skipped for cover/repaint. |
+| DiT | `acestep-v15-turbo` (2B) by default (`start-ace-stack.ps1`, bridge `DEFAULT_DIT_MODEL`). Users report 2B sounds better than the 4B XL (ACE issue **#1063**) and it is faster on 16 GB; the non-XL family (base/SFT/turbo) is **2B**, XL-turbo is **4B**, and a LoRA must match its family. XL-turbo stays selectable via `ACESTEP_CONFIG_PATH=acestep-v15-xl-turbo`. ACE README rates turbo/xl-turbo *Very High*, SFT *High*, base *Medium*. The bridge sends ACE's loaded model and ignores the browser's `checkpointId`. |
+| LM | `acestep-5Hz-lm-1.7B` by default; `start-ace-stack.ps1` prefers `acestep-5Hz-lm-4B` when the DiT is 2B and `checkpoints\acestep-5Hz-lm-4B` exists (0.6B also on disk) and prints the choice. The planner runs on text2music (thinking), skipped for cover/repaint. |
 | text2music payload | `thinking: true`, `use_cot_caption: false`, `use_cot_language: false`, `lyrics` = song-map structure tags (`[Build - rising tension]`, `[Drop - explosive]` …; bridge keeps tag lines only, `[Instrumental]` fallback), `lm_cfg_scale: 2.0`, `bpm` = job tempo, duration from bars (cap 480 s). Turbo 8 steps; base/SFT 64 steps + ADG. |
 | Style reference | User-owned file only. Default `mode: 'reference'` (`a1f0aaa`): bridge sends it as multipart `reference_audio` on text2music — timbre/mix guidance; `task_type` and thinking unchanged. `cover` mode sends `src_audio` + `audioCoverStrength` (0.55, clamped 0.35–0.7) and skips the LM. Owner attestation gates both; a repaint take may ride with a reference. UI toggle: "Sound like (reference)" / "Remake it (cover)". |
 | Real stems (Demucs) | "Split stems (Demucs)" in More (`78f39d5`): bridge `POST /stems` runs Demucs v4 `htdemucs` (MIT; GPU if CUDA, else CPU) on the Studio mix and returns drums/bass/other/vocals. `AceStepBackend.separateStems` maps to drums/bass/other StemFiles; the store swaps the mirrored lanes, sets `stemsReal`, and drops the "mirror mix" warning only then. Returns 501 + `pip install demucs` hint when absent (never auto-installs). |
@@ -52,7 +52,8 @@ same ±6 BPM gate.
    bridges shared port 8766 and an old one answered every request (see
    ACE-NOTES "Gotchas").
 3. Check `http://127.0.0.1:8766/probe`: it should show `bridgeBuild`,
-   `checkpoint: acestep-v15-xl-turbo` and `upstreamUp: true`.
+   `checkpoint: acestep-v15-turbo` and `upstreamUp: true` (XL only if you set
+   `ACESTEP_CONFIG_PATH`).
 4. The first Generate lazy-loads the models (about 40 s).
 5. Real stems need Demucs in the bridge Python: `pip install demucs`. The start
    script does not auto-install; `/stems` returns 501 with that hint otherwise.
@@ -80,7 +81,7 @@ ACE renders one BPM per call, so switches come in two kinds:
 Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
 (bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**), R-3 `4541662` (downbeat bar grid), UI-7 `7dbe475` (skin pass), R-5 `70ba5f7` (loudness master — actually applies after the K-weighting fix `91ee7cb`), listening set `522ec58` (**npm run listen:set**), E-1 `9222c20` (arrangement editor: **Duplicate / Delete / Move-by-drag / Insert blank N bars**). User verified Redo, clearer builds, no vocals. Default Studio DiT switched to ACE-Step **XL-turbo** (4B, CPU offload) `fc5f224` with a one-time download in the start script + turbo fallback.
 
-Latest batch (since `720371c`): **45 s reference window + mastering-target presets** `e197b3e` (Balanced −11 default) and the **hardening pass** `96e559d`; **reproducible manifests + full export + render progress** `4d0a17b` (ZIP `mix_mastered.wav` / `mix_raw.wav` / real stems / `manifest.json`, **Recreate** button, `GET /progress/<jobId>`); **real break layer under Studio drops** `d5887e7`; **club Finish chain** `e1e17e7` (Demucs `htdemucs_ft` stem rebalance + pedalboard/pyloudnorm, **Matchering** when a reference is attached, genre targets, ≤ −1 dBTP); **UI-7 finish** `b9a16be` (primary Generate, grouped glass More, fewer `?`). DiT families are 2B (base/SFT/turbo) vs 4B XL-turbo; LM default is `acestep-5Hz-lm-1.7B`.
+Latest batch (since `720371c`): **45 s reference window + mastering-target presets** `e197b3e` (Balanced −11 default) and the **hardening pass** `96e559d`; **reproducible manifests + full export + render progress** `4d0a17b` (ZIP `mix_mastered.wav` / `mix_raw.wav` / real stems / `manifest.json`, **Recreate** button, `GET /progress/<jobId>`); **real break layer under Studio drops** `d5887e7`; **club Finish chain** `e1e17e7` (Demucs `htdemucs_ft` stem rebalance + pedalboard/pyloudnorm, **Matchering** when a reference is attached, genre targets, ≤ −1 dBTP); **UI-7 finish** `b9a16be` (primary Generate, grouped glass More, fewer `?`); **2B turbo default + 4B LM when present** `beba60a` (ACE #1063; XL selectable via `ACESTEP_CONFIG_PATH`).
 
 | # | Ticket | What |
 |---|---|---|
