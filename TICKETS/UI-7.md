@@ -1,6 +1,6 @@
 # UI-7 Skin pass — glass, hierarchy, fewer ?
 
-**Status: Deferred until after R-4** (R-2..R-4 change the waveform and song map). Part of the help cull landed in `8d2de74`.
+**Status: Done** `b9a16be` (primary Generate, ghost Vary, glass More grouped into Export / Sound / Style reference / Mixer & stems / Advanced, one HelpTip per component). Part of the help cull landed in `8d2de74`.
 
 File:
 - src/styles/app.css
