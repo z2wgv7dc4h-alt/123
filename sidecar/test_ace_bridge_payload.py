@@ -6,6 +6,7 @@ import base64
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -263,6 +264,34 @@ class BuildRenderPayloadTest(unittest.TestCase):
         )
         self.assertTrue(single.endswith(b"------b--\r\n"))
         self.assertIn(b'name="src_audio"', single)
+
+
+class StemsEndpointTest(unittest.TestCase):
+    def test_stems_returns_501_when_demucs_missing(self):
+        with mock.patch.object(bridge, "demucs_available", return_value=False):
+            status, body = bridge.build_stems_response({"mixWavBase64": "AAAA"})
+        self.assertEqual(status, 501)
+        self.assertEqual(body["error"], "demucs_not_installed")
+        self.assertEqual(body["installHint"], "pip install demucs")
+
+    def test_stems_requires_mix(self):
+        status, body = bridge.build_stems_response({})
+        self.assertEqual(status, 400)
+        self.assertEqual(body["error"], "missing_mix")
+
+    def test_stems_returns_every_demucs_stem(self):
+        fake = [
+            {"id": "drums", "wavBase64": "AAA", "durationSec": 1.0},
+            {"id": "bass", "wavBase64": "BBB", "durationSec": 1.0},
+            {"id": "other", "wavBase64": "CCC", "durationSec": 1.0},
+        ]
+        with mock.patch.object(bridge, "demucs_available", return_value=True), mock.patch.object(
+            bridge, "separate_stems_demucs", return_value=fake
+        ):
+            status, body = bridge.build_stems_response({"mixWavBase64": "AAAA"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["stems"], fake)
+        self.assertEqual(body["model"], bridge.DEMUCS_MODEL)
 
 
 if __name__ == "__main__":

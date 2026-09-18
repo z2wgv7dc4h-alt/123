@@ -306,6 +306,11 @@ export interface RenderResult {
   rawMixBlob?: Blob;
   /** Best-of-N Redo mixes. Present when a batch render returned >1 candidate. */
   candidates?: Blob[];
+  /**
+   * True when stems are real separations (e.g. Demucs), not the ACE mix
+   * mirrored across lanes. Only then do mute/solo isolate actual parts.
+   */
+  stemsReal?: boolean;
   /** Loudness mastering report (Studio). Present when mastering was applied. */
   master?: MasterReport;
 }
@@ -380,6 +385,8 @@ export interface AudioBackend {
   capabilities: BackendCaps;
   probe(): Promise<HardwareProbe>;
   render(job: RenderJob): Promise<RenderResult>;
+  /** Optional real stem separation (Studio/Demucs). Absent = not supported. */
+  separateStems?(mix: Blob): Promise<StemFile[]>;
   cancel(jobId: string): Promise<void>;
 }
 

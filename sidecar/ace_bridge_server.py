@@ -10,7 +10,10 @@ import base64
 import io
 import json
 import os
+import shutil
 import subprocess
+import sys
+import tempfile
 import time
 import uuid
 import urllib.error
@@ -22,6 +25,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HOST = "0.0.0.0"
 PORT = 8766
 BRIDGE_BUILD = "2026-09-16-turbo-instrumental"
+
+# Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
+# bridge never auto-installs it. Without it /stems returns 501 + install hint.
+DEMUCS_MODEL = "htdemucs"
+DEMUCS_STEM_IDS = ("drums", "bass", "other", "vocals")
+DEMUCS_INSTALL_HINT = "pip install demucs"
 
 
 class ExclusiveBridgeServer(ThreadingHTTPServer):
@@ -73,6 +82,74 @@ def torch_cuda() -> bool:
         return bool(torch.cuda.is_available())
     except Exception:
         return False
+
+
+def demucs_available() -> bool:
+    """True when Demucs v4 is importable in this Python env (MIT license)."""
+    try:
+        import demucs  # type: ignore  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def separate_stems_demucs(mix_bytes: bytes, timeout: float = 300.0) -> list[dict]:
+    """Run Demucs htdemucs on a temp WAV; return [{id, wavBase64, durationSec}].
+
+    GPU is used when torch reports CUDA, else CPU. The temp dir is always
+    cleaned up. Only the four htdemucs stems are read back."""
+    tmpdir = tempfile.mkdtemp(prefix="dnb-demucs-")
+    try:
+        in_path = os.path.join(tmpdir, "mix.wav")
+        with open(in_path, "wb") as fh:
+            fh.write(mix_bytes)
+        out_dir = os.path.join(tmpdir, "out")
+        cmd = [sys.executable, "-m", "demucs", "-n", DEMUCS_MODEL, "-o", out_dir]
+        if not torch_cuda():
+            cmd += ["-d", "cpu"]
+        cmd.append(in_path)
+        subprocess.check_call(cmd, timeout=timeout)
+        stems: list[dict] = []
+        for root, _dirs, files in os.walk(out_dir):
+            for fn in files:
+                stem_id = os.path.splitext(fn)[0].lower()
+                if stem_id not in DEMUCS_STEM_IDS:
+                    continue
+                with open(os.path.join(root, fn), "rb") as fh:
+                    data = fh.read()
+                stems.append(
+                    {
+                        "id": stem_id,
+                        "wavBase64": base64.b64encode(data).decode("ascii"),
+                        "durationSec": wav_duration_sec(data),
+                    }
+                )
+        # Stable musical order regardless of os.walk order.
+        order = {name: i for i, name in enumerate(DEMUCS_STEM_IDS)}
+        stems.sort(key=lambda s: order.get(str(s["id"]), 99))
+        return stems
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def build_stems_response(req: dict) -> tuple[int, dict]:
+    """Pure /stems response: 400 no mix, 501 Demucs missing, 200 stems."""
+    mix_b64 = req.get("mixWavBase64")
+    if not mix_b64:
+        return 400, {"error": "missing_mix", "message": "Send mixWavBase64"}
+    if not demucs_available():
+        return 501, {
+            "error": "demucs_not_installed",
+            "message": f"Demucs is not installed on the bridge PC — run: {DEMUCS_INSTALL_HINT}",
+            "installHint": DEMUCS_INSTALL_HINT,
+        }
+    try:
+        stems = separate_stems_demucs(base64.b64decode(mix_b64))
+    except Exception as e:  # noqa: BLE001 - surface any Demucs/runtime failure
+        return 502, {"error": "demucs_failed", "message": str(e)}
+    if not stems:
+        return 502, {"error": "demucs_no_stems", "message": "Demucs returned no stems"}
+    return 200, {"stems": stems, "model": DEMUCS_MODEL}
 
 DEFAULT_PROMPT = (
     "drum and bass, instrumental, two-step breakbeat, tight punchy drums, "
@@ -620,6 +697,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path == "/stems":
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                req = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            except Exception:
+                json_response(self, 400, {"error": "bad_json"})
+                return
+            # Demucs is local — no ACE/GPU health gate here.
+            status, body = build_stems_response(req)
+            json_response(self, status, body)
+            return
         if path != "/render":
             json_response(self, 404, {"error": "not_found"})
             return

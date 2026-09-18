@@ -141,12 +141,20 @@ export function getAceSidecarBase(): string {
 export const ACE_SIDECAR_BASE = typeof window !== "undefined" ? `${window.location.origin}/ace-bridge` : "http://127.0.0.1:8766";
 export const ACE_SIDECAR_PROBE_URL = `${ACE_SIDECAR_BASE}/probe`;
 export const ACE_SIDECAR_RENDER_URL = `${ACE_SIDECAR_BASE}/render`;
+export const ACE_SIDECAR_STEMS_URL = `${ACE_SIDECAR_BASE}/stems`;
 export function getAceSidecarProbeUrl(): string {
   return `${aceSidecarBase()}/probe`;
 }
 export function getAceSidecarRenderUrl(): string {
   return `${aceSidecarBase()}/render`;
 }
+export function getAceSidecarStemsUrl(): string {
+  return `${aceSidecarBase()}/stems`;
+}
+
+/** Demucs htdemucs output is 4-track; only these map to our StemIds. */
+export const DEMUCS_STEM_IDS = ['drums', 'bass', 'other'] as const;
+export const DEMUCS_TIMEOUT_MS = 300_000;
 
 function failSoftNotes(extra?: string): string[] {
   const notes = [
@@ -608,6 +616,80 @@ export class AceStepBackend implements AudioBackend {
       ...(candidateBlobs.length > 1 ? { candidates: candidateBlobs } : {}),
       ...(masterReport ? { master: masterReport } : {}),
     };
+  }
+
+  /**
+   * Real stem separation via the bridge's Demucs v4 endpoint. Returns
+   * StemFiles for drums/bass/other (htdemucs's vocals track is dropped — this
+   * is an instrumental studio). Throws with the install hint on a 501.
+   */
+  async separateStems(mix: Blob): Promise<StemFile[]> {
+    const mixWavBase64 = await blobToBase64(mix);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), DEMUCS_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(getAceSidecarStemsUrl(), {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ mixWavBase64 }),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`ACE sidecar /stems failed (${msg}). Start the ACE stack on the GPU PC.`);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (res.status === 501) {
+      let hint = 'pip install demucs';
+      try {
+        const detail = (await res.json()) as { installHint?: string };
+        if (detail?.installHint) hint = detail.installHint;
+      } catch {
+        /* keep default hint */
+      }
+      throw new Error(`Demucs is not installed on the bridge PC — run: ${hint}`);
+    }
+    if (!res.ok) {
+      let detail = '';
+      try {
+        detail = await res.text();
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`ACE sidecar /stems HTTP ${res.status}: ${detail.slice(0, 400)}`);
+    }
+
+    const data = (await res.json()) as {
+      stems?: Array<{ id?: string; wavBase64?: string; durationSec?: number }>;
+    };
+    const stems: StemFile[] = [];
+    for (const raw of data.stems ?? []) {
+      const id = String(raw.id ?? '').toLowerCase();
+      if (!(DEMUCS_STEM_IDS as readonly string[]).includes(id) || !raw.wavBase64) continue;
+      const blob = b64ToBlob(raw.wavBase64);
+      let sampleRateHz = 44100; // Demucs htdemucs outputs 44.1 kHz
+      let durationSec = typeof raw.durationSec === 'number' ? raw.durationSec : 0;
+      try {
+        const decoded = decodeWavToMono(await blob.arrayBuffer());
+        sampleRateHz = decoded.sampleRateHz;
+        durationSec = decoded.mono.length / decoded.sampleRateHz;
+      } catch {
+        /* header not PCM — keep response duration */
+      }
+      stems.push({
+        id: id as StemId,
+        url: URL.createObjectURL(blob),
+        blob,
+        channels: 2,
+        sampleRateHz,
+        bitDepth: 16,
+        durationSec,
+      });
+    }
+    return stems;
   }
 }
 

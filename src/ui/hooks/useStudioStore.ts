@@ -18,7 +18,7 @@ import {
   type Section,
 } from '@/core/types';
 import { backendRegistry } from '@/core/registry';
-import { getAceSidecarBase } from '@/core/backends';
+import { getAceSidecarBase, aceStepBackend } from '@/core/backends';
 import {
   previewPlayer,
   audibleStemIds,
@@ -81,6 +81,24 @@ export function resolveRemixStemIds(audible: readonly StemId[]): RemixStemId[] {
   if (elementals.length > 0) return [...elementals];
   if (audible.includes('drums')) return ['drums'];
   return [];
+}
+
+/**
+ * Real (Demucs) stems are a different set: drums/bass/other, no kick/snare/
+ * hats/perc. Choose those present + audible instead of the synthetic
+ * elementals-preferred rule.
+ */
+export function remixStemIdsForResult(
+  result: RenderResult,
+  audible: readonly StemId[],
+): StemId[] {
+  if (result.stemsReal) {
+    const present = new Set(result.stems.map((s) => s.id));
+    return audible.filter(
+      (id) => present.has(id) && (id === 'drums' || id === 'bass' || id === 'other'),
+    );
+  }
+  return resolveRemixStemIds(audible);
 }
 
 function emptyMixer(): MixerState {
@@ -280,6 +298,10 @@ export interface StudioState {
     /** Real breakbeat loop under drops (Sketch). Opt-OUT: defaults on. */
     realBreak: boolean;
   };
+  /** Demucs real-stem separation in progress. */
+  stemsBusy: boolean;
+  /** Replace mirrored ACE stems with real Demucs stems (drums/bass/other). */
+  separateStems: () => Promise<void>;
   /** Earlier versions of the current Studio take (newest last). Not persisted. */
   takeHistory: RenderResult[];
   /** Apply loudness mastering to Studio (ACE) mixes (default true). */
@@ -357,6 +379,10 @@ let gainRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 /** Elemental (+ optional other if present) stems for Tone live graph. */
 function liveGraphStemIds(result: RenderResult): string[] {
   const present = new Set(result.stems.map((s) => s.id));
+  // Real Demucs stems: use drums/bass/other directly (no fake kick/snare bus).
+  if (result.stemsReal) {
+    return (['drums', 'bass', 'other'] as const).filter((id) => present.has(id));
+  }
   const ids: string[] = ELEMENTAL_STEM_IDS.filter((id) => present.has(id));
   if (present.has('other') && !ids.includes('other')) ids.push('other');
   return ids;
@@ -420,7 +446,7 @@ async function loadPreviewFromMixer(result: RenderResult, mixer: MixerState): Pr
     return;
   }
   const ids = audibleStemIds(mixer.mute, mixer.solo, STEM_IDS);
-  const remixIds = resolveRemixStemIds(ids);
+  const remixIds = remixStemIdsForResult(result, ids);
   const stems = result.stems.filter((s) => remixIds.includes(s.id as RemixStemId));
   if (!stems.length) throw new Error('All stems muted — unmute one to preview.');
   const gains: Partial<Record<string, number>> = {};
@@ -505,6 +531,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   result: null,
   previousResult: null,
   takeHistory: [],
+  stemsBusy: false,
   loopRegion: null,
   waveformZoom: false,
   abFlashback: false,
@@ -1337,6 +1364,48 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   extendLastSection: (index, deltaBars) =>
     get().generate({ edit: { kind: 'extend', sectionIndex: index, deltaBars } }),
 
+  separateStems: async () => {
+    const { result, stemsBusy } = get();
+    if (stemsBusy) return;
+    if (!result || !result.backendId.startsWith('ace-step')) {
+      pushToast('Split stems needs a Studio (GPU) take', 'warn', 3600);
+      return;
+    }
+    if (result.stemsReal) {
+      pushToast('Stems are already real', 'info', 2200);
+      return;
+    }
+    const mix = result.stems.find((s) => s.id === 'mix');
+    if (!mix?.blob) {
+      pushToast('No Studio mix blob to split', 'warn', 3200);
+      return;
+    }
+    set({ stemsBusy: true, error: null });
+    try {
+      const real = await aceStepBackend.separateStems(mix.blob);
+      if (!real.length) throw new Error('Demucs returned no usable stems');
+      const stems = [...real, mix];
+      // Honesty: only now may the "mirror mix" note go away.
+      const dropMirror = (w: string) => !/mirror mix|share mix/i.test(w);
+      const next: RenderResult = {
+        ...result,
+        stems,
+        stemsReal: true,
+        warnings: result.warnings.filter(dropMirror),
+      };
+      set({ result: next, stemsBusy: false, warnings: get().warnings.filter(dropMirror) });
+      previewPlayer.clearStemCache();
+      previewPlayer.onState = (ps) => set({ previewState: ps });
+      await loadPreviewFromMixer(next, get().mixer);
+      previewPlayer.setAuthoritativeDuration(mix.durationSec);
+      pushToast(`Real stems ready · ${real.map((s) => s.id).join(', ')}`, 'success', 3400);
+    } catch (e) {
+      const msg = formatStudioError(e instanceof Error ? e.message : String(e));
+      set({ stemsBusy: false, error: msg });
+      pushToast(msg, 'error', 0);
+    }
+  },
+
   undoTakeEdit: async () => {
     const { takeHistory, mixer, busy } = get();
     if (busy || !takeHistory.length) return;
@@ -1562,7 +1631,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         const needsRemix = anyMute || anySolo || anyGain || live.mixerDirty;
         let blob: Blob;
         if (needsRemix) {
-          const remixIds = resolveRemixStemIds(ids);
+          const remixIds = remixStemIdsForResult(result, ids);
           const stems = result.stems.filter((x) => remixIds.includes(x.id as RemixStemId));
           if (!stems.length) throw new Error('All stems muted — unmute one to export what you heard.');
           const gains: Partial<Record<string, number>> = {};
@@ -1620,7 +1689,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         let asHeardMix: Blob | undefined;
         let preGluePeak = 0;
         if (needsRemix) {
-          const remixIds = resolveRemixStemIds(ids);
+          const remixIds = remixStemIdsForResult(result, ids);
           const stems = result.stems.filter((s) => remixIds.includes(s.id as RemixStemId));
           if (stems.length) {
             const gains: Partial<Record<string, number>> = {};

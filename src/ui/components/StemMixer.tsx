@@ -31,6 +31,8 @@ function MixerBody() {
   const undoMixer = useStudioStore((s) => s.undoMixer);
   const mixerUndoAvailable = useStudioStore((s) => s.mixerUndoAvailable);
   const mixerAnnounce = useStudioStore((s) => s.mixerAnnounce);
+  const stemsBusy = useStudioStore((s) => s.stemsBusy);
+  const separateStems = useStudioStore((s) => s.separateStems);
 
   return (
     <>
@@ -58,6 +60,22 @@ function MixerBody() {
           <button type="button" className="btn tiny ghost" disabled={!mixerDirty} onClick={() => resetMix()}>
             Reset mix
           </button>
+          {result.backendId.startsWith('ace-step') && !result.stemsReal && (
+            <button
+              type="button"
+              className="btn tiny ghost"
+              disabled={stemsBusy}
+              title="Separate this mix into real drums / bass / other stems with Demucs (GPU if available)"
+              onClick={() => void separateStems()}
+            >
+              {stemsBusy ? 'Splitting…' : 'Split stems (Demucs)'}
+            </button>
+          )}
+          {result.stemsReal && (
+            <span className="pill tiny" title="Real Demucs stems — mute/solo isolates parts">
+              Real stems
+            </span>
+          )}
         </div>
       )}
       <div className="stem-legend" aria-label="Mixer controls explained">
@@ -162,7 +180,8 @@ export function StemMixerCompact() {
   if (!result) return null;
 
   const sharedMix =
-    Boolean(result.manifest?.gpuUsed) || Boolean(result.backendId?.startsWith('ace-step'));
+    !result.stemsReal &&
+    (Boolean(result.manifest?.gpuUsed) || Boolean(result.backendId?.startsWith('ace-step')));
   const compactHelp = sharedMix ? HELP.stemsSharedMix : HELP.remixPreview;
 
   return (
@@ -231,8 +250,8 @@ export function StemMixerCompact() {
 export function StemMixer() {
   const result = useStudioStore((s) => s.result);
   const sharedMix =
-    Boolean(result?.manifest?.gpuUsed) ||
-    Boolean(result?.backendId?.startsWith('ace-step'));
+    !result?.stemsReal &&
+    (Boolean(result?.manifest?.gpuUsed) || Boolean(result?.backendId?.startsWith('ace-step')));
   const stemsHelp = sharedMix ? HELP.stemsSharedMix : HELP.stems;
 
   return (
@@ -242,9 +261,11 @@ export function StemMixer() {
         <HelpTip text={stemsHelp} ariaLabel="About stem mixer" />
       </h2>
       <p className="hint">
-        {sharedMix
-          ? 'Studio ACE may share one mix across lanes — Mute/Solo are preview-relative, not isolated stems yet.'
-          : 'Mute / Solo / Gain update the preview live. ZIP always keeps dry stems for DAW work; when you tweak, it also adds mix_as_heard.wav matching this preview.'}
+        {result?.stemsReal
+          ? 'Real separated stems (Demucs) — Mute / Solo / Gain now isolate actual drums, bass and other.'
+          : sharedMix
+            ? 'Studio ACE may share one mix across lanes — Mute/Solo are preview-relative, not isolated stems yet. Use Split stems (Demucs) to separate them.'
+            : 'Mute / Solo / Gain update the preview live. ZIP always keeps dry stems for DAW work; when you tweak, it also adds mix_as_heard.wav matching this preview.'}
       </p>
       <details className="stem-mixer-details" open>
         <summary>Preview stem mix (optional)</summary>

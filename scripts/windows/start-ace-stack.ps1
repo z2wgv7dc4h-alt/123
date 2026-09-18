@@ -1,5 +1,11 @@
 # Start ACE API (:8001) + DnB bridge (:8766)
 # Keep this window open while using DnB Studio.
+#
+# Real stem separation (bridge POST /stems, "Split stems (Demucs)") needs
+# Demucs v4 (MIT) in the same Python env the bridge runs:
+#     pip install demucs
+# This script does NOT auto-install it; without it /stems returns 501 with
+# the install hint. GPU is used when torch reports CUDA, else CPU.
 $ErrorActionPreference = "Stop"
 # Kill stale ACE API / bridge processes first. Duplicates on 8766 answered with old code.
 $stale = Get-CimInstance Win32_Process -Filter "Name like 'python%'" | Where-Object { $_.CommandLine -match 'ace_bridge_server|acestep' }
