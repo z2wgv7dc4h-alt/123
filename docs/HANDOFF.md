@@ -36,7 +36,7 @@ Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
 | Caption | `buildAceCaption` (P-1): a paragraph in ACE example style — genre + energy (or section role), drums + bass, arrangement narrative from the song map, deduped extras, "polished and club-ready, with no vocals". No BPM; no guitar unless the layer is on or typed. |
 | Tempo | A setting, 70–200 (`clampProductBpm`). Genres set the default: DnB 174, dubstep 140, half-time 170, jungle 165, trap 140. Default length 96 bars (cap 128). |
 | Home UI | Genre row → style presets → style text → song shape → Generate / Vary → waveform + compact Play/Stop → song map → More. UI-7 `b9a16be`: Generate is a solid primary, Vary a ghost; More is a glass sheet grouped into **Export / Sound / Style reference / Mixer & stems / Advanced**; one HelpTip per component. |
-| Song map edits | **Studio take** (R-2, `6aede3d`; strength + best-of-3 `7a21e57`): the selected section gets **Redo** / **Redo as…** (epic drop, build-up, breakdown, dubstep/trap/jungle/half-time switch, own words; ACE repaint of that bar range), a **Change amount** range (0.2–1, default 0.5 → `repaint_strength`), and **+8 / +16** on the last section (repaint past the end); **Undo edit** steps back through `takeHistory` without rendering. Redo asks ACE for `batchSize: 3`; the bridge returns every result file as a candidate, and **Pick 1 2 3** swaps the heard mix (new take version, no render). Generate / Vary start a new take. **Sketch** keeps Expand / Repeat / ×2, which re-render the whole song. |
+| Song map edits | **Studio take** (R-2, `6aede3d`; strength + best-of-3 `7a21e57`): the selected section gets **Redo** / **Redo as…** (epic drop, build-up, breakdown, dubstep/trap/jungle/half-time switch, own words; ACE repaint of that bar range), a **Change amount** range (0.2–1, default 0.5 → `repaint_strength`), and **+8 / +16** on the last section (repaint past the end); **Undo edit** steps back through `takeHistory` without rendering. Redo asks ACE for `batchSize: 3`; the bridge returns every result file as a candidate, and **Pick 1 2 3** swaps the heard mix (new take version, no render). **A-3 Switch tempo here** (selected section): inserts a `{genre, bpm, bars}` block after it, renders that block as its own text2music at its bpm with the previous 8 bars as `reference_audio` (best-of-2 + takeScore auto-pick), and hard-cuts `[before][transition][block][after]` with per-section BPM; Undo steps back. Generate / Vary start a new take. **Sketch** keeps Expand / Repeat / ×2, which re-render the whole song. |
 | Header chip | Labels the backend of the buffer you hear, not the last probe. |
 
 **Sketch** (`OfflineStubBackend`) is the CPU fallback. It honors the tempo. Its
@@ -85,7 +85,7 @@ Latest batch (since `720371c`): **45 s reference window + mastering-target prese
 
 | # | Ticket | What |
 |---|---|---|
-| 1 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins (`reference_audio` primitive landed `a1f0aaa`) |
+| 1 | A-3 | **Done** — per-section BPM, block rendered at its own tempo/genre with the previous 8 bars as `reference_audio`, hard-cut joins (`planTempoJoinFrames`), Undo via `takeHistory`. Transition-bar repaint (last bar of `before` as `build`) is planned in the join; wiring it as the seam edit is the follow-up. |
 
 Open, unscheduled: S-5 (cover strength listening A/B), `05` (ACE-native
 `extract` for kick/snare granularity — real stems already ship via Demucs,

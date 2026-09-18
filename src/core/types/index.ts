@@ -50,6 +50,10 @@ export interface Section {
   startBar: number;
   lengthBars: number;
   fillHint?: boolean;
+  /** A-3 per-section tempo for a tempo block (absent = structure.bpm). */
+  bpm?: number;
+  /** A-3 per-section genre for a tempo block (absent = job genre). */
+  genre?: GenreId;
 }
 
 export interface StructureInput {

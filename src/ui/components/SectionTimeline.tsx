@@ -3,12 +3,12 @@ import { previewPlayer } from '@/core/audio';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { pushToast } from '../lib/toasts';
 import { barsToDurationSec, formatDurationMmSs, sectionClickRatio } from '../lib/barPosition';
-import { DEFAULT_BPM } from '@/core/types';
+import { DEFAULT_BPM, GENRES } from '@/core/types';
 import { retailStructureLabel } from '../lib/retailLabels';
 import { totalBarsOf } from '../lib/structureEdit';
 import { isStudioTake, REDO_PRESETS, REDO_STRENGTH_DEFAULT, REDO_STRENGTH_MAX, REDO_STRENGTH_MIN } from '../lib/takeEdit';
 import { INSERT_SECTION_NAMES } from '../lib/arrangeTake';
-import type { SectionName } from '@/core/types';
+import type { GenreId, SectionName } from '@/core/types';
 import { BAR_GRID_MIN_CONFIDENCE } from '@/core/audio/downbeatGrid';
 
 const SECTION_CLASS: Record<string, string> = {
@@ -76,6 +76,10 @@ export function SectionTimeline() {
   const arrangeSection = useStudioStore((s) => s.arrangeSection);
   const undoTakeEdit = useStudioStore((s) => s.undoTakeEdit);
   const polishDrops = useStudioStore((s) => s.polishDrops);
+  const switchTempoHere = useStudioStore((s) => s.switchTempoHere);
+  const [switchGenre, setSwitchGenre] = useState<GenreId>('dubstep');
+  const [switchBpm, setSwitchBpm] = useState(140);
+  const [switchBars, setSwitchBars] = useState(16);
   const takeHistory = useStudioStore((s) => s.takeHistory);
 
   const studioTake = isStudioTake(result);
@@ -238,6 +242,57 @@ export function SectionTimeline() {
             >
               Polish drops
             </button>
+            {selectedIndex != null && (
+              <span className="tempo-switch-controls" role="group" aria-label="Switch tempo here">
+                <select
+                  value={switchGenre}
+                  disabled={busy}
+                  aria-label="Block genre"
+                  onChange={(e) => setSwitchGenre(e.target.value as GenreId)}
+                >
+                  {(Object.keys(GENRES) as GenreId[]).map((id) => (
+                    <option key={id} value={id}>
+                      {GENRES[id].label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={70}
+                  max={200}
+                  value={switchBpm}
+                  disabled={busy}
+                  aria-label="Block BPM"
+                  onChange={(e) => setSwitchBpm(Number(e.target.value))}
+                />
+                <input
+                  type="number"
+                  min={4}
+                  max={64}
+                  step={4}
+                  value={switchBars}
+                  disabled={busy}
+                  aria-label="Block bars"
+                  onChange={(e) => setSwitchBars(Number(e.target.value))}
+                />
+                <button
+                  type="button"
+                  className="btn tiny"
+                  disabled={busy}
+                  title="Render this section after the selected one at a new tempo and hard-cut it in"
+                  onClick={() =>
+                    void switchTempoHere(selectedIndex, {
+                      genre: switchGenre,
+                      bpm: switchBpm,
+                      bars: switchBars,
+                      role: 'drop',
+                    })
+                  }
+                >
+                  Switch tempo here
+                </button>
+              </span>
+            )}
           </>
         )}
         {editedSections && (

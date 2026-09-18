@@ -38,6 +38,33 @@ export function framesPerBar(bpm: number, sampleRateHz: number): number {
   return Math.round((240 / bpm) * sampleRateHz);
 }
 
+/** A-3: a section's own tempo, falling back to the structure's base tempo. */
+export function sectionBpm(
+  section: Pick<Section, 'bpm'> | undefined,
+  fallback: number,
+): number {
+  return section?.bpm && section.bpm > 0 ? section.bpm : fallback;
+}
+
+/** A-3: frames from the take start to an absolute bar, per-section BPM. */
+export function structureBarToFrame(
+  structure: StructureMap,
+  bar: number,
+  offsetSec: number,
+  sampleRateHz: number,
+): number {
+  let frame = Math.round(offsetSec * sampleRateHz);
+  let cursor = 0;
+  for (const s of structure.sections) {
+    const fpb = framesPerBar(sectionBpm(s, structure.bpm), sampleRateHz);
+    const end = cursor + s.lengthBars;
+    if (bar <= end) return frame + Math.round((bar - cursor) * fpb);
+    frame += s.lengthBars * fpb;
+    cursor = end;
+  }
+  return frame;
+}
+
 /** First frame of a 0-based bar, including the grid offset (R-3). */
 export function frameAtBar(
   bar: number,
@@ -127,7 +154,7 @@ export function planArrange(opts: {
   if (!channels.length || !structure.sections.length) return null;
   const fpb = framesPerBar(bpm, sampleRateHz);
   const total = totalFrames(channels);
-  const frameFor = (bar: number) => frameAtBar(bar, offsetSec, sampleRateHz, fpb);
+  const frameFor = (bar: number) => structureBarToFrame(structure, bar, offsetSec, sampleRateHz);
 
   let outChannels: Float32Array[];
   let nextStructure: StructureMap;

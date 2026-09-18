@@ -23,6 +23,7 @@ import {
   type StylePrompt,
   type VibeProfile,
   type Section,
+  type RenderJob,
 } from '@/core/types';
 import { backendRegistry } from '@/core/registry';
 import { getAceSidecarBase, aceStepBackend, clampText2MusicBars } from '@/core/backends';
@@ -55,6 +56,13 @@ import { formatStudioError } from '@/core/uiMessages';
 import { saveResumeDraft } from '../lib/resumeDraft';
 import { songShapeById, type SongShapeId } from '../lib/songShapes';
 import { planTakeEdit, isStudioTake, roleForSectionName, gridOffsetSec, type SectionStyle, type TakeEditRequest } from '../lib/takeEdit';
+import {
+  withTempoBlock,
+  planTempoJoinFrames,
+  structureBarToFrame,
+  TEMPO_REFERENCE_BARS,
+  type TempoBlock,
+} from '../lib/tempoBlocks';
 import { planArrange, type ArrangeOp } from '../lib/arrangeTake';
 import {
   expandSection,
@@ -372,6 +380,8 @@ export interface StudioState {
   }) => Promise<void>;
   /** P-3: repaint every drop section, best-of-2, auto-pick the top score. */
   polishDrops: () => Promise<void>;
+  /** A-3: render a different-tempo block after a section and hard-cut it in. */
+  switchTempoHere: (sectionIndex: number, block: TempoBlock) => Promise<void>;
   /** Club Finish: bridge Demucs + pedalboard/pyloudnorm master, new take version. */
   finishTake: () => Promise<void>;
   /** Load an exported manifest and re-render with its exact params. */
@@ -1632,6 +1642,148 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         'success',
         3200,
       );
+    }
+  },
+
+  switchTempoHere: async (sectionIndex, block) => {
+    const s = get();
+    if (s.busy) return;
+    const result = s.result;
+    if (!result || !isStudioTake(result)) {
+      pushToast('Switch tempo needs a Studio (GPU) take', 'warn', 3600);
+      return;
+    }
+    const baseStructure = result.structure!;
+    const planned = withTempoBlock(baseStructure, sectionIndex, block);
+    if (!planned) {
+      pushToast('Cannot place a tempo block there', 'warn', 3200);
+      return;
+    }
+    const source = result.rawMixBlob ?? result.stems.find((x) => x.id === 'mix')?.blob;
+    if (!source) {
+      pushToast('No raw mix to reference', 'warn', 3200);
+      return;
+    }
+    set({ busy: true, error: null, renderProgress: null });
+    try {
+      const decoded = decodeWavChannels(await source.arrayBuffer());
+      const off = gridOffsetSec(result);
+      const sec = baseStructure.sections[sectionIndex]!;
+      const refBars = Math.min(TEMPO_REFERENCE_BARS, sec.lengthBars);
+      const refStartBar = sec.startBar + sec.lengthBars - refBars;
+      const refStartFrame = structureBarToFrame(baseStructure, refStartBar, off, decoded.sampleRate);
+      const refChannels = decoded.channels.map((ch) => ch.slice(Math.max(0, refStartFrame)));
+      const refBlob = encodeWav(refChannels, decoded.sampleRate, decoded.bitDepth === 24 ? 24 : 16);
+
+      const job: RenderJob = {
+        jobId: `tempo_${s.seed}_${Date.now()}`,
+        seed: (s.seed + sectionIndex * 101 + 7) >>> 0,
+        bpm: block.bpm,
+        bpmTolerance: 2,
+        durationBars: block.bars,
+        sampleRateHz: DEFAULT_SAMPLE_RATE,
+        bitDepth: DEFAULT_BIT_DEPTH,
+        channels: 2,
+        prompt: { descriptors: [], energy: s.energy, darkness: s.darkness, chaos: s.chaos, text: s.promptText },
+        genre: block.genre,
+        sectionRole: 'switch',
+        structureRef: planned.structure,
+        batchSize: 2,
+        stemSchemaVersion: 'v0',
+        master: s.masterOn,
+        masterTarget: s.masterTarget,
+        sampler: s.sampler,
+        lmTemperature: COHERENCE_LM_TEMPERATURE[s.coherence ?? 'balanced'],
+        styleReference: {
+          file: refBlob,
+          mode: 'reference',
+          ownerAttested: true,
+          fileName: 'tempo-ref.wav',
+          intensity: 0.7,
+          estimatedBpm: baseStructure.bpm,
+          energy: s.energy,
+        },
+      };
+      const blockResult = await aceStepBackend.render(job);
+      const blockBlob =
+        blockResult.candidates?.[0]?.mix ?? blockResult.stems.find((x) => x.id === 'mix')?.blob;
+      if (!blockBlob) throw new Error('Tempo block rendered no audio');
+
+      // Hard-cut join [before][block][after]; the transition (last bar of
+      // `before` repainted as a build riser/stop) is a follow-up seam edit.
+      let joinedBlob = blockBlob;
+      let outDurationSec =
+        result.stems.find((x) => x.id === 'mix')?.durationSec ?? decoded.channels[0]!.length / decoded.sampleRate;
+      const join = planTempoJoinFrames({
+        structure: planned.structure,
+        blockIndex: planned.blockIndex,
+        offsetSec: off,
+        sampleRateHz: decoded.sampleRate,
+      });
+      if (join) {
+        try {
+          const blockDecoded = decodeWavChannels(await blockBlob.arrayBuffer());
+          const blockLen = Math.max(0, Math.min(join.blockEnd - join.blockStart, blockDecoded.channels[0]!.length));
+          const before = decoded.channels.map((ch) => ch.slice(0, join.beforeEnd));
+          const blockPart = decoded.channels.map((_, c) => blockDecoded.channels[c % blockDecoded.channels.length]!.slice(0, blockLen));
+          const after = decoded.channels.map((ch) => ch.slice(join.afterStart));
+          const joined = decoded.channels.map((_, c) => {
+            const parts = [before[c]!, blockPart[c]!, after[c]!];
+            const len = parts.reduce((n, p) => n + p.length, 0);
+            const out = new Float32Array(len);
+            let o = 0;
+            for (const p of parts) {
+              out.set(p, o);
+              o += p.length;
+            }
+            return out;
+          });
+          joinedBlob = encodeWav(joined, decoded.sampleRate, 16);
+          outDurationSec = joined[0]!.length / decoded.sampleRate;
+        } catch {
+          /* test stubs / non-WAV block: keep the block mix */
+        }
+      }
+
+      const stems = result.stems.map((x) => ({
+        ...x,
+        blob: joinedBlob,
+        url: URL.createObjectURL(joinedBlob),
+        durationSec: outDurationSec,
+        sampleRateHz: decoded.sampleRate,
+        bitDepth: 16,
+      }));
+      const next: RenderResult = {
+        ...result,
+        stems,
+        structure: planned.structure,
+        rawMixBlob: joinedBlob,
+        barGrid: undefined,
+        master: blockResult.master,
+        finish: undefined,
+        warnings: [
+          ...get().warnings,
+          `Tempo block: ${block.bpm} BPM ${block.genre} after section ${sectionIndex + 1} — hard cut (transition repaint pending)`,
+        ],
+      };
+      set({
+        result: next,
+        takeHistory: [...get().takeHistory, result],
+        activeCandidate: 0,
+        busy: false,
+        loopRegion: null,
+        abFlashback: false,
+        flowStep: 'generated',
+      });
+      previewPlayer.clearStemCache();
+      previewPlayer.onState = (ps) => set({ previewState: ps });
+      await loadPreviewFromMixer(next, get().mixer);
+      previewPlayer.setAuthoritativeDuration(outDurationSec);
+      pushToast(`Switched to ${block.bpm} BPM — hit Play`, 'success', 3200);
+    } catch (e) {
+      const msg = formatStudioError(e instanceof Error ? e.message : String(e));
+      set({ busy: false, error: msg });
+      pushToast(msg, 'error', 0);
     }
   },
 

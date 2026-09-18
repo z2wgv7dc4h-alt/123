@@ -1,5 +1,6 @@
 import type { GenreId, RenderJob, RenderResult, SectionRole, StructureMap } from '@/core/types';
 import { BAR_GRID_MIN_CONFIDENCE } from '@/core/audio/downbeatGrid';
+import { sectionBpm, sectionStartSec } from './tempoBlocks';
 
 export type SectionStyle = { role?: SectionRole; genre?: GenreId; words?: string; strength?: number };
 
@@ -64,7 +65,7 @@ export function gridOffsetSec(result: RenderResult): number {
   return g && g.confidence >= BAR_GRID_MIN_CONFIDENCE ? g.offsetSec : 0;
 }
 
-/** Section index → [startSec, endSec) on the take (startBar is 0-based). */
+/** Section index → [startSec, endSec) on the take (startBar is 0-based, per-section BPM). */
 export function sectionWindowSec(
   structure: StructureMap,
   index: number,
@@ -73,11 +74,9 @@ export function sectionWindowSec(
 ): { startSec: number; endSec: number } | null {
   const sec = structure.sections[index];
   if (!sec) return null;
-  const spb = secondsPerBar(bpm);
-  return {
-    startSec: offsetSec + sec.startBar * spb,
-    endSec: offsetSec + (sec.startBar + sec.lengthBars) * spb,
-  };
+  const spb = 240 / sectionBpm(sec, bpm);
+  const start = offsetSec + sectionStartSec(structure, index, bpm);
+  return { startSec: start, endSec: start + sec.lengthBars * spb };
 }
 
 /** Grow one section; later sections shift; total bars grow. */
@@ -119,7 +118,6 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
     ? undefined
     : 'No raw mix for this take — editing the mastered mix (tone may drift)';
   const bpm = result.bpmMeasured || structure.bpm;
-  const spb = secondsPerBar(bpm);
   const off = gridOffsetSec(result);
   if (req.kind === 'splice') {
     // E-1 arrangement edit: the spliced PCM is the new source; ACE only
@@ -160,12 +158,16 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
   }
   const last = structure.sections.length - 1;
   if (req.sectionIndex !== last || req.deltaBars <= 0) return null;
+  const lastSec = structure.sections[last]!;
+  const lastBpm = sectionBpm(lastSec, bpm);
+  const lastSpb = 240 / lastBpm;
+  const lastStart = off + sectionStartSec(structure, last, bpm);
   return {
     edit: {
       kind: 'repaint',
       source,
-      startSec: off + Math.max(0, structure.bars - 1) * spb,
-      endSec: off + (structure.bars + req.deltaBars) * spb,
+      startSec: lastStart + Math.max(0, lastSec.lengthBars - 1) * lastSpb,
+      endSec: lastStart + (lastSec.lengthBars + req.deltaBars) * lastSpb,
     },
     structureRef: extendStructure(structure, last, req.deltaBars),
     seed: result.seed,
