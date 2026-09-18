@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
-BRIDGE_BUILD = "2026-09-16-turbo-instrumental"
+BRIDGE_BUILD = "2026-09-18-stems-ref-bestof3"
 
 # Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
 # bridge never auto-installs it. Without it /stems returns 501 + install hint.

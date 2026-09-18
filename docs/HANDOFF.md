@@ -62,15 +62,12 @@ ACE renders one BPM per call, so switches come in two kinds:
   a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
 
 Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
-(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**). User verified Redo, clearer builds, no vocals.
+(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**), R-3 `4541662` (downbeat bar grid), UI-7 `7dbe475` (skin pass), R-5 `70ba5f7` (loudness master). User verified Redo, clearer builds, no vocals.
 
 | # | Ticket | What |
 |---|---|---|
-| 1 | R-3 | Downbeat detection so the bar grid lines up with the take |
-| 2 | E-1 | Arrangement editor on the take: insert, delete, duplicate, move, resize sections, extend anywhere (splice + seam repaint), undo. Absorbs R-4 and A-2. |
-| 3 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins (`reference_audio` primitive landed `a1f0aaa`) |
-| 4 | UI-7 | Skin pass (after the editor settles) |
-| 5 | R-5 | Mastering (matched loudness across blocks) |
+| 1 | E-1 | Arrangement editor on the take: insert, delete, duplicate, move, resize sections, extend anywhere (splice + seam repaint), undo. Absorbs R-4 and A-2. |
+| 2 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins (`reference_audio` primitive landed `a1f0aaa`) |
 
 Open, unscheduled: S-5 (cover strength listening A/B), `05` (ACE-native
 `extract` for kick/snare granularity — real stems already ship via Demucs,
