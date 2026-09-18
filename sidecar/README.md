@@ -21,11 +21,15 @@ CUDA stays **off** the browser bundle. The browser talks only to the DnB contrac
 `POST /render` is **audio-only**. `structureRef` is a timing hint only — sidecar must **not** invent arrangement/MIDI. Stem lanes share the ACE mix; **Split stems (Demucs)** (`POST /stems`) separates real drums/bass/other (ACE-native extract is still pending, ticket `05`).
 
 ## Preferred checkpoints
-1. `acestep-v15-turbo` — **default** (ACE README: Very High, 8 steps)
-2. `acestep-v15-base` / `acestep-v15-sft` — 64 steps + ADG (Medium / High)
-3. `acestep-v15-xl-turbo` — larger, needs more VRAM
+1. `acestep-v15-xl-turbo` — **default** (4B, ACE README Very High, 8 steps; CPU
+   offload fits 16 GB). `start-ace-stack.ps1` downloads it on first run and falls
+   back to `acestep-v15-turbo` if the download fails.
+2. `acestep-v15-turbo` — smaller 8-step turbo (Very High)
+3. `acestep-v15-base` / `acestep-v15-sft` — 64 steps + ADG (Medium / High)
 
-Models auto-download on first ACE run. Do not auto-pull multi-GB weights on shared boxes.
+XL + offload is slower: the bridge polls up to 600 s and the browser render
+timeout is 660 s. Models lazy-load on first ACE run; the start script ships the
+one-time XL download (do not auto-pull multi-GB weights on shared boxes).
 
 ## Local try path (full stack — not Gradio-primary)
 

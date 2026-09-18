@@ -23,7 +23,7 @@ Listen polish (cycle-9): Play autofocus after Generate; mixerDirty pulses Play (
 On the RTX 5080 PC:
 
 1. See `INSTALL.txt` or run `scripts\windows\INSTALL-AND-RUN.ps1`
-2. Wait for models + bridge `:8766`
+2. Wait for models + bridge `:8766` — the first run downloads **XL-turbo (4B, ~19 GB)** via `start-ace-stack.ps1` (falls back to plain turbo if that fails) and lazy-loads it on first Generate
 3. Generate uses Studio ACE only when probe `"hasGpu": true`; otherwise Sketch (CPU)
 
 Full honesty table: [docs/_archive_2026-09-16/TRY_ACE.md](docs/_archive_2026-09-16/TRY_ACE.md). ACE stem lanes share the mix until you hit **Split stems (Demucs)** in More, which separates real drums/bass/other; ACE-native extract (ticket `05`) is still pending.
@@ -33,7 +33,7 @@ Full honesty table: [docs/_archive_2026-09-16/TRY_ACE.md](docs/_archive_2026-09-
 | Path | Status |
 |------|--------|
 | **OfflineStub** (Sketch / CPU) | Default until probe `hasGpu: true` — real separate stems. Guitar/Solo/Extra-drums layers work here too (pure CPU synthesis, no GPU needed) — only Vocal-ish is ACE-only. |
-| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on the RTX 5080 — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md). Stem lanes share the ACE mix until **Split stems (Demucs)**. |
+| **ACE-Step 1.5** (Studio / GPU) | **Proven live** on the RTX 5080 — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md). Default DiT now **`acestep-v15-xl-turbo`** (4B, CPU offload). Stem lanes share the ACE mix until **Split stems (Demucs)**. |
 
 ACE/CUDA proven live 2026-09-15: real end-to-end GPU render confirmed via the raw ACE model log (not just the probe endpoint). Two bugs fixed the same day — see [docs/_archive_2026-09-16/STATUS.md](docs/_archive_2026-09-16/STATUS.md) for details and evidence:
 1. `generate()` could silently fall back to Sketch even with the Studio/GPU badge showing live, due to a redundant internal re-probe in `BackendRegistry.selectBest()` that swallowed errors with no toast. Fixed — Generate now reuses the probe result it already has.
