@@ -59,6 +59,34 @@ describe('integratedLufs ITU-R BS.1770 measurement', () => {
     // This is acceptable for our use case (glue compressor reference)
     expect([true, false].includes(Number.isFinite(lufs))).toBe(true);
   });
+
+  it('synthetic tone returns finite LUFS (regression: old K-weighting gave -Infinity)', () => {
+    const n = 48000 * 2;
+    const left = new Float32Array(n);
+    const right = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const s = 0.3 * Math.sin((2 * Math.PI * 440 * i) / 48000);
+      left[i] = s;
+      right[i] = s;
+    }
+    const lufs = integratedLufs(left, right, 48000);
+    expect(Number.isFinite(lufs)).toBe(true);
+    expect(lufs).toBeLessThan(0);
+  });
+
+  it('louder signal measures higher than a quieter one', () => {
+    const n = 48000 * 2;
+    const tone = (amp: number) => {
+      const a = new Float32Array(n);
+      for (let i = 0; i < n; i++) a[i] = amp * Math.sin((2 * Math.PI * 440 * i) / 48000);
+      return a;
+    };
+    const quiet = integratedLufs(tone(0.2), tone(0.2), 48000);
+    const loud = integratedLufs(tone(0.8), tone(0.8), 48000);
+    expect(loud).toBeGreaterThan(quiet);
+    // +12 dB amplitude ≈ +12 LU.
+    expect(loud - quiet).toBeGreaterThan(9);
+  });
 });
 
 describe('masterStereo glue + loudness + limiting', () => {

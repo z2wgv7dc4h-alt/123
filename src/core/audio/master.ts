@@ -6,41 +6,84 @@
 import type { MasterReport } from '../types';
 
 /**
- * Compute integrated loudness per ITU-R BS.1770-4 (simplified).
- * Applies K-weighting (high-pass + high-shelf) and measures RMS in blocks.
- * Returns -Infinity for silence.
+ * One biquad section, direct form I. Coefficients are normalized by a0.
+ * Shared by both K-weighting stages.
+ */
+function biquad(
+  input: Float32Array,
+  b0: number,
+  b1: number,
+  b2: number,
+  a0: number,
+  a1: number,
+  a2: number,
+): Float32Array {
+  const out = new Float32Array(input.length);
+  const nb0 = b0 / a0;
+  const nb1 = b1 / a0;
+  const nb2 = b2 / a0;
+  const na1 = a1 / a0;
+  const na2 = a2 / a0;
+  let x1 = 0;
+  let x2 = 0;
+  let y1 = 0;
+  let y2 = 0;
+  for (let i = 0; i < input.length; i++) {
+    const x0 = input[i]!;
+    const y0 = nb0 * x0 + nb1 * x1 + nb2 * x2 - na1 * y1 - na2 * y2;
+    x2 = x1;
+    x1 = x0;
+    y2 = y1;
+    y1 = y0;
+    out[i] = y0;
+  }
+  return out;
+}
+
+/**
+ * ITU-R BS.1770-4 K-weighting = high-shelf (head pre-filter) then RLB
+ * high-pass, both designed from the standard's analog prototype (the
+ * libebur128 coefficients), so they are valid at any sample rate and hit the
+ * published 48 kHz values exactly. The old hand-rolled "simplified" filter
+ * attenuated everything by ~1e6, which made every measurement -Infinity and
+ * silently no-opped mastering.
+ */
+function kWeight(channel: Float32Array, sampleRate: number): Float32Array {
+  // Stage 1: high-shelf (~+4 dB above ~1.7 kHz).
+  const shelfF0 = 1681.974450955533;
+  const shelfGain = 3.999843853973347;
+  const shelfQ = 0.7071752369554196;
+  const kShelf = Math.tan((Math.PI * shelfF0) / sampleRate);
+  const vh = Math.pow(10, shelfGain / 20);
+  const vb = Math.pow(vh, 0.4996667741545416);
+  const shelfA0 = 1 + kShelf / shelfQ + kShelf * kShelf;
+  const shelfB0 = vh + (vb * kShelf) / shelfQ + kShelf * kShelf;
+  const shelfB1 = 2 * (kShelf * kShelf - vh);
+  const shelfB2 = vh - (vb * kShelf) / shelfQ + kShelf * kShelf;
+  const shelfA1 = 2 * (kShelf * kShelf - 1);
+  const shelfA2 = 1 - kShelf / shelfQ + kShelf * kShelf;
+  const shelved = biquad(channel, shelfB0, shelfB1, shelfB2, shelfA0, shelfA1, shelfA2);
+
+  // Stage 2: RLB high-pass (~38 Hz).
+  const hpF0 = 38.13547087602444;
+  const hpQ = 0.5003270373238773;
+  const kHp = Math.tan((Math.PI * hpF0) / sampleRate);
+  const hpA0 = 1 + kHp / hpQ + kHp * kHp;
+  const hpA1 = 2 * (kHp * kHp - 1);
+  const hpA2 = 1 - kHp / hpQ + kHp * kHp;
+  return biquad(shelved, 1, -2, 1, hpA0, hpA1, hpA2);
+}
+
+/**
+ * Compute integrated loudness per ITU-R BS.1770-4 (simplified gating).
+ * Applies K-weighting (high-shelf + RLB high-pass) and measures RMS in 400 ms
+ * blocks with 75% overlap. Returns -Infinity for silence.
  */
 export function integratedLufs(left: Float32Array, right: Float32Array, sampleRate: number): number {
   if (left.length === 0 || right.length === 0) return -Infinity;
 
-  // Simple K-weighting via RMS-based approach: apply high-pass filter approximation
-  // BS.1770 uses biquad filters; we use a simplified design that's close enough
-  const applyHighPass = (channel: Float32Array): Float32Array => {
-    const out = new Float32Array(channel.length);
-    const cutoffHz = 38; // RLB high-pass
-    const omega = (2 * Math.PI * cutoffHz) / sampleRate;
-    const coeff = (1 - Math.cos(omega)) / 2; // simplified
-    const alpha = 0.5; // pole Q ~ 0.5 for wide rolloff
-    const a0 = 1 + alpha;
-    const a1 = -2 * (1 - coeff);
-    const a2 = 1 - alpha;
-    const b0 = coeff;
-    const b1 = -2 * coeff;
-    const b2 = coeff;
-
-    let s1 = 0,
-      s2 = 0;
-    for (let i = 0; i < channel.length; i++) {
-      const y = (b0 * channel[i]! + b1 * s1 + b2 * s2) / a0;
-      s2 = s1;
-      s1 = channel[i]! - (a1 * y + a2 * s2) / a0;
-      out[i] = y;
-    }
-    return out;
-  };
-
-  const leftHp = applyHighPass(left);
-  const rightHp = applyHighPass(right);
+  const leftHp = kWeight(left, sampleRate);
+  const rightHp = kWeight(right, sampleRate);
 
   // Measure RMS in 400 ms blocks with 75% overlap
   const blockMs = Math.round((400 * sampleRate) / 1000);
