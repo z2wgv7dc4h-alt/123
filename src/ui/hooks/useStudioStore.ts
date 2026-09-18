@@ -32,7 +32,7 @@ import {
   type PreviewState,
 } from '@/core/audio';
 import { analyzeUserAudio, mapVibeToParams } from '@/core/styleRef';
-import { exportAll, exportZip, buildSketchNotes } from '@/core/export';
+import { exportAll, exportZip, buildSketchNotes, decodeWavChannels, encodeWav } from '@/core/export';
 import {
   shouldShowExportDawTip,
   markExportDawTipSeen,
@@ -47,7 +47,8 @@ import { HELP } from '../lib/helpCopy';
 import { formatStudioError } from '@/core/uiMessages';
 import { saveResumeDraft } from '../lib/resumeDraft';
 import { songShapeById, type SongShapeId } from '../lib/songShapes';
-import { planTakeEdit, type SectionStyle, type TakeEditRequest } from '../lib/takeEdit';
+import { planTakeEdit, isStudioTake, roleForSectionName, gridOffsetSec, type SectionStyle, type TakeEditRequest } from '../lib/takeEdit';
+import { planArrange, type ArrangeOp } from '../lib/arrangeTake';
 import {
   expandSection,
   repeatSection,
@@ -336,6 +337,8 @@ export interface StudioState {
   generateAgain: () => Promise<void>;
   vary: () => Promise<void>;
   redoSection: (index: number, style?: SectionStyle) => Promise<void>;
+  /** E-1: splice the Studio take in the browser then repaint the seam(s). */
+  arrangeSection: (op: ArrangeOp) => Promise<void>;
   /** Best-of-N Redo: swap the heard mix to a candidate — new take version, no render. */
   pickCandidate: (index: number) => Promise<void>;
   extendLastSection: (index: number, deltaBars: number) => Promise<void>;
@@ -1265,16 +1268,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         /* private storage */
       }
       if (opts?.edit) {
-        const styled = opts.edit.kind === 'redo' ? opts.edit.style : undefined;
-        const styleBits = [styled?.genre, styled?.role].filter(Boolean).join(' ');
-        pushToast(
-          styleBits
-            ? `Section redone as ${styleBits} — hit Play`
-            : opts.edit.kind === 'redo'
-              ? 'Section redone — hit Play'
-              : `Extended +${opts.edit.deltaBars} bars — hit Play`,
-          'success',
-        );
+        const edit = opts.edit;
+        if (edit.kind === 'splice') {
+          pushToast('Arrangement updated — hit Play', 'success');
+        } else {
+          const styled = edit.kind === 'redo' ? edit.style : undefined;
+          const styleBits = [styled?.genre, styled?.role].filter(Boolean).join(' ');
+          pushToast(
+            styleBits
+              ? `Section redone as ${styleBits} — hit Play`
+              : edit.kind === 'redo'
+                ? 'Section redone — hit Play'
+                : `Extended +${edit.deltaBars} bars — hit Play`,
+            'success',
+          );
+        }
       } else if (opts?.variation === 'vary') {
         pushToast('New variation ready — hit Play', 'success');
       } else if (opts?.variation === 'again') {
@@ -1319,6 +1327,58 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   redoSection: (index, style) =>
     get().generate({ edit: { kind: 'redo', sectionIndex: index, ...(style ? { style } : {}) } }),
+
+  arrangeSection: async (op) => {
+    const { result, busy } = get();
+    if (busy) return;
+    if (!result || !isStudioTake(result)) {
+      pushToast('Arrangement editing needs a Studio (GPU) take', 'warn', 3600);
+      return;
+    }
+    const structure = result.structure!;
+    const mix = result.stems.find((s) => s.id === 'mix');
+    const sourceBlob = result.rawMixBlob ?? mix?.blob;
+    if (!sourceBlob) {
+      pushToast('No Studio mix to edit', 'warn', 3200);
+      return;
+    }
+    set({ busy: true, error: null });
+    try {
+      const decoded = decodeWavChannels(await sourceBlob.arrayBuffer());
+      const bpm = result.bpmMeasured || structure.bpm;
+      const plan = planArrange({
+        op,
+        channels: decoded.channels,
+        structure,
+        bpm,
+        offsetSec: gridOffsetSec(result),
+        sampleRateHz: decoded.sampleRate,
+      });
+      if (!plan) throw new Error('That arrangement change is not possible on this take');
+      const splicedWav = encodeWav(
+        plan.channels,
+        decoded.sampleRate,
+        decoded.bitDepth === 24 ? 24 : 16,
+      );
+      const style: SectionStyle | undefined =
+        op.kind === 'insert' ? { role: roleForSectionName(op.name) } : undefined;
+      set({ busy: false });
+      await get().generate({
+        edit: {
+          kind: 'splice',
+          source: splicedWav,
+          structure: plan.structure,
+          startSec: plan.repaint.startSec,
+          endSec: plan.repaint.endSec,
+          ...(style ? { style } : {}),
+        },
+      });
+    } catch (e) {
+      const msg = formatStudioError(e instanceof Error ? e.message : String(e));
+      set({ busy: false, error: msg });
+      pushToast(msg, 'error', 0);
+    }
+  },
 
   pickCandidate: async (index) => {
     const { result, busy, takeHistory } = get();

@@ -15,7 +15,16 @@ export function clampRedoStrength(value?: number | null): number {
 
 export type TakeEditRequest =
   | { kind: 'redo'; sectionIndex: number; style?: SectionStyle }
-  | { kind: 'extend'; sectionIndex: number; deltaBars: number };
+  | { kind: 'extend'; sectionIndex: number; deltaBars: number }
+  | {
+      /** E-1: browser already spliced the PCM; ACE repaints one seam window. */
+      kind: 'splice';
+      source: Blob;
+      structure: StructureMap;
+      startSec: number;
+      endSec: number;
+      style?: SectionStyle;
+    };
 
 export type TakeEditPlan = {
   edit: NonNullable<RenderJob['edit']>;
@@ -103,6 +112,23 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
   const bpm = result.bpmMeasured || structure.bpm;
   const spb = secondsPerBar(bpm);
   const off = gridOffsetSec(result);
+  if (req.kind === 'splice') {
+    // E-1 arrangement edit: the spliced PCM is the new source; ACE only
+    // repaints the seam window(s) the pure planner produced.
+    return {
+      edit: {
+        kind: 'repaint',
+        source: req.source,
+        startSec: req.startSec,
+        endSec: req.endSec,
+        mode: 'balanced',
+      },
+      structureRef: req.structure,
+      seed: result.seed,
+      bpm,
+      ...(req.style ? { style: req.style } : {}),
+    };
+  }
   if (req.kind === 'redo') {
     const w = sectionWindowSec(structure, req.sectionIndex, bpm, off);
     if (!w) return null;

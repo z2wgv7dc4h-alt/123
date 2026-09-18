@@ -7,6 +7,8 @@ import { DEFAULT_BPM } from '@/core/types';
 import { retailStructureLabel } from '../lib/retailLabels';
 import { totalBarsOf } from '../lib/structureEdit';
 import { isStudioTake, REDO_PRESETS, REDO_STRENGTH_DEFAULT, REDO_STRENGTH_MAX, REDO_STRENGTH_MIN } from '../lib/takeEdit';
+import { INSERT_SECTION_NAMES } from '../lib/arrangeTake';
+import type { SectionName } from '@/core/types';
 import { BAR_GRID_MIN_CONFIDENCE } from '@/core/audio/downbeatGrid';
 
 const SECTION_CLASS: Record<string, string> = {
@@ -71,6 +73,7 @@ export function SectionTimeline() {
   const seekPreview = useStudioStore((s) => s.seekPreview);
   const previewState = useStudioStore((s) => s.previewState);
   const redoSection = useStudioStore((s) => s.redoSection);
+  const arrangeSection = useStudioStore((s) => s.arrangeSection);
   const pickCandidate = useStudioStore((s) => s.pickCandidate);
   const extendLastSection = useStudioStore((s) => s.extendLastSection);
   const undoTakeEdit = useStudioStore((s) => s.undoTakeEdit);
@@ -95,6 +98,9 @@ export function SectionTimeline() {
   const [redoPresetId, setRedoPresetId] = useState('auto');
   const [redoWords, setRedoWords] = useState('');
   const [redoStrength, setRedoStrength] = useState(REDO_STRENGTH_DEFAULT);
+  const [insertBars, setInsertBars] = useState(8);
+  const [insertName, setInsertName] = useState<SectionName>('break');
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
 
   useEffect(() => {
     setSelectedIndex(null);
@@ -229,8 +235,8 @@ export function SectionTimeline() {
       </div>
       <p className="hint timeline-drag-hint">
         {studioTake
-          ? 'Select a section · Redo regenerates just that part · Extend grows the last section · the rest stays'
-          : 'Select a section for Expand / Repeat / ×2 · or drag its right edge · then Generate again'}
+          ? 'Select a section · Redo regenerates it · drag a section to reorder · Duplicate / Delete / Insert blank N bars · the rest stays'
+          : 'Select a section for Expand / Repeat / ×2 · or drag its right edge · then Generate again · arrangement editing (E-1) is Studio only'}
       </p>
       <div
         className="timeline-track"
@@ -244,13 +250,34 @@ export function SectionTimeline() {
           return (
             <div
               key={`${s.name}-${s.startBar}-${index}`}
-              className={`timeline-seg ${SECTION_CLASS[s.name] ?? 'seg-other'}${dragging === index ? ' dragging' : ''}${selectedIndex === index ? ' selected' : ''}`}
+              className={`timeline-seg ${SECTION_CLASS[s.name] ?? 'seg-other'}${dragging === index ? ' dragging' : ''}${selectedIndex === index ? ' selected' : ''}${dropTarget === index ? ' drop-target' : ''}`}
               style={{ flex: s.lengthBars }}
               role="listitem"
               tabIndex={0}
               title={label}
               aria-label={label}
               data-selected={selectedIndex === index}
+              draggable={studioTake && !busy}
+              onDragStart={(e) => {
+                if (!studioTake || busy) return;
+                e.dataTransfer.setData('text/plain', String(index));
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragOver={(e) => {
+                if (!studioTake || busy) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDropTarget(index);
+              }}
+              onDragLeave={() => setDropTarget((t) => (t === index ? null : t))}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDropTarget(null);
+                if (!studioTake || busy) return;
+                const from = Number(e.dataTransfer.getData('text/plain'));
+                if (!Number.isInteger(from) || from === index) return;
+                void arrangeSection({ kind: 'move', sectionIndex: from, toIndex: index });
+              }}
               onFocus={() => setSelectedIndex(index)}
               onClick={(e) => {
                 setSelectedIndex(index);
@@ -352,6 +379,71 @@ export function SectionTimeline() {
                           </button>
                         );
                       })}
+                      <span className="arrange-e1" role="group" aria-label="Arrangement edit">
+                        <button
+                          type="button"
+                          className="btn tiny ghost"
+                          disabled={busy}
+                          title="Copy this section right after itself, then repaint the seams"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void arrangeSection({ kind: 'duplicate', sectionIndex: index });
+                          }}
+                        >
+                          Duplicate
+                        </button>
+                        <button
+                          type="button"
+                          className="btn tiny ghost"
+                          disabled={busy || sections.length <= 1}
+                          title="Cut this section out, then repaint the join"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void arrangeSection({ kind: 'delete', sectionIndex: index });
+                          }}
+                        >
+                          Delete
+                        </button>
+                        <select
+                          className="arrange-insert-bars"
+                          aria-label="Insert blank bars"
+                          value={insertBars}
+                          disabled={busy}
+                          onChange={(e) => setInsertBars(Number(e.target.value))}
+                        >
+                          {[4, 8, 16].map((n) => (
+                            <option key={n} value={n}>{n} bars</option>
+                          ))}
+                        </select>
+                        <select
+                          className="arrange-insert-name"
+                          aria-label="Insert section role"
+                          value={insertName}
+                          disabled={busy}
+                          onChange={(e) => setInsertName(e.target.value as SectionName)}
+                        >
+                          {INSERT_SECTION_NAMES.map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="btn tiny ghost"
+                          disabled={busy}
+                          title="Insert blank bars before this section, then repaint the whole gap + 1 bar each side"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void arrangeSection({
+                              kind: 'insert',
+                              atStartBar: s.startBar,
+                              bars: insertBars,
+                              name: insertName,
+                            });
+                          }}
+                        >
+                          Insert blank
+                        </button>
+                      </span>
                     </>
                   ) : (
                     <>
@@ -384,6 +476,17 @@ export function SectionTimeline() {
                           ×2
                         </button>
                       )}
+                      <span className="arrange-e1 arrange-e1-disabled" role="group" aria-label="Arrangement edit (Studio only)">
+                        <button type="button" className="btn tiny ghost" disabled title="Studio only — E-1 edits the take in place">
+                          Duplicate
+                        </button>
+                        <button type="button" className="btn tiny ghost" disabled title="Studio only — E-1 edits the take in place">
+                          Delete
+                        </button>
+                        <button type="button" className="btn tiny ghost" disabled title="Studio only — E-1 edits the take in place">
+                          Insert blank
+                        </button>
+                      </span>
                     </>
                   )}
                 </div>

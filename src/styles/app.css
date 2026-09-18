@@ -3284,6 +3284,10 @@ details summary:hover { color: var(--text); }
   letter-spacing: 0.02em;
 }
 .timeline-seg-actions .label-with-tip { gap: 0.15rem; }
+.timeline-seg.drop-target { outline: 2px dashed var(--accent, #6ee7ff); outline-offset: -2px; }
+.arrange-e1 { display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+.arrange-e1-disabled { opacity: 0.55; }
+.arrange-insert-bars, .arrange-insert-name { font-size: 0.68rem; }
 .redo-strength {
   display: inline-flex; align-items: center; gap: 0.3rem;
   font-size: 0.68rem; color: var(--muted, #9aa3b5);
