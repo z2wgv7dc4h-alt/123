@@ -44,6 +44,13 @@ guides timbre/mix while the request stays text2music with thinking on. The bridg
 sends one multipart body with both when a repaint take and a reference are
 attached (`a1f0aaa`).
 
+**Real stems are Demucs, not ACE extract** (`78f39d5`): the bridge's own
+`POST /stems` runs Demucs v4 `htdemucs` (MIT) on the rendered mix — GPU when
+torch reports CUDA, else CPU — and returns `drums/bass/other/vocals`. It is a
+separate process, so it needs `pip install demucs` in the bridge Python and
+does not depend on ACE being loaded. ACE's own `extract` task (ticket `05`,
+base-model only) remains the path for kick/snare-level granularity.
+
 ## Gotchas (each one caused real bad output here)
 
 | Gotcha | Evidence | Rule |

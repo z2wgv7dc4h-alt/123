@@ -1,6 +1,6 @@
 # Handoff
 
-**Updated**: 2026-09-18. **Last code commit**: `a1f0aaa` (style reference via `reference_audio`).
+**Updated**: 2026-09-18. **Last code commit**: `78f39d5` (real stems via Demucs).
 Law is `AGENTS.md` + `CLAUDE.md` only. `docs/_archive_*` is not law.
 
 Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
@@ -25,6 +25,7 @@ Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
 | LM | `acestep-5Hz-lm-1.7B`, auto-selected by ACE. |
 | text2music payload | `thinking: true`, `use_cot_caption: false`, `use_cot_language: false`, `lyrics` = song-map structure tags (`[Build - rising tension]`, `[Drop - explosive]` …; bridge keeps tag lines only, `[Instrumental]` fallback), `lm_cfg_scale: 2.0`, `bpm` = job tempo, duration from bars (cap 480 s). Turbo 8 steps; base/SFT 64 steps + ADG. |
 | Style reference | User-owned file only. Default `mode: 'reference'` (`a1f0aaa`): bridge sends it as multipart `reference_audio` on text2music — timbre/mix guidance; `task_type` and thinking unchanged. `cover` mode sends `src_audio` + `audioCoverStrength` (0.55, clamped 0.35–0.7) and skips the LM. Owner attestation gates both; a repaint take may ride with a reference. UI toggle: "Sound like (reference)" / "Remake it (cover)". |
+| Real stems (Demucs) | "Split stems (Demucs)" in More (`78f39d5`): bridge `POST /stems` runs Demucs v4 `htdemucs` (MIT; GPU if CUDA, else CPU) on the Studio mix and returns drums/bass/other/vocals. `AceStepBackend.separateStems` maps to drums/bass/other StemFiles; the store swaps the mirrored lanes, sets `stemsReal`, and drops the "mirror mix" warning only then. Returns 501 + `pip install demucs` hint when absent (never auto-installs). |
 | Repaint / extend | `RenderJob.edit = {kind:'repaint', source, startSec, endSec}` (R-1); `endSec` past the source = extend. Used by the song map (R-2, A-1). Bridge adds `repaint_mode` (`conservative`/`balanced`/`aggressive`, default `balanced`) and `repaint_strength` (0–1, default 0.5). |
 | Caption | `buildAceCaption` (P-1): a paragraph in ACE example style — genre + energy (or section role), drums + bass, arrangement narrative from the song map, deduped extras, "polished and club-ready, with no vocals". No BPM; no guitar unless the layer is on or typed. |
 | Tempo | A setting, 70–200 (`clampProductBpm`). Genres set the default: DnB 174, dubstep 140, half-time 170, jungle 165, trap 140. Default length 96 bars (cap 128). |
@@ -45,7 +46,9 @@ real break loops are cut at 174, so they switch off more than 6 BPM away.
 3. Check `http://127.0.0.1:8766/probe`: it should show `bridgeBuild`,
    `checkpoint: acestep-v15-turbo` and `upstreamUp: true`.
 4. The first Generate lazy-loads the models (about 40 s).
-5. **Any bridge edit needs a stack restart.**
+5. Real stems need Demucs in the bridge Python: `pip install demucs`. The start
+   script does not auto-install; `/stems` returns 501 with that hint otherwise.
+6. **Any bridge edit needs a stack restart.**
 
 ## Next, in order
 
@@ -59,7 +62,7 @@ ACE renders one BPM per call, so switches come in two kinds:
   a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
 
 Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
-(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes). User verified Redo, clearer builds, no vocals.
+(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**). User verified Redo, clearer builds, no vocals.
 
 | # | Ticket | What |
 |---|---|---|
@@ -69,8 +72,9 @@ Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
 | 4 | UI-7 | Skin pass (after the editor settles) |
 | 5 | R-5 | Mastering (matched loudness across blocks) |
 
-Open, unscheduled: S-5 (cover strength listening A/B), `05` (extract; base-model
-only), `07` (raw samples).
+Open, unscheduled: S-5 (cover strength listening A/B), `05` (ACE-native
+`extract` for kick/snare granularity — real stems already ship via Demucs,
+S-7 `78f39d5`), `07` (raw samples).
 
 **Decisions waiting on the user**: LoRA (the only way to reliably match one
 artist's sound; training was previously out of scope), downloading
