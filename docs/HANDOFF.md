@@ -1,6 +1,6 @@
 # Handoff
 
-**Updated**: 2026-09-18. **Last code commit**: `78f39d5` (real stems via Demucs).
+**Updated**: 2026-09-18. **Last code commit**: `6377242` (bridge build `2026-09-18-stems-ref-bestof3`; last feature `78f39d5` real stems via Demucs).
 Law is `AGENTS.md` + `CLAUDE.md` only. `docs/_archive_*` is not law.
 
 Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
