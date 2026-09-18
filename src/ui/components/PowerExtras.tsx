@@ -1,5 +1,5 @@
 import { backendRegistry } from '@/core/registry';
-import type { Coherence } from '@/core/types';
+import type { Coherence, SamplerMethod } from '@/core/types';
 import { listLoraPacks, loraNotes, useStudioStore } from '../hooks/useStudioStore';
 import { loraPackManager } from '@/core/lora';
 import { useMemo, useState } from 'react';
@@ -45,6 +45,8 @@ export function PowerExtras() {
   const setMasterOn = useStudioStore((s) => s.setMasterOn);
   const coherence = useStudioStore((s) => s.coherence);
   const setCoherence = useStudioStore((s) => s.setCoherence);
+  const sampler = useStudioStore((s) => s.sampler);
+  const setSampler = useStudioStore((s) => s.setSampler);
   const [trainMsg, setTrainMsg] = useState<string | null>(null);
   const backends = backendRegistry.list();
   const packs = listLoraPacks();
@@ -101,6 +103,20 @@ export function PowerExtras() {
           <option value="tight">Tight · 0.6</option>
           <option value="balanced">Balanced · 0.7 (default)</option>
           <option value="wild">Wild · 0.9</option>
+        </select>
+      </label>
+
+      <label className="sampler-select">
+        <span className="label-with-tip">
+          <span className="label-with-tip-text">Sampler (Studio)</span>
+        </span>
+        <select
+          value={sampler}
+          onChange={(e) => setSampler(e.target.value as SamplerMethod)}
+          title="ACE infer_method: ODE is deterministic, SDE adds noise for more variation"
+        >
+          <option value="ode">ODE · deterministic (default)</option>
+          <option value="sde">SDE · more variation</option>
         </select>
       </label>
 

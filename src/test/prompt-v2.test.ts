@@ -3,6 +3,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildAceCaption, buildAceLyrics, arrangementSentence } from '../core/prompt/buildAceCaption';
+import { GENRE_TEMPLATES } from '../ui/lib/genreTemplates';
 import {
   AceStepBackend,
   ACE_SIDECAR_PROBE_URL,
@@ -28,9 +29,24 @@ describe('P-1 paragraph captions', () => {
     expect(cap.match(/drum and bass/g)!.length).toBe(1);
     const words = cap.split(/\s+/).length;
     expect(words).toBeGreaterThan(40);
-    // Production sentence added; keep a generous ceiling (ACE examples run 60-110).
-    expect(words).toBeLessThan(170);
+    // ACE examples run 60-110 words; the caption must stay inside the budget.
+    expect(words).toBeLessThanOrEqual(110);
     expect(cap).not.toMatch(/bpm|guitar/i);
+  });
+
+  it('caption stays within the ACE word/char budget (default, festival, 7-section)', () => {
+    const festival = GENRE_TEMPLATES.find((t) => t.id === 'festival-anthem')!;
+    const cases: Array<[string, string]> = [
+      ['default', buildAceCaption({ ...knobs })],
+      ['festival', buildAceCaption({ ...knobs, userText: festival.promptText })],
+      ['7-section map', buildAceCaption({ ...knobs, sections: MAP })],
+    ];
+    for (const [label, cap] of cases) {
+      const words = cap.trim().split(/\s+/).length;
+      expect(words, `${label}: ${cap}`).toBeLessThanOrEqual(110);
+      expect(words, `${label}: ${cap}`).toBeGreaterThan(40);
+      expect(cap.length, `${label}: ${cap}`).toBeLessThan(800);
+    }
   });
 
   it('section caption leads with the role, no arrangement sentence', () => {

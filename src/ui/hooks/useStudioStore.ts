@@ -9,6 +9,7 @@ import {
   GENRES,
   COHERENCE_LM_TEMPERATURE,
   type Coherence,
+  type SamplerMethod,
   type GenreId,
   type ProductTier,
   type FlowStep,
@@ -311,11 +312,14 @@ export interface StudioState {
   masterOn: boolean;
   /** LM coherence preset — maps to ACE lm_temperature (Tight/Balanced/Wild). */
   coherence: Coherence;
+  /** ACE diffusion sampler (infer_method) A/B. */
+  sampler: SamplerMethod;
   /** Which best-of-N take is currently heard (0 = A, the default). */
   activeCandidate: number;
   setProductTier: (t: ProductTier) => void;
   setMasterOn: (v: boolean) => void;
   setCoherence: (c: Coherence) => void;
+  setSampler: (s: SamplerMethod) => void;
   setSeed: (n: number) => void;
   setKeepSeed: (v: boolean) => void;
   setBpm: (n: number) => void;
@@ -559,6 +563,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   moreOpen: false,
   masterOn: true,
   coherence: 'balanced',
+  sampler: 'ode',
   activeCandidate: 0,
   exportBitDepth: DEFAULT_BIT_DEPTH,
   flowStep: 'idle',
@@ -662,6 +667,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setMoreOpen: (v) => set({ moreOpen: v }),
   setMasterOn: (v) => set({ masterOn: Boolean(v) }),
   setCoherence: (c) => set({ coherence: c }),
+  setSampler: (s) => set({ sampler: s === 'sde' ? 'sde' : 'ode' }),
   setExportBitDepth: (d) => set({ exportBitDepth: d === 24 ? 24 : 16 }),
   setVibeIntensity: (n) =>
     set((s) => {
@@ -1190,6 +1196,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           stemSchemaVersion: 'v0',
           master: live.masterOn,
           lmTemperature: COHERENCE_LM_TEMPERATURE[live.coherence ?? 'balanced'],
+          sampler: live.sampler ?? 'ode',
           // Belt-and-suspenders: never send styleReference without explicit ownership attest
           styleReference: editPlan
             ? undefined

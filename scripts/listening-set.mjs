@@ -1,7 +1,8 @@
 /**
  * Listening set — run by the USER against a live ACE stack (never agents):
  *
- *   npm run listen:set          # needs `tsx` available
+ *   npm run listen:set                    # needs `tsx` available
+ *   npm run listen:set -- --sampler sde   # A/B the diffusion sampler
  *
  * 5 fixed prompts x 2 seeds -> POST bridge /render with the same payload
  * shape the app sends, write WAVs to exports/listening/<date>/ and a
@@ -19,6 +20,18 @@ const bridge = process.env.ACE_BRIDGE_URL ?? 'http://127.0.0.1:8766';
 const seeds = [17400, 90210];
 const sampleRateHz = 48000;
 const durationBars = 64;
+
+/** `--sampler ode|sde` — forwarded to the bridge as ACE infer_method. */
+const VALID_SAMPLERS = ['ode', 'sde'];
+function cliValue(flag) {
+  const i = process.argv.indexOf(flag);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+const samplerArg = String(cliValue('--sampler') ?? '').toLowerCase();
+const sampler = VALID_SAMPLERS.includes(samplerArg) ? samplerArg : undefined;
+if (samplerArg && !sampler) {
+  console.warn(`[listening] ignoring --sampler ${samplerArg} (use ode|sde)`);
+}
 
 const { buildAceCaption, buildAceLyrics, buildAceTags } = await import(
   '../src/core/prompt/buildAceCaption.ts'
@@ -127,6 +140,8 @@ function payloadFor(prompt, seed) {
       sections,
     },
     stemSchemaVersion: 'v0',
+    // Sampler A/B flag (bridge maps it to ACE infer_method).
+    ...(sampler ? { sampler } : {}),
   };
 }
 
@@ -160,20 +175,21 @@ const outDir = join(root, 'exports', 'listening', date);
 await mkdir(outDir, { recursive: true });
 
 const rows = [];
+const samplerSuffix = sampler ? `_${sampler}` : '';
 for (const prompt of prompts) {
   for (const seed of seeds) {
     const payload = payloadFor(prompt, seed);
-    process.stdout.write(`[listening] ${prompt.name} seed ${seed} ... `);
+    process.stdout.write(`[listening] ${prompt.name}${samplerSuffix} seed ${seed} ... `);
     const data = await renderOnce(payload);
     const bytes = Buffer.from(data.mixWavBase64, 'base64');
-    const wavName = `${prompt.name}_${seed}.wav`;
+    const wavName = `${prompt.name}${samplerSuffix}_${seed}.wav`;
     await writeFile(join(outDir, wavName), bytes);
 
     const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     try {
       const decoded = decodeWavChannels(ab);
       const row = analyzeMix(decoded.channels, decoded.sampleRate, {
-        name: prompt.name,
+        name: `${prompt.name}${samplerSuffix}`,
         seed,
       });
       rows.push(row);
@@ -183,7 +199,7 @@ for (const prompt of prompts) {
     } catch (e) {
       console.log(`wrote ${wavName} (report skipped: ${e instanceof Error ? e.message : e})`);
       rows.push({
-        name: prompt.name,
+        name: `${prompt.name}${samplerSuffix}`,
         seed,
         durationSec: 0,
         integratedLufs: -Infinity,

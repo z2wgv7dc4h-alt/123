@@ -147,6 +147,9 @@ export const PRODUCTION_WORDS: Record<GenreId, string> = {
   halftime: 'Heavy spacious half-time drums, weighty reese, deep sub, dark cinematic mix.',
 };
 
+/** ACE captions run 60-110 words; keep the "It also features…" list to 3 phrases. */
+const MAX_EXTRAS = 3;
+
 const ROLE_NOUN: Record<SectionRole, string> = {
   intro: 'intro',
   build: 'build-up',
@@ -161,16 +164,17 @@ function joinList(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
-/** Arrangement narrative from the song map, in ACE's example-caption style. */
+/** Arrangement narrative from the song map, kept terse (ACE budget 60-110 words). */
 export function arrangementSentence(sectionNames: readonly string[]): string {
   const clauses: string[] = [];
   let drops = 0;
   for (const name of sectionNames) {
-    if (name === 'intro') clauses.push('opens with an atmospheric filtered intro');
-    else if (name === 'build') clauses.push('rises through a build-up of snare rolls and risers');
-    else if (name === 'drop') clauses.push(drops++ === 0 ? 'explodes into a massive drop' : 'hits another full-energy drop');
-    else if (name === 'break' || name === 'breakdown') clauses.push('strips back for a breakdown with atmospheric pads');
-    else if (name === 'outro') clauses.push('ends with a sparse outro');
+    if (name === 'intro') clauses.push('opens atmospheric');
+    else if (name === 'build') clauses.push('builds with snare rolls');
+    else if (name === 'drop') {
+      clauses.push(drops++ === 0 ? 'explodes into a massive drop' : 'hits another full-energy drop');
+    } else if (name === 'break' || name === 'breakdown') clauses.push('breaks down');
+    else if (name === 'outro') clauses.push('fades out');
   }
   return clauses.length ? `The arrangement ${joinList(clauses)}.` : '';
 }
@@ -223,6 +227,8 @@ export function buildAceCaption(input: AceCaptionInput): string {
     const sub = /\bsub\b|808/.test(bass) ? '' : ' and a deep sub bass';
     sentences.push(`It is driven by ${drums} and ${bass}, with tight punchy drums${sub}.`);
   }
+  // Concrete production/mix words (ACE's own examples lead with these).
+  sentences.push(PRODUCTION_WORDS[genre]);
   if (!role && input.sections?.length) {
     const arrangement = arrangementSentence(input.sections);
     if (arrangement) sentences.push(arrangement);
@@ -230,7 +236,8 @@ export function buildAceCaption(input: AceCaptionInput): string {
 
   // Extras (user words, layers, shape) — skip anything the paragraph already says.
   // A phrase counts as said when it, or its last two words, already appear
-  // ("rolling reese bass" is covered by "heavy reese bass").
+  // ("rolling reese bass" is covered by "heavy reese bass"). ACE's 60-110 word
+  // budget caps the list at 3, so trailing generic phrases cannot bloat it.
   const extras: string[] = [];
   const alreadySaid = (phrase: string) => {
     const text = [...sentences, ...extras].join(' ').toLowerCase();
@@ -240,6 +247,7 @@ export function buildAceCaption(input: AceCaptionInput): string {
   };
   const addExtra = (phrase: string) => {
     const t = phrase.trim();
+    if (extras.length >= MAX_EXTRAS) return;
     if (t && !alreadySaid(t)) extras.push(t);
   };
   const addExtras = (text: string) => text.split(',').forEach(addExtra);
@@ -264,13 +272,16 @@ export function buildAceCaption(input: AceCaptionInput): string {
   input.userText?.split(',').forEach(addUser);
   for (const d of input.descriptors ?? []) String(d ?? '').split(',').forEach(addUser);
 
-  if (input.layers?.guitar) addExtras('rock-dnb crossover, original rock-dnb guitar riffs, distorted rhythm guitar');
+  // Solo before guitar so the 3-phrase cap keeps both "guitar" and "lead" when
+  // the user turns both layers on.
   if (input.layers?.solo) addExtras('original lead guitar solo, expressive rock-dnb crossover lead');
+  // "distorted rhythm guitar" before "original … riffs" so the cap keeps the
+  // texture word tests (and ACE) look for.
+  if (input.layers?.guitar) addExtras('rock-dnb crossover, distorted rhythm guitar, original rock-dnb guitar riffs');
   if (input.layers?.vocalish) addExtras('vocal-ish synth texture, chopped pad vocalese');
   if (input.layers?.extraDrums) addExtras('extra breakbeat layers, dense percussion fills');
 
   if (extras.length) sentences.push(`It also features ${joinList(extras)}.`);
-  sentences.push(PRODUCTION_WORDS[genre]);
   sentences.push('The mix is polished and club-ready, with no vocals.');
   return sentences.join(' ');
 }

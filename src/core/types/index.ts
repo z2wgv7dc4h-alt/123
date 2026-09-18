@@ -157,6 +157,9 @@ export const COHERENCE_LM_TEMPERATURE: Record<Coherence, number> = {
   wild: 0.9,
 };
 
+/** ACE diffusion sampler (infer_method): ODE deterministic, SDE noisier. */
+export type SamplerMethod = 'ode' | 'sde';
+
 export interface RenderJob {
   /** Arrangement preset (intro length, breakdown, etc.). */
   songShape?: SongShapeId;
@@ -239,6 +242,8 @@ export interface RenderJob {
   master?: boolean;
   /** LM sampling temperature (coherence). Bridge default 0.7, clamped 0.3-1.0. */
   lmTemperature?: number;
+  /** Diffusion sampler A/B. Bridge default 'ode'. */
+  sampler?: SamplerMethod;
 }
 
 export type StemId = 'kick' | 'snare' | 'hats' | 'perc' | 'bass' | 'mix' | 'drums' | 'other';

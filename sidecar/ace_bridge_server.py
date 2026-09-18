@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
-BRIDGE_BUILD = "2026-09-18-xl-turbo"
+BRIDGE_BUILD = "2026-09-18-prompt-sampler"
 
 # Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
 # bridge never auto-installs it. Without it /stems returns 501 + install hint.
@@ -207,6 +207,24 @@ def clamp_lm_temperature(value: object) -> float:
     return max(LM_TEMPERATURE_MIN, min(LM_TEMPERATURE_MAX, num))
 
 
+# Instrumental-only negative prompt: the caption already says "no vocals"; this
+# keeps the LM from steering into sung/spoken takes.
+LM_NEGATIVE_PROMPT_DEFAULT = (
+    "vocals, singing, spoken words, lo-fi, muddy mix, harsh distortion, "
+    "clipping, amateur production"
+)
+
+# Diffusion sampler (ACE infer_method). ODE is deterministic; SDE injects noise
+# each step (more variation). Exposed as a More-panel A/B.
+INFER_METHODS = ("ode", "sde")
+INFER_METHOD_DEFAULT = "ode"
+
+
+def normalize_infer_method(value: object) -> str:
+    method = str(value or "").strip().lower()
+    return method if method in INFER_METHODS else INFER_METHOD_DEFAULT
+
+
 def clamp_repaint_strength(value: object) -> float:
     try:
         num = float(value)  # type: ignore[arg-type]
@@ -366,6 +384,10 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
         "lm_cfg_scale": 2.0,
         # Coherence knob from the More panel, clamped to ACE's sane window.
         "lm_temperature": clamp_lm_temperature(req.get("lmTemperature")),
+        # Instrumental guardrail; overridable but never empty.
+        "lm_negative_prompt": str(req.get("negativePrompt") or LM_NEGATIVE_PROMPT_DEFAULT),
+        # No lyrics language: structure tags only, so ACE must not guess a tongue.
+        "vocal_language": "unknown",
         "bpm": bpm,
         "audio_duration": duration_sec,
         "time_signature": "4",
@@ -379,6 +401,8 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
         "guidance_scale": float(req.get("guidanceScale") or 7.0),
         # Timestep shift: base-model-only per ACE-Step's own docs.
         "shift": float(req.get("shift") or 3.0),
+        # Diffusion sampler A/B ('ode' deterministic | 'sde' noisier).
+        "infer_method": normalize_infer_method(req.get("sampler")),
         # ADG is base/SFT-only; turbo DiT ignores it.
         "use_adg": (not turbo) if use_adg is None else (bool(use_adg) and not turbo),
         # DCW: ACE leaves it off for non-turbo unless asked. Wired as "low";

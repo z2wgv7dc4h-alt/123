@@ -382,6 +382,7 @@ export class AceStepBackend implements AudioBackend {
           ...(typeof job.lmTemperature === 'number' && Number.isFinite(job.lmTemperature)
             ? { lmTemperature: job.lmTemperature }
             : {}),
+          ...(job.sampler === 'ode' || job.sampler === 'sde' ? { sampler: job.sampler } : {}),
           dcwEnabled: aceDcwEnabled(checkpoint ?? ACE_DEFAULT_CHECKPOINT, Boolean(srcAudioBase64)),
           dcwMode: ACE_DCW_MODE,
           ...(job.edit

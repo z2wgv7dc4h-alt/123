@@ -170,6 +170,35 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertEqual(bridge.build_render_payload({"lmTemperature": 0.0})["lm_temperature"], 0.3)
         self.assertEqual(bridge.build_render_payload({"lmTemperature": 5})["lm_temperature"], 1.0)
 
+    def test_lm_negative_prompt_default_and_override(self):
+        p = bridge.build_render_payload({})
+        self.assertEqual(p["lm_negative_prompt"], bridge.LM_NEGATIVE_PROMPT_DEFAULT)
+        self.assertIn("vocals", p["lm_negative_prompt"])
+        self.assertIn("clipping", p["lm_negative_prompt"])
+        override = bridge.build_render_payload({"negativePrompt": "vocals, autotune"})
+        self.assertEqual(override["lm_negative_prompt"], "vocals, autotune")
+        # Empty override falls back to the instrumental guardrail.
+        self.assertEqual(
+            bridge.build_render_payload({"negativePrompt": ""})["lm_negative_prompt"],
+            bridge.LM_NEGATIVE_PROMPT_DEFAULT,
+        )
+
+    def test_vocal_language_is_unknown(self):
+        self.assertEqual(bridge.build_render_payload({})["vocal_language"], "unknown")
+        self.assertEqual(
+            bridge.build_render_payload({"vocalLanguage": "en"})["vocal_language"], "unknown"
+        )
+
+    def test_infer_method_default_sde_and_clamp(self):
+        self.assertEqual(bridge.normalize_infer_method(None), "ode")
+        self.assertEqual(bridge.normalize_infer_method(""), "ode")
+        self.assertEqual(bridge.normalize_infer_method("SDE"), "sde")
+        self.assertEqual(bridge.normalize_infer_method("ode"), "ode")
+        self.assertEqual(bridge.normalize_infer_method("junk"), "ode")
+        self.assertEqual(bridge.build_render_payload({})["infer_method"], "ode")
+        self.assertEqual(bridge.build_render_payload({"sampler": "sde"})["infer_method"], "sde")
+        self.assertEqual(bridge.build_render_payload({"sampler": "nope"})["infer_method"], "ode")
+
     def test_build_candidates_returns_every_result_file(self):
         import io, wave
 

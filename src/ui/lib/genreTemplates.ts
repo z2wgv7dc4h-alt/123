@@ -95,7 +95,7 @@ export const GENRE_TEMPLATES: readonly GenreTemplate[] = [
     label: 'Festival anthem',
     genre: 'dnb',
     bpm: 174,
-    promptText: 'festival drum and bass, huge supersaw synth leads, heavy distorted guitars, massive reese bass, punchy breakbeat drums, long riser build, anthemic stadium drop, loud polished master',
+    promptText: 'festival drum and bass, huge supersaw synth leads, heavy distorted guitars, anthemic stadium drop, long riser build, massive reese bass, punchy breakbeat drums, loud polished master',
     energy: 0.9,
     darkness: 0.4,
     chaos: 0.3,
