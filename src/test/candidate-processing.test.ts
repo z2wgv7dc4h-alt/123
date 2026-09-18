@@ -9,6 +9,7 @@ import {
   ACE_SIDECAR_RENDER_URL,
 } from '../core/backends/AceStepBackend';
 import type { RenderResult, StructureMap } from '../core/types';
+import { decodeWavChannels } from '../core/export/wav';
 import { useStudioStore } from '../ui/hooks/useStudioStore';
 import { planTakeEdit } from '../ui/lib/takeEdit';
 import { previewPlayer } from '../core/audio';
@@ -123,7 +124,8 @@ describe('AceStepBackend masters + grids every candidate', () => {
   });
 
   it('2 float32 candidates → both mastered (report) and both gridded', async () => {
-    const b64A = toB64(buildFloat32Wav(toneBuffer(220, 0.3), toneBuffer(220, 0.3)));
+    const leftA = toneBuffer(220, 0.3);
+    const b64A = toB64(buildFloat32Wav(leftA, leftA.slice()));
     const b64B = toB64(buildFloat32Wav(toneBuffer(330, 0.25), toneBuffer(330, 0.25)));
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
@@ -172,6 +174,15 @@ describe('AceStepBackend masters + grids every candidate', () => {
     expect(result.barGrid).toBeDefined();
     expect(result.master).toBeDefined();
     expect(result.candidateScores).toHaveLength(2);
+
+    // Studio real break layer: labelled in the manifest, but the RAW mix stays
+    // the untouched ACE output (edits must not bake the loop in).
+    expect(result.manifest.realBreakLoop?.used).toBe(true);
+    expect(result.manifest.realBreakLoop?.loopName).toBe('amen_174bpm_1bar');
+    const rawDecoded = decodeWavChannels(await result.rawMixBlob!.arrayBuffer());
+    for (let i = 0; i < 32; i++) {
+      expect(rawDecoded.channels[0]![i]).toBeCloseTo(leftA[i]!, 6);
+    }
   });
 });
 

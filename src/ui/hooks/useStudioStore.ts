@@ -310,9 +310,11 @@ export interface StudioState {
     solo: boolean;
     vocalish: boolean;
     extraDrums: boolean;
-    /** Real breakbeat loop under drops (Sketch). Opt-OUT: defaults on. */
+    /** Real breakbeat loop under drops (Sketch + Studio). Opt-OUT: defaults on. */
     realBreak: boolean;
   };
+  /** Studio real-break loop level, dB (default -12; UI trims 0 to -6). */
+  realBreakGainDb: number;
   /** Demucs real-stem separation in progress. */
   stemsBusy: boolean;
   /** Replace mirrored ACE stems with real Demucs stems (drums/bass/other). */
@@ -395,6 +397,8 @@ export interface StudioState {
   setSectionLengthAt: (index: number, lengthBars: number) => void;
   clearStructureEdits: () => void;
   setLayer: (key: keyof StudioState['layers'], on: boolean) => void;
+  /** Studio real-break loop level in dB (clamped -18..0). */
+  setRealBreakGainDb: (db: number) => void;
   /** #60 swap previous sketch into current (secondary). */
   restorePrevious: () => Promise<void>;
   setLoopRegion: (start: number, end: number, opts?: { seek?: boolean }) => void;
@@ -648,6 +652,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   genre: 'dnb',
   editedSections: null,
   layers: { guitar: false, solo: false, vocalish: false, extraDrums: false, realBreak: true },
+  realBreakGainDb: -12,
 
   setProductTier: (tier) => {
     const st = get();
@@ -1042,6 +1047,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       layers: { ...s.layers, [key]: on },
       paramsDirty: s.result ? true : s.paramsDirty,
     })),
+  setRealBreakGainDb: (db) =>
+    set((s) => ({
+      realBreakGainDb: Math.min(0, Math.max(-18, Number.isFinite(db) ? db : -12)),
+      paramsDirty: s.result ? true : s.paramsDirty,
+    })),
 
   initBackends: async () => {
     try {
@@ -1331,6 +1341,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             ? { ...prompt, text: [editPlan.style.words, prompt.text].filter(Boolean).join(', ') }
             : prompt,
           layers: { ...live.layers },
+          realBreakGainDb: live.realBreakGainDb ?? -12,
           lora: live.loraPath ? [{ packId: live.loraPath, scale: live.loraScale }] : undefined,
           stemSchemaVersion: 'v0',
           master: live.masterOn,

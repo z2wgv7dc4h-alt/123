@@ -16,6 +16,7 @@ import type {
   MasterReport,
   StudioCandidate,
   AceRequestRecord,
+  RealBreakLoopProvenance,
 } from '../types';
 import { buildExportManifest } from '../export/manifest.ts';
 import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
@@ -27,6 +28,7 @@ import { decodeWavChannels, encodeWav } from '../export/wav';
 import { masterStereo } from '../audio/master';
 import { scoreTake } from '../audio/takeScore';
 import { extractReferenceWindow } from '../audio/referenceWindow';
+import { buildStudioBreakLayer, breakTempoOk, hasDropSections, STUDIO_BREAK_BPM } from '../audio/studioBreakLayer';
 import { MASTER_TARGET_LUFS } from '../types';
 
 const CAPS: BackendCaps = {
@@ -557,6 +559,11 @@ export class AceStepBackend implements AudioBackend {
 
     type ProcessedCandidate = StudioCandidate & { rawB64: string; mixB64: string; score: number };
 
+    // Studio real break layer — additive, pre-mastering; the RAW mix stays
+    // untouched so take edits never bake in the loop.
+    let realBreak: RealBreakLoopProvenance | undefined;
+    let realBreakTempoSkipped = false;
+
     // EVERY candidate gets its own raw decode, bar grid and master pass, so
     // picking any take keeps edits (rawMixBlob) and R-3 grid in sync.
     const processCandidate = async (rawB64: string): Promise<ProcessedCandidate> => {
@@ -578,6 +585,39 @@ export class AceStepBackend implements AudioBackend {
       }
       let mixB64 = rawB64;
       let candidateMaster: MasterReport | undefined;
+      // Layer the licensed break under drop bars BEFORE mastering.
+      if (decoded && decoded.channels.length === 2 && job.layers?.realBreak !== false) {
+        if (!breakTempoOk(structure.bpm)) {
+          realBreakTempoSkipped = true;
+        } else if (hasDropSections(structure)) {
+          const layer = await buildStudioBreakLayer({
+            totalSamples: decoded.channels[0]!.length,
+            sampleRateHz: decoded.sampleRate,
+            bpm: structure.bpm,
+            chaos: job.prompt.chaos ?? 0.25,
+            sections: structure.sections,
+            samplesPerBar: structure.samplesPerBar,
+            offsetSec: candidateGrid?.offsetSec ?? 0,
+            ...(typeof job.realBreakGainDb === 'number' ? { gainDb: job.realBreakGainDb } : {}),
+          });
+          if (layer) {
+            const bus = layer.bus;
+            for (let i = 0; i < bus.length; i++) {
+              decoded.channels[0]![i] = decoded.channels[0]![i]! + bus[i]!;
+              decoded.channels[1]![i] = decoded.channels[1]![i]! + bus[i]!;
+            }
+            if (!realBreak) {
+              realBreak = {
+                used: true,
+                loopName: layer.loopName,
+                patternFamily: layer.patternFamily,
+                gain: layer.gain,
+                note: `Mix contains a real pre-recorded breakbeat loop (${layer.loopName}) blended under drop bars — this render is not 100% synthesized.`,
+              };
+            }
+          }
+        }
+      }
       if (job.master !== false && decoded && decoded.channels.length === 2) {
         try {
           const mastered = masterStereo(
@@ -686,6 +726,12 @@ export class AceStepBackend implements AudioBackend {
               `peak ${primary.master.peakDbAfter.toFixed(1)} dBFS)`,
           ]
         : []),
+      ...(realBreakTempoSkipped
+        ? [`Real break layer off at ${structure.bpm} BPM (loops are cut at ${STUDIO_BREAK_BPM})`]
+        : []),
+      ...(realBreak
+        ? [`Real break layer: ${realBreak.loopName} under drop bars (${realBreak.gain.toFixed(2)}× gain)`]
+        : []),
       'Studio ACE (GPU) â€” original generation; not an artist clone',
       'Stem lanes may share mix until ACE lego/extract is wired',
     ];
@@ -725,6 +771,7 @@ export class AceStepBackend implements AudioBackend {
       notes,
       aceRequest,
       ...(primary.master ? { master: primary.master } : {}),
+      ...(realBreak ? { realBreakLoop: realBreak } : {}),
     });
 
     return {

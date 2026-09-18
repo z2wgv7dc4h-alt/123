@@ -73,6 +73,9 @@ export function PowerExtras() {
   const setCoherence = useStudioStore((s) => s.setCoherence);
   const sampler = useStudioStore((s) => s.sampler);
   const setSampler = useStudioStore((s) => s.setSampler);
+  const realBreakOn = useStudioStore((s) => s.layers.realBreak);
+  const realBreakGainDb = useStudioStore((s) => s.realBreakGainDb);
+  const setRealBreakGainDb = useStudioStore((s) => s.setRealBreakGainDb);
   const [loras, setLoras] = useState<LoraOption[]>([]);
   const [loraNote, setLoraNote] = useState<string | null>(null);
   const backends = backendRegistry.list();
@@ -213,6 +216,24 @@ export function PowerExtras() {
           <option value="ode">ODE · deterministic (default)</option>
           <option value="sde">SDE · more variation</option>
         </select>
+      </label>
+
+      <label className="real-break-level">
+        <span className="label-with-tip">
+          <span className="label-with-tip-text">
+            Real break level · {realBreakGainDb} dB{realBreakOn ? '' : ' (off)'}
+          </span>
+        </span>
+        <input
+          type="range"
+          min={-6}
+          max={0}
+          step={1}
+          value={Math.min(0, Math.max(-6, realBreakGainDb + 12))}
+          disabled={!realBreakOn}
+          onChange={(e) => setRealBreakGainDb(-12 + Number(e.target.value))}
+          title="Trim the break-under-drops bus: 0 dB keeps the -12 dB default, -6 dB makes it -18 dB"
+        />
       </label>
 
       <div className="backend-badges" aria-label="Audio path badges">

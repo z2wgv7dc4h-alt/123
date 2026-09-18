@@ -256,6 +256,8 @@ export interface RenderJob {
   lmTemperature?: number;
   /** Diffusion sampler A/B. Bridge default 'ode'. */
   sampler?: SamplerMethod;
+  /** Studio real-break loop level in dB (default -12). */
+  realBreakGainDb?: number;
 }
 
 export type StemId = 'kick' | 'snare' | 'hats' | 'perc' | 'bass' | 'mix' | 'drums' | 'other';
