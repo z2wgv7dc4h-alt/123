@@ -464,5 +464,27 @@ describe('reference tone match', () => {
   });
 });
 
+describe('mastering target presets', () => {
+  it('hits Loud -9 / Balanced -11 / Dynamic -14 within ±1 LU', () => {
+    const sr = 48000;
+    const n = sr * 3;
+    const left = new Float32Array(n);
+    const right = new Float32Array(n);
+    // Low-crest tone so the limiter is not the limiting factor for -9.
+    for (let i = 0; i < n; i++) {
+      const s = 0.4 * Math.sin((2 * Math.PI * 220 * i) / sr);
+      left[i] = s;
+      right[i] = s;
+    }
+    for (const target of [-9, -11, -14]) {
+      const out = masterStereo(left, right, sr, { targetLufs: target });
+      expect(Math.abs(out.report.lufsAfter - target)).toBeLessThanOrEqual(1);
+    }
+    // Default is Balanced (-11).
+    const dflt = masterStereo(left, right, sr);
+    expect(Math.abs(dflt.report.lufsAfter - -11)).toBeLessThanOrEqual(1);
+  });
+});
+
 
 

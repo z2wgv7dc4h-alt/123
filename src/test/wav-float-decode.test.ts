@@ -182,7 +182,7 @@ describe('float32 WAV decode (ACE-Step fmt tag 3)', () => {
 });
 
 describe('masterStereo float-decoded fixture + stereo width', () => {
-  it('float-decoded tone masters to -9 ±1 LUFS', () => {
+  it('float-decoded tone masters to -11 ±1 LUFS (Balanced default)', () => {
     const n = SR * 2;
     const l = new Float32Array(n);
     const r = new Float32Array(n);
@@ -196,8 +196,8 @@ describe('masterStereo float-decoded fixture + stereo width', () => {
     const decoded = decodeWavChannels(buildFloat32Wav(l, r));
     const out = masterStereo(decoded.channels[0]!, decoded.channels[1]!, decoded.sampleRate);
     expect(out.report.widthApplied).toBe(true);
-    expect(out.report.lufsAfter).toBeGreaterThan(-10);
-    expect(out.report.lufsAfter).toBeLessThan(-8);
+    expect(out.report.lufsAfter).toBeGreaterThan(-12);
+    expect(out.report.lufsAfter).toBeLessThan(-10);
     expect(out.report.peakDbAfter).toBeLessThanOrEqual(-0.999);
   });
 

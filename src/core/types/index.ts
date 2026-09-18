@@ -160,6 +160,14 @@ export const COHERENCE_LM_TEMPERATURE: Record<Coherence, number> = {
 /** ACE diffusion sampler (infer_method): ODE deterministic, SDE noisier. */
 export type SamplerMethod = 'ode' | 'sde';
 
+/** Mastering loudness preset (More panel). Balanced is the Studio default. */
+export type MasterTarget = 'loud' | 'balanced' | 'dynamic';
+export const MASTER_TARGET_LUFS: Record<MasterTarget, number> = {
+  loud: -9,
+  balanced: -11,
+  dynamic: -14,
+};
+
 export interface RenderJob {
   /** Arrangement preset (intro length, breakdown, etc.). */
   songShape?: SongShapeId;
@@ -242,6 +250,8 @@ export interface RenderJob {
   };
   /** Apply loudness mastering to Studio mix (default true). */
   master?: boolean;
+  /** Mastering loudness preset. Default 'balanced' (-11 LUFS). */
+  masterTarget?: MasterTarget;
   /** LM sampling temperature (coherence). Bridge default 0.7, clamped 0.3-1.0. */
   lmTemperature?: number;
   /** Diffusion sampler A/B. Bridge default 'ode'. */

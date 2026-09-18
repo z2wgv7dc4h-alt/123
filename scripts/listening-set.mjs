@@ -33,11 +33,22 @@ if (samplerArg && !sampler) {
   console.warn(`[listening] ignoring --sampler ${samplerArg} (use ode|sde)`);
 }
 
+/** `--target loud|balanced|dynamic` — local mastering loudness preset. */
+const VALID_TARGETS = ['loud', 'balanced', 'dynamic'];
+const targetArg = String(cliValue('--target') ?? '').toLowerCase();
+const masterTarget = VALID_TARGETS.includes(targetArg) ? targetArg : 'balanced';
+if (targetArg && !VALID_TARGETS.includes(targetArg)) {
+  console.warn(`[listening] ignoring --target ${targetArg} (use loud|balanced|dynamic)`);
+}
+
 const { buildAceCaption, buildAceLyrics, buildAceTags } = await import(
   '../src/core/prompt/buildAceCaption.ts'
 );
-const { decodeWavChannels } = await import('../src/core/export/wav.ts');
+const { decodeWavChannels, encodeWav } = await import('../src/core/export/wav.ts');
 const { analyzeMix, listeningReportCsv } = await import('../src/core/audio/listeningReport.ts');
+const { masterStereo } = await import('../src/core/audio/master.ts');
+const { MASTER_TARGET_LUFS } = await import('../src/core/types/index.ts');
+const targetLufs = MASTER_TARGET_LUFS[masterTarget];
 
 /** Typical 64-bar arrangement so ACE's timeline tags land on real sections. */
 const sections = [
@@ -201,11 +212,12 @@ const outDir = join(root, 'exports', 'listening', date);
 await mkdir(outDir, { recursive: true });
 
 const rows = [];
-const samplerSuffix = sampler ? `_${sampler}` : '';
+// Target only changes the filename when it is not the default (balanced).
+const variantSuffix = `${sampler ? `_${sampler}` : ''}${masterTarget === 'balanced' ? '' : `_${masterTarget}`}`;
 for (const prompt of prompts) {
   for (const seed of seeds) {
     const payload = payloadFor(prompt, seed);
-    process.stdout.write(`[listening] ${prompt.name}${samplerSuffix} seed ${seed} ... `);
+    process.stdout.write(`[listening] ${prompt.name}${variantSuffix} seed ${seed} ... `);
     let data;
     try {
       data = await renderWithRetry(payload);
@@ -213,7 +225,7 @@ for (const prompt of prompts) {
       const msg = e instanceof Error ? e.message : String(e);
       console.log(`FAILED (${msg})`);
       rows.push({
-        name: `${prompt.name}${samplerSuffix}`,
+        name: `${prompt.name}${variantSuffix}`,
         seed,
         durationSec: 0,
         integratedLufs: -Infinity,
@@ -222,31 +234,43 @@ for (const prompt of prompts) {
       });
       continue;
     }
-    const bytes = Buffer.from(data.mixWavBase64, 'base64');
-    const wavName = `${prompt.name}${samplerSuffix}_${seed}.wav`;
-    await writeFile(join(outDir, wavName), bytes);
-
-    const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const rawBytes = Buffer.from(data.mixWavBase64, 'base64');
+    const wavName = `${prompt.name}${variantSuffix}_${seed}.wav`;
+    const ab = rawBytes.buffer.slice(rawBytes.byteOffset, rawBytes.byteOffset + rawBytes.byteLength);
+    let wrote = false;
     try {
       const decoded = decodeWavChannels(ab);
-      const row = analyzeMix(decoded.channels, decoded.sampleRate, {
-        name: `${prompt.name}${samplerSuffix}`,
+      const left = decoded.channels[0] ?? new Float32Array(0);
+      const right = decoded.channels[1] ?? left;
+      // Master locally to the --target preset so the report matches Studio.
+      const mastered = masterStereo(left, right, decoded.sampleRate, { targetLufs });
+      const masteredWav = encodeWav(
+        [mastered.left, mastered.right],
+        decoded.sampleRate,
+        decoded.bitDepth === 24 ? 24 : 16,
+      );
+      await writeFile(join(outDir, wavName), Buffer.from(await masteredWav.arrayBuffer()));
+      wrote = true;
+      const row = analyzeMix([mastered.left, mastered.right], decoded.sampleRate, {
+        name: `${prompt.name}${variantSuffix}`,
         seed,
       });
       rows.push(row);
       console.log(
-        `${row.durationSec.toFixed(1)}s · ${row.integratedLufs.toFixed(1)} LUFS · ${row.samplePeakDbFS.toFixed(1)} dBFS`,
+        `${row.durationSec.toFixed(1)}s · ${row.integratedLufs.toFixed(1)} LUFS (target ${targetLufs}) · ${row.samplePeakDbFS.toFixed(1)} dBFS`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.log(`wrote ${wavName} (report skipped: ${msg})`);
+      console.log(`master skipped (${msg})`);
+      // Fall back to the raw ACE WAV so the render is still on disk.
+      if (!wrote) await writeFile(join(outDir, wavName), rawBytes);
       rows.push({
-        name: `${prompt.name}${samplerSuffix}`,
+        name: `${prompt.name}${variantSuffix}`,
         seed,
         durationSec: 0,
         integratedLufs: -Infinity,
         samplePeakDbFS: -Infinity,
-        error: `report skipped: ${msg}`,
+        error: `master skipped: ${msg}`,
       });
     }
   }

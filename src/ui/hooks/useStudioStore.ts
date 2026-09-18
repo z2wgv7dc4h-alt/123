@@ -10,6 +10,7 @@ import {
   COHERENCE_LM_TEMPERATURE,
   type Coherence,
   type SamplerMethod,
+  type MasterTarget,
   type GenreId,
   type ProductTier,
   type FlowStep,
@@ -316,6 +317,8 @@ export interface StudioState {
   takeHistory: RenderResult[];
   /** Apply loudness mastering to Studio (ACE) mixes (default true). */
   masterOn: boolean;
+  /** Mastering loudness preset (Balanced -11 default). */
+  masterTarget: MasterTarget;
   /** LM coherence preset — maps to ACE lm_temperature (Tight/Balanced/Wild). */
   coherence: Coherence;
   /** ACE diffusion sampler (infer_method) A/B. */
@@ -324,6 +327,7 @@ export interface StudioState {
   activeCandidate: number;
   setProductTier: (t: ProductTier) => void;
   setMasterOn: (v: boolean) => void;
+  setMasterTarget: (t: MasterTarget) => void;
   setCoherence: (c: Coherence) => void;
   setSampler: (s: SamplerMethod) => void;
   setSeed: (n: number) => void;
@@ -620,6 +624,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   aceCheckpoint: null,
   moreOpen: false,
   masterOn: true,
+  masterTarget: 'balanced',
   coherence: 'balanced',
   sampler: 'ode',
   activeCandidate: 0,
@@ -725,6 +730,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setStyleRefMode: (m) => set({ styleRefMode: m === 'cover' ? 'cover' : 'reference' }),
   setMoreOpen: (v) => set({ moreOpen: v }),
   setMasterOn: (v) => set({ masterOn: Boolean(v) }),
+  setMasterTarget: (t) => set({ masterTarget: t }),
   setCoherence: (c) => set({ coherence: c }),
   setSampler: (s) => set({ sampler: s === 'sde' ? 'sde' : 'ode' }),
   setExportBitDepth: (d) => set({ exportBitDepth: d === 24 ? 24 : 16 }),
@@ -1305,6 +1311,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           lora: live.loraPath ? [{ packId: live.loraPath, scale: live.loraScale }] : undefined,
           stemSchemaVersion: 'v0',
           master: live.masterOn,
+          masterTarget: live.masterTarget ?? 'balanced',
           lmTemperature: COHERENCE_LM_TEMPERATURE[live.coherence ?? 'balanced'],
           sampler: live.sampler ?? 'ode',
           // Belt-and-suspenders: never send styleReference without explicit ownership attest

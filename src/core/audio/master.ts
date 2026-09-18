@@ -269,7 +269,7 @@ function limitPeak(
 /**
  * Master a stereo mix: glue compression → gain to target loudness →
  * look-ahead peak limiter → mid/side width → re-limit → re-measure.
- * Defaults: targetLufs -9, ceilingDb -1.
+ * Defaults: targetLufs -11 (Balanced), ceilingDb -1.
  * Inputs never mutated; output arrays are new.
  * Silence in → silence out, report.gainDb 0.
  */
@@ -284,15 +284,24 @@ export function masterStereo(
     reference?: { channels: Float32Array[]; sampleRate: number };
     /** Genre target for the default tilt when no reference is attached. */
     genre?: GenreId;
+    /** Apply glue compressor (default true). */
+    compressor?: boolean;
+    /** Apply mid/side width (default true). */
+    width?: boolean;
+    /** Apply tone matching (default true). */
+    toneMatch?: boolean;
   },
 ): {
   left: Float32Array;
   right: Float32Array;
   report: MasterReport;
 } {
-  const targetLufs = opts?.targetLufs ?? -9;
+  const targetLufs = opts?.targetLufs ?? -11;
   const ceilingDb = opts?.ceilingDb ?? -1;
   const ceilingLinear = Math.pow(10, ceilingDb / 20);
+  const applyCompressor = opts?.compressor !== false;
+  const applyWidth = opts?.width !== false;
+  const applyToneMatch = opts?.toneMatch !== false;
 
   // Measure source
   const lufsBefore = integratedLufs(left, right, sampleRate);
@@ -319,75 +328,79 @@ export function masterStereo(
   // Reference tone match (or gentle default tilt) before the compressor.
   let matchApplied = false;
   let maxCorrectionDb = 0;
-  const centers = oneThirdOctaveCenters();
-  const ref = opts?.reference;
-  if (ref?.channels?.length) {
-    const refDb = spectrumDb(ref.channels, ref.sampleRate, centers);
-    // Closed loop: peaking biquads do not track 1/3-octave averages exactly,
-    // so match, re-measure and trim the residual. Cumulative gain per band
-    // still respects the ±6 dB (±3 below 60 Hz) clamp.
-    const cumulative = centers.map(() => 0);
-    let cur = { left: outL, right: outR };
-    for (let pass = 0; pass < 2; pass++) {
-      const takeDb = spectrumDb([cur.left, cur.right], sampleRate, centers);
-      const gains = toneMatchGains(refDb, takeDb, centers);
-      const applied = gains.map((g, i) => {
-        const limit = centers[i]! < 60 ? 3 : 6;
-        const total = Math.max(-limit, Math.min(limit, cumulative[i]! + g));
-        const delta = total - cumulative[i]!;
-        cumulative[i] = total;
-        return delta;
-      });
-      cur = applyBandGains(cur.left, cur.right, sampleRate, centers, applied);
+  if (applyToneMatch) {
+    const centers = oneThirdOctaveCenters();
+    const ref = opts?.reference;
+    if (ref?.channels?.length) {
+      const refDb = spectrumDb(ref.channels, ref.sampleRate, centers);
+      // Closed loop: peaking biquads do not track 1/3-octave averages exactly,
+      // so match, re-measure and trim the residual. Cumulative gain per band
+      // still respects the ±6 dB (±3 below 60 Hz) clamp.
+      const cumulative = centers.map(() => 0);
+      let cur = { left: outL, right: outR };
+      for (let pass = 0; pass < 2; pass++) {
+        const takeDb = spectrumDb([cur.left, cur.right], sampleRate, centers);
+        const gains = toneMatchGains(refDb, takeDb, centers);
+        const applied = gains.map((g, i) => {
+          const limit = centers[i]! < 60 ? 3 : 6;
+          const total = Math.max(-limit, Math.min(limit, cumulative[i]! + g));
+          const delta = total - cumulative[i]!;
+          cumulative[i] = total;
+          return delta;
+        });
+        cur = applyBandGains(cur.left, cur.right, sampleRate, centers, applied);
+      }
+      outL = cur.left;
+      outR = cur.right;
+      maxCorrectionDb = cumulative.reduce((m, g) => Math.max(m, Math.abs(g)), 0);
+      matchApplied = true;
+    } else {
+      const filters = GENRE_TONE_TARGETS[opts?.genre ?? 'dnb'] ?? GENRE_TONE_TARGETS.dnb;
+      maxCorrectionDb = filters.reduce((m, f) => Math.max(m, Math.abs(f.gainDb)), 0);
+      const tilted = applyFilters(outL, outR, sampleRate, filters);
+      outL = tilted.left;
+      outR = tilted.right;
     }
-    outL = cur.left;
-    outR = cur.right;
-    maxCorrectionDb = cumulative.reduce((m, g) => Math.max(m, Math.abs(g)), 0);
-    matchApplied = true;
-  } else {
-    const filters = GENRE_TONE_TARGETS[opts?.genre ?? 'dnb'] ?? GENRE_TONE_TARGETS.dnb;
-    maxCorrectionDb = filters.reduce((m, f) => Math.max(m, Math.abs(f.gainDb)), 0);
-    const tilted = applyFilters(outL, outR, sampleRate, filters);
-    outL = tilted.left;
-    outR = tilted.right;
   }
 
   // Glue compressor: gentle, stereo-linked, RMS detector
   // Attack 10 ms, release 120 ms, ratio 2:1, threshold 6 dB below track RMS
-  const attackSamples = Math.max(1, Math.round((10 * sampleRate) / 1000));
-  const releaseSamples = Math.max(1, Math.round((120 * sampleRate) / 1000));
-  const windowSamples = Math.max(100, Math.round((200 * sampleRate) / 1000));
+  if (applyCompressor) {
+    const attackSamples = Math.max(1, Math.round((10 * sampleRate) / 1000));
+    const releaseSamples = Math.max(1, Math.round((120 * sampleRate) / 1000));
+    const windowSamples = Math.max(100, Math.round((200 * sampleRate) / 1000));
 
-  // Measure RMS level
-  let sumRms = 0;
-  const checkEnd = Math.min(outL.length, windowSamples);
-  for (let i = 0; i < checkEnd; i++) {
-    sumRms += (outL[i]! * outL[i]! + outR[i]! * outR[i]!) / 2;
-  }
-  const trackRms = Math.sqrt(sumRms / checkEnd);
-  const trackRmsDb = trackRms > 0 ? 20 * Math.log10(trackRms) : -60;
-  const threshold = trackRmsDb - 6;
-
-  let gainReductionDb = 0;
-  for (let i = 0; i < outL.length; i++) {
-    const s = Math.sqrt((outL[i]! * outL[i]! + outR[i]! * outR[i]!) / 2);
-    const sDb = s > 0 ? 20 * Math.log10(s) : -60;
-
-    let target = 0;
-    if (sDb > threshold + 3) {
-      target = (sDb - threshold) * (1 - 0.5); // 2:1 ratio
-    } else if (sDb > threshold - 3) {
-      // Soft knee
-      const t = (sDb - threshold + 3) / 6;
-      target = t * t * (sDb - threshold) * (1 - 0.5);
+    // Measure RMS level
+    let sumRms = 0;
+    const checkEnd = Math.min(outL.length, windowSamples);
+    for (let i = 0; i < checkEnd; i++) {
+      sumRms += (outL[i]! * outL[i]! + outR[i]! * outR[i]!) / 2;
     }
+    const trackRms = Math.sqrt(sumRms / checkEnd);
+    const trackRmsDb = trackRms > 0 ? 20 * Math.log10(trackRms) : -60;
+    const threshold = trackRmsDb - 6;
 
-    const coeff = target > gainReductionDb ? 1 / attackSamples : 1 / releaseSamples;
-    gainReductionDb = target * coeff + gainReductionDb * (1 - coeff);
+    let gainReductionDb = 0;
+    for (let i = 0; i < outL.length; i++) {
+      const s = Math.sqrt((outL[i]! * outL[i]! + outR[i]! * outR[i]!) / 2);
+      const sDb = s > 0 ? 20 * Math.log10(s) : -60;
 
-    const linearGain = Math.pow(10, -gainReductionDb / 20);
-    outL[i] = outL[i]! * linearGain;
-    outR[i] = outR[i]! * linearGain;
+      let target = 0;
+      if (sDb > threshold + 3) {
+        target = (sDb - threshold) * (1 - 0.5); // 2:1 ratio
+      } else if (sDb > threshold - 3) {
+        // Soft knee
+        const t = (sDb - threshold + 3) / 6;
+        target = t * t * (sDb - threshold) * (1 - 0.5);
+      }
+
+      const coeff = target > gainReductionDb ? 1 / attackSamples : 1 / releaseSamples;
+      gainReductionDb = target * coeff + gainReductionDb * (1 - coeff);
+
+      const linearGain = Math.pow(10, -gainReductionDb / 20);
+      outL[i] = outL[i]! * linearGain;
+      outR[i] = outR[i]! * linearGain;
+    }
   }
 
   // Gain to target loudness (up to 2 passes with iterative correction)
@@ -410,8 +423,13 @@ export function masterStereo(
   const limited = limitPeak(outL, outR, sampleRate, ceilingLinear);
 
   // Mild stereo width after the limiter, then re-limit to the ceiling.
-  const widened = applyStereoWidth(limited.left, limited.right, sampleRate);
-  const relimited = limitPeak(widened.left, widened.right, sampleRate, ceilingLinear);
+  let relimited = limited;
+  let widthAppliedReport = false;
+  if (applyWidth) {
+    const widened = applyStereoWidth(limited.left, limited.right, sampleRate);
+    relimited = limitPeak(widened.left, widened.right, sampleRate, ceilingLinear);
+    widthAppliedReport = true;
+  }
 
   // Measure final loudness and peak
   const lufsAfter = integratedLufs(relimited.left, relimited.right, sampleRate);
@@ -432,7 +450,7 @@ export function masterStereo(
       lufsAfter: Number.isFinite(lufsAfter) ? lufsAfter : 0,
       peakDbAfter: Number.isFinite(peakDbAfter) ? peakDbAfter : ceilingDb,
       gainDb,
-      widthApplied: true,
+      widthApplied: widthAppliedReport,
       matchApplied,
       maxCorrectionDb,
     },

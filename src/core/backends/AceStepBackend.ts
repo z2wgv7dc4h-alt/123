@@ -25,6 +25,8 @@ import { decodeWavToMono } from '../audio/onsetGrid';
 import { decodeWavChannels, encodeWav } from '../export/wav';
 import { masterStereo } from '../audio/master';
 import { scoreTake } from '../audio/takeScore';
+import { extractReferenceWindow } from '../audio/referenceWindow';
+import { MASTER_TARGET_LUFS } from '../types';
 
 const CAPS: BackendCaps = {
   fullSong: true,
@@ -74,22 +76,6 @@ export function aceSamplerFor(checkpoint: string | null | undefined): {
 }
 /** Timestep shift — base-model-only per ACE-Step docs. */
 export const ACE_SHIFT = 3.0;
-/**
- * DCW: training-free, negligible-compute quality correction. ACE-Step
- * enables it by default for Turbo and disables it for non-Turbo — this
- * project always uses acestep-v15-base, so it was off on every render
- * until this was wired. "low" is the starting mode DCW.md recommends.
- */
-export const ACE_DCW_ENABLED = true;
-export const ACE_DCW_MODE = 'low' as const;
-/**
- * DCW off on non-turbo text2music: ACE issue #1259 — forcing DCW on
- * base/SFT distorts audio. Turbo and cover keep ACE_DCW_ENABLED.
- */
-export function aceDcwEnabled(checkpoint: string | null | undefined, isCover: boolean): boolean {
-  if (isTurboCheckpoint(checkpoint) || isCover) return ACE_DCW_ENABLED;
-  return false;
-}
 /**
  * LM on for text2music: the 5Hz LM plans the track (audio codes). The bridge
  * keeps use_cot_caption/use_cot_language false so the LM cannot rewrite our
@@ -311,8 +297,11 @@ export class AceStepBackend implements AudioBackend {
       sectionsOverride: job.sectionsOverride,
     });
 
-    const styleAudioB64 =
-      styleAudio && ownerAttested ? await blobToBase64(styleAudio) : undefined;
+    // Send ACE only the loudest 45 s window of the user's reference (drop-like
+    // energy), not the whole track. Edits keep their own untrimmed source.
+    const styleAudioForAce =
+      styleAudio && ownerAttested ? await extractReferenceWindow(styleAudio) : undefined;
+    const styleAudioB64 = styleAudioForAce ? await blobToBase64(styleAudioForAce) : undefined;
     const srcAudioBase64 = editAudio
       ? await blobToBase64(editAudio)
       : styleMode === 'cover'
@@ -385,8 +374,6 @@ export class AceStepBackend implements AudioBackend {
             ? { lmTemperature: job.lmTemperature }
             : {}),
           ...(job.sampler === 'ode' || job.sampler === 'sde' ? { sampler: job.sampler } : {}),
-          dcwEnabled: aceDcwEnabled(checkpoint ?? ACE_DEFAULT_CHECKPOINT, Boolean(srcAudioBase64)),
-          dcwMode: ACE_DCW_MODE,
           ...(job.edit
             ? {
                 srcAudioBase64,
@@ -520,6 +507,10 @@ export class AceStepBackend implements AudioBackend {
       }
     }
 
+    // Mastering loudness preset (Balanced -11 is the Studio default).
+    const targetLufs =
+      MASTER_TARGET_LUFS[job.masterTarget ?? 'balanced'] ?? MASTER_TARGET_LUFS.balanced;
+
     const bytesFromB64 = (b64: string): Uint8Array => {
       const bin = atob(b64);
       const bytes = new Uint8Array(bin.length);
@@ -562,6 +553,7 @@ export class AceStepBackend implements AudioBackend {
             decoded.channels[1]!,
             decoded.sampleRate,
             {
+              targetLufs,
               ...(reference ? { reference } : {}),
               genre: job.genre ?? 'dnb',
             },
@@ -658,7 +650,7 @@ export class AceStepBackend implements AudioBackend {
       ...decodeWarnings,
       ...(primary.master
         ? [
-            `Mastered to -9 LUFS (measured ${primary.master.lufsAfter.toFixed(1)}, ` +
+            `Mastered to ${targetLufs} LUFS (measured ${primary.master.lufsAfter.toFixed(1)}, ` +
               `peak ${primary.master.peakDbAfter.toFixed(1)} dBFS)`,
           ]
         : []),

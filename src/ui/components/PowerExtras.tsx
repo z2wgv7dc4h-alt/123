@@ -1,6 +1,6 @@
 import { backendRegistry } from '@/core/registry';
 import { getAceSidecarBase } from '@/core/backends';
-import type { Coherence, SamplerMethod } from '@/core/types';
+import type { Coherence, MasterTarget, SamplerMethod } from '@/core/types';
 import { loraNotes, useStudioStore } from '../hooks/useStudioStore';
 import { useEffect, useMemo, useState } from 'react';
 import { HELP } from '../lib/helpCopy';
@@ -52,6 +52,8 @@ export function PowerExtras() {
   const setExportBitDepth = useStudioStore((s) => s.setExportBitDepth);
   const masterOn = useStudioStore((s) => s.masterOn);
   const setMasterOn = useStudioStore((s) => s.setMasterOn);
+  const masterTarget = useStudioStore((s) => s.masterTarget);
+  const setMasterTarget = useStudioStore((s) => s.setMasterTarget);
   const coherence = useStudioStore((s) => s.coherence);
   const setCoherence = useStudioStore((s) => s.setCoherence);
   const sampler = useStudioStore((s) => s.sampler);
@@ -130,6 +132,22 @@ export function PowerExtras() {
           title="Apply loudness mastering (-9 LUFS, -1 dB ceiling) to Studio takes"
         />
         <span>Master for loudness (Studio)</span>
+      </label>
+
+      <label className="master-target">
+        <span className="label-with-tip">
+          <span className="label-with-tip-text">Mastering target</span>
+        </span>
+        <select
+          value={masterTarget}
+          disabled={!masterOn}
+          onChange={(e) => setMasterTarget(e.target.value as MasterTarget)}
+          title="Target loudness: Loud -9 / Balanced -11 (default) / Dynamic -14 LUFS"
+        >
+          <option value="loud">Loud · -9 LUFS</option>
+          <option value="balanced">Balanced · -11 LUFS (default)</option>
+          <option value="dynamic">Dynamic · -14 LUFS</option>
+        </select>
       </label>
 
       <label className="coherence-select">
