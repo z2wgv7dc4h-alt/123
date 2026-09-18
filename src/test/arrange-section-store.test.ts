@@ -125,6 +125,21 @@ describe('store arrangeSection', () => {
     expect(useStudioStore.getState().takeHistory.length).toBe(0);
   });
 
+  it('resize splices once and Undo restores without a render', async () => {
+    await useStudioStore.getState().arrangeSection({ kind: 'resize', sectionIndex: 1, lengthBars: 2 });
+
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    const job = renderSpy.mock.calls[0]![0] as { structureRef: StructureMap };
+    expect(job.structureRef.bars).toBe(6);
+    expect(job.structureRef.sections.map((s) => s.lengthBars)).toEqual([4, 2]);
+    expect(useStudioStore.getState().takeHistory.length).toBe(1);
+
+    await useStudioStore.getState().undoTakeEdit();
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    expect(useStudioStore.getState().result).toBe(fakeStudioResult);
+    expect(useStudioStore.getState().takeHistory.length).toBe(0);
+  });
+
   it('refuses on a Sketch take without rendering', async () => {
     useStudioStore.setState({ result: { ...fakeStudioResult, backendId: 'offline-stub' } as RenderResult });
     await useStudioStore.getState().arrangeSection({ kind: 'duplicate', sectionIndex: 0 });

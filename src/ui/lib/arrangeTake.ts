@@ -2,9 +2,10 @@
  * E-1 arrangement splicing on a Studio take.
  *
  * Every op is a deterministic PCM edit at exact bar lines (using the R-3
- * downbeat offset): Duplicate, Delete, Move and Insert-blank. The browser does
- * the splice, then ACE repaints the seam(s) (R-1 edit). These functions are
- * pure — no Blob/Web Audio — so sample counts and seam windows are testable.
+ * downbeat offset): Duplicate, Delete, Move, Insert-blank, Resize and
+ * Extend-anywhere. The browser does the splice, then ACE repaints the seam(s)
+ * (R-1 edit). These functions are pure — no Blob/Web Audio — so sample counts
+ * and seam windows are testable.
  */
 import type { Section, SectionName, StructureMap } from '@/core/types';
 
@@ -14,7 +15,11 @@ export type ArrangeOp =
   | { kind: 'delete'; sectionIndex: number }
   | { kind: 'duplicate'; sectionIndex: number }
   | { kind: 'move'; sectionIndex: number; toIndex: number }
-  | { kind: 'insert'; atStartBar: number; bars: number; name: SectionName };
+  | { kind: 'insert'; atStartBar: number; bars: number; name: SectionName }
+  /** Drag a section edge: shorter cuts bars at the end, longer inserts silence. */
+  | { kind: 'resize'; sectionIndex: number; lengthBars: number }
+  /** +N on any section: copy its last N bars after itself (grows the section). */
+  | { kind: 'extendAnywhere'; sectionIndex: number; deltaBars: number };
 
 export type ArrangePlan = {
   op: ArrangeOp;
@@ -174,6 +179,59 @@ export function planArrange(opts: {
     seamFrames = [
       [at - fpb, at + fpb],
       [at + gapFrames - fpb, at + gapFrames + fpb],
+    ];
+  } else if (op.kind === 'resize') {
+    const sec = structure.sections[op.sectionIndex];
+    if (!sec) return null;
+    const target = Math.max(1, Math.round(op.lengthBars));
+    const delta = target - sec.lengthBars;
+    if (delta === 0) return null;
+    const start = sec.startBar;
+    const oldEnd = frameFor(start + sec.lengthBars);
+    if (delta < 0) {
+      // Shorter: cut the tail bars; later sections shift down.
+      const newEnd = frameFor(start + target);
+      outChannels = concatChannels([sliceChannels(channels, 0, newEnd), sliceChannels(channels, oldEnd, total)]);
+      seamFrames = [[newEnd - fpb, newEnd + fpb]];
+    } else {
+      // Longer: insert silence for the new bars; later sections shift up.
+      const newEnd = frameFor(start + target);
+      outChannels = concatChannels([
+        sliceChannels(channels, 0, oldEnd),
+        silentChannels(channels, delta * fpb),
+        sliceChannels(channels, oldEnd, total),
+      ]);
+      seamFrames = [
+        [oldEnd - fpb, oldEnd + fpb],
+        [newEnd - fpb, newEnd + fpb],
+      ];
+    }
+    const sections = structure.sections.map((s, i) =>
+      i === op.sectionIndex ? { ...s, lengthBars: target } : { ...s },
+    );
+    nextStructure = { ...structure, ...relayout(sections) };
+  } else if (op.kind === 'extendAnywhere') {
+    const sec = structure.sections[op.sectionIndex];
+    if (!sec) return null;
+    // Can't copy more bars than the section has.
+    const grow = Math.max(1, Math.min(Math.round(op.deltaBars), sec.lengthBars));
+    const start = sec.startBar;
+    const oldEnd = frameFor(start + sec.lengthBars);
+    const copyStart = frameFor(start + sec.lengthBars - grow);
+    const tail = sliceChannels(channels, copyStart, oldEnd);
+    outChannels = concatChannels([
+      sliceChannels(channels, 0, oldEnd),
+      tail,
+      sliceChannels(channels, oldEnd, total),
+    ]);
+    const sections = structure.sections.map((s, i) =>
+      i === op.sectionIndex ? { ...s, lengthBars: s.lengthBars + grow } : { ...s },
+    );
+    nextStructure = { ...structure, ...relayout(sections) };
+    const newEnd = frameFor(start + sec.lengthBars + grow);
+    seamFrames = [
+      [oldEnd - fpb, oldEnd + fpb],
+      [newEnd - fpb, newEnd + fpb],
     ];
   } else {
     // move

@@ -75,7 +75,6 @@ export function SectionTimeline() {
   const redoSection = useStudioStore((s) => s.redoSection);
   const arrangeSection = useStudioStore((s) => s.arrangeSection);
   const pickCandidate = useStudioStore((s) => s.pickCandidate);
-  const extendLastSection = useStudioStore((s) => s.extendLastSection);
   const undoTakeEdit = useStudioStore((s) => s.undoTakeEdit);
   const takeHistory = useStudioStore((s) => s.takeHistory);
 
@@ -90,8 +89,10 @@ export function SectionTimeline() {
   );
 
   const trackRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ index: number; startX: number; startLen: number } | null>(null);
+  const dragRef = useRef<{ index: number; startX: number; startLen: number; studio: boolean } | null>(null);
   const [dragging, setDragging] = useState<number | null>(null);
+  const [resizePreview, setResizePreview] = useState<{ index: number; lengthBars: number } | null>(null);
+  const resizePreviewRef = useRef<{ index: number; lengthBars: number } | null>(null);
   const [playheadRatio, setPlayheadRatio] = useState(0);
   // UI-7: Expand / Repeat / ×2 apply only to the selected section.
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -132,10 +133,11 @@ export function SectionTimeline() {
         index,
         startX: e.clientX,
         startLen: sections[index]!.lengthBars,
+        studio: studioTake,
       };
       setDragging(index);
     },
-    [sections, busy],
+    [sections, busy, studioTake],
   );
 
   const onEdgePointerMove = useCallback(
@@ -148,7 +150,12 @@ export function SectionTimeline() {
       if (pxPerBar < 1) return;
       const deltaBars = Math.round((e.clientX - d.startX) / pxPerBar / 4) * 4;
       const nextLen = Math.max(4, d.startLen + deltaBars);
-      if (nextLen !== sections[d.index]!.lengthBars) {
+      if (d.studio) {
+        // Studio: preview the length, splice once on release (one repaint).
+        const preview = nextLen !== d.startLen ? { index: d.index, lengthBars: nextLen } : null;
+        resizePreviewRef.current = preview;
+        setResizePreview(preview);
+      } else if (nextLen !== sections[d.index]!.lengthBars) {
         setSectionLengthAt(d.index, nextLen);
       }
     },
@@ -159,13 +166,26 @@ export function SectionTimeline() {
     const d = dragRef.current;
     if (d) {
       const live = useStudioStore.getState();
-      const now = live.editedSections ?? live.result?.structure?.sections;
-      const nextLen = now?.[d.index]?.lengthBars;
-      if (nextLen != null && nextLen !== d.startLen) {
-        const bars = live.bars || now?.reduce((n, s) => n + s.lengthBars, 0) || 0;
-        const bpm = live.result?.bpmMeasured ?? live.bpm ?? DEFAULT_BPM;
-        const approx = formatDurationMmSs(barsToDurationSec(bars, bpm));
-        pushToast(`Arrangement ~${approx} on next Generate`, 'info', 3400);
+      if (d.studio) {
+        const target = resizePreviewRef.current;
+        if (target && target.index === d.index && target.lengthBars !== d.startLen) {
+          void live.arrangeSection({
+            kind: 'resize',
+            sectionIndex: d.index,
+            lengthBars: target.lengthBars,
+          });
+        }
+        resizePreviewRef.current = null;
+        setResizePreview(null);
+      } else {
+        const now = live.editedSections ?? live.result?.structure?.sections;
+        const nextLen = now?.[d.index]?.lengthBars;
+        if (nextLen != null && nextLen !== d.startLen) {
+          const bars = live.bars || now?.reduce((n, s) => n + s.lengthBars, 0) || 0;
+          const bpm = live.result?.bpmMeasured ?? live.bpm ?? DEFAULT_BPM;
+          const approx = formatDurationMmSs(barsToDurationSec(bars, bpm));
+          pushToast(`Arrangement ~${approx} on next Generate`, 'info', 3400);
+        }
       }
     }
     dragRef.current = null;
@@ -246,12 +266,14 @@ export function SectionTimeline() {
         onPointerCancel={onEdgePointerUp}
       >
         {sections.map((s, index) => {
-          const label = sectionLabel(s.name, s.startBar, s.lengthBars);
+          const displayLen =
+            resizePreview && resizePreview.index === index ? resizePreview.lengthBars : s.lengthBars;
+          const label = sectionLabel(s.name, s.startBar, displayLen);
           return (
             <div
               key={`${s.name}-${s.startBar}-${index}`}
               className={`timeline-seg ${SECTION_CLASS[s.name] ?? 'seg-other'}${dragging === index ? ' dragging' : ''}${selectedIndex === index ? ' selected' : ''}${dropTarget === index ? ' drop-target' : ''}`}
-              style={{ flex: s.lengthBars }}
+              style={{ flex: displayLen }}
               role="listitem"
               tabIndex={0}
               title={label}
@@ -297,7 +319,7 @@ export function SectionTimeline() {
             >
               <span className="timeline-seg-name">{s.name}</span>
               <small className="timeline-seg-bars">
-                {s.lengthBars}b · {s.startBar}–{s.startBar + s.lengthBars - 1}
+                {displayLen}b · {s.startBar}–{s.startBar + displayLen - 1}
               </small>
               <span className="timeline-seg-tip" aria-hidden="true">
                 {SECTION_HINT[s.name] ?? 'Section'}
@@ -358,21 +380,16 @@ export function SectionTimeline() {
                         Redo
                       </button>
                       {[8, 16].map((n) => {
-                        const isLast = index === sections.length - 1;
                         return (
                           <button
                             key={n}
                             type="button"
                             className="btn tiny ghost"
-                            disabled={busy || !isLast}
-                            title={
-                              isLast
-                                ? `Grow this section by ${n} bars (ACE extends the take)`
-                                : 'Extend in the middle comes with R-4 — select the last section'
-                            }
+                            disabled={busy}
+                            title={`Extend anywhere: copy this section's last ${Math.min(n, s.lengthBars)} bars after it, then repaint the seams`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              void extendLastSection(index, n);
+                              void arrangeSection({ kind: 'extendAnywhere', sectionIndex: index, deltaBars: n });
                             }}
                           >
                             +{n}

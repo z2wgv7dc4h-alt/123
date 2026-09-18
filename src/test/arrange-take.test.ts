@@ -165,3 +165,58 @@ describe('arrangeTake grid offset', () => {
     });
   });
 });
+
+describe('arrangeTake resize', () => {
+  it('shorter cuts the tail bars and shifts later sections', () => {
+    const p = plan({ kind: 'resize', sectionIndex: 1, lengthBars: 2 })!;
+    expect(p.channels[0]!.length).toBe(TOTAL - 2 * FPB);
+    expect(p.channels[0]!.length % FPB).toBe(0);
+    expect(p.structure.bars).toBe(10);
+    expect(p.structure.sections.map((s) => s.lengthBars)).toEqual([4, 2, 2, 2]);
+    expect(p.structure.sections.map((s) => s.startBar)).toEqual([0, 4, 6, 8]);
+    // Content: tail resumes at bar 6 with what used to be bar 8.
+    expect(p.channels[0]![6 * FPB]).toBe(8 * FPB);
+    expect(p.seams).toEqual([{ startSec: (5 * FPB) / SR, endSec: (7 * FPB) / SR }]);
+  });
+
+  it('longer inserts exact silence at the section end', () => {
+    const p = plan({ kind: 'resize', sectionIndex: 1, lengthBars: 6 })!;
+    expect(p.channels[0]!.length).toBe(TOTAL + 2 * FPB);
+    expect(p.structure.bars).toBe(14);
+    expect(p.structure.sections.map((s) => s.lengthBars)).toEqual([4, 6, 2, 2]);
+    expect(p.structure.sections.map((s) => s.startBar)).toEqual([0, 4, 10, 12]);
+    for (let i = 8 * FPB; i < 10 * FPB; i++) expect(p.channels[0]![i]).toBe(0);
+    expect(p.channels[0]![10 * FPB]).toBe(8 * FPB);
+    // Both joins - old end and new end - covered by one repaint.
+    expect(p.seams).toEqual([
+      { startSec: (7 * FPB) / SR, endSec: (9 * FPB) / SR },
+      { startSec: (9 * FPB) / SR, endSec: (11 * FPB) / SR },
+    ]);
+    expect(p.repaint).toEqual({ startSec: (7 * FPB) / SR, endSec: (11 * FPB) / SR });
+  });
+
+  it('refuses a no-op resize', () => {
+    expect(plan({ kind: 'resize', sectionIndex: 1, lengthBars: 4 })).toBeNull();
+  });
+});
+
+describe('arrangeTake extend anywhere', () => {
+  it('copies the last N bars of any section and grows it', () => {
+    const p = plan({ kind: 'extendAnywhere', sectionIndex: 1, deltaBars: 2 })!;
+    expect(p.channels[0]!.length).toBe(TOTAL + 2 * FPB);
+    expect(p.structure.bars).toBe(14);
+    expect(p.structure.sections.map((s) => s.lengthBars)).toEqual([4, 6, 2, 2]);
+    expect(p.structure.sections.map((s) => s.startBar)).toEqual([0, 4, 10, 12]);
+    // Inserted tail is the drop's last 2 bars, then the original later sections.
+    expect(p.channels[0]![8 * FPB]).toBe(6 * FPB);
+    expect(p.channels[0]![10 * FPB]).toBe(8 * FPB);
+    expect(p.repaint).toEqual({ startSec: (7 * FPB) / SR, endSec: (11 * FPB) / SR });
+  });
+
+  it('clamps the copy to the section length', () => {
+    // break is 2 bars; +8 can only copy its 2 bars.
+    const p = plan({ kind: 'extendAnywhere', sectionIndex: 2, deltaBars: 8 })!;
+    expect(p.channels[0]!.length).toBe(TOTAL + 2 * FPB);
+    expect(p.structure.sections.map((s) => s.lengthBars)).toEqual([4, 4, 4, 2]);
+  });
+});
