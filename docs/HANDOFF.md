@@ -1,6 +1,6 @@
 # Handoff
 
-**Updated**: 2026-09-18. **Last code commit**: `522ec58` (listening set script; LUFS K-weighting fix `91ee7cb`).
+**Updated**: 2026-09-18. **Last code commit**: `9222c20` (E-1 arrangement editor).
 Law is `AGENTS.md` + `CLAUDE.md` only. `docs/_archive_*` is not law.
 
 Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
@@ -70,12 +70,11 @@ ACE renders one BPM per call, so switches come in two kinds:
   a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
 
 Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
-(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**), R-3 `4541662` (downbeat bar grid), UI-7 `7dbe475` (skin pass), R-5 `70ba5f7` (loudness master — actually applies after the K-weighting fix `91ee7cb`), listening set `522ec58` (**npm run listen:set**). User verified Redo, clearer builds, no vocals.
+(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**), style reference via `reference_audio` `a1f0aaa` (reference/cover modes), real stems via Demucs `78f39d5` (**Split stems (Demucs)**), R-3 `4541662` (downbeat bar grid), UI-7 `7dbe475` (skin pass), R-5 `70ba5f7` (loudness master — actually applies after the K-weighting fix `91ee7cb`), listening set `522ec58` (**npm run listen:set**), E-1 `9222c20` (arrangement editor: **Duplicate / Delete / Move-by-drag / Insert blank N bars**; Resize + extend-anywhere still open). User verified Redo, clearer builds, no vocals.
 
 | # | Ticket | What |
 |---|---|---|
-| 1 | E-1 | Arrangement editor on the take: insert, delete, duplicate, move, resize sections, extend anywhere (splice + seam repaint), undo. Absorbs R-4 and A-2. |
-| 2 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins (`reference_audio` primitive landed `a1f0aaa`) |
+| 1 | A-3 | Tempo blocks: per-block BPM, reference-audio continuity, transition joins (`reference_audio` primitive landed `a1f0aaa`) |
 
 Open, unscheduled: S-5 (cover strength listening A/B), `05` (ACE-native
 `extract` for kick/snare granularity — real stems already ship via Demucs,

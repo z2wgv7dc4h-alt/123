@@ -76,6 +76,7 @@ Also: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [LICENSE](LICENSE) (MIT)
 - Stem mute/solo/gain → remixed Play; remixed Export adds `mix_as_heard.wav`
 - Again / Vary; Simple quick-mute strip; Regen when settings change
 - Studio take edits: per-section **Redo** (strength slider) + best-of-3 **Pick 1 2 3**, Extend, Undo edit
+- Arrangement editor (E-1): **Duplicate / Delete / drag-to-Move / Insert blank N bars** on the take, spliced in-browser at bar lines then seam-repainted
 - Style reference in two modes: **Sound like (reference)** (`reference_audio`) or **Remake it (cover)**
 - **Split stems (Demucs)** → real drums/bass/other with live mute/solo; **npm run listen:set** listening report
 - Surprise Me under More (allowlisted templates)
