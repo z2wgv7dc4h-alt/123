@@ -1,6 +1,6 @@
 # Handoff
 
-**Updated**: 2026-09-17. **Last code commit**: `84db6eb` (P-1 prompt v2).
+**Updated**: 2026-09-18. **Last code commit**: `7a21e57` (Redo strength + best-of-3).
 Law is `AGENTS.md` + `CLAUDE.md` only. `docs/_archive_*` is not law.
 
 Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
@@ -25,11 +25,11 @@ Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
 | LM | `acestep-5Hz-lm-1.7B`, auto-selected by ACE. |
 | text2music payload | `thinking: true`, `use_cot_caption: false`, `use_cot_language: false`, `lyrics` = song-map structure tags (`[Build - rising tension]`, `[Drop - explosive]` …; bridge keeps tag lines only, `[Instrumental]` fallback), `lm_cfg_scale: 2.0`, `bpm` = job tempo, duration from bars (cap 480 s). Turbo 8 steps; base/SFT 64 steps + ADG. |
 | Cover (style ref) | Strength 0.55, clamped 0.35–0.7. Thinking off (ACE skips the LM for cover anyway). |
-| Repaint / extend | `RenderJob.edit = {kind:'repaint', source, startSec, endSec}` (R-1); `endSec` past the source = extend. Used by the song map (R-2, A-1). |
+| Repaint / extend | `RenderJob.edit = {kind:'repaint', source, startSec, endSec}` (R-1); `endSec` past the source = extend. Used by the song map (R-2, A-1). Bridge adds `repaint_mode` (`conservative`/`balanced`/`aggressive`, default `balanced`) and `repaint_strength` (0–1, default 0.5). |
 | Caption | `buildAceCaption` (P-1): a paragraph in ACE example style — genre + energy (or section role), drums + bass, arrangement narrative from the song map, deduped extras, "polished and club-ready, with no vocals". No BPM; no guitar unless the layer is on or typed. |
 | Tempo | A setting, 70–200 (`clampProductBpm`). Genres set the default: DnB 174, dubstep 140, half-time 170, jungle 165, trap 140. Default length 96 bars (cap 128). |
 | Home UI | Genre row → style presets → style text → song shape → Generate / Vary → waveform + compact Play/Stop → song map → More. |
-| Song map edits | **Studio take** (R-2, `6aede3d`): the selected section gets **Redo** / **Redo as…** (epic drop, build-up, breakdown, dubstep/trap/jungle/half-time switch, own words; ACE repaint of that bar range) and **+8 / +16** on the last section (repaint past the end); **Undo edit** steps back through `takeHistory` without rendering; Generate / Vary start a new take. **Sketch** keeps Expand / Repeat / ×2, which re-render the whole song. |
+| Song map edits | **Studio take** (R-2, `6aede3d`; strength + best-of-3 `7a21e57`): the selected section gets **Redo** / **Redo as…** (epic drop, build-up, breakdown, dubstep/trap/jungle/half-time switch, own words; ACE repaint of that bar range), a **Change amount** range (0.2–1, default 0.5 → `repaint_strength`), and **+8 / +16** on the last section (repaint past the end); **Undo edit** steps back through `takeHistory` without rendering. Redo asks ACE for `batchSize: 3`; the bridge returns every result file as a candidate, and **Pick 1 2 3** swaps the heard mix (new take version, no render). Generate / Vary start a new take. **Sketch** keeps Expand / Repeat / ×2, which re-render the whole song. |
 | Header chip | Labels the backend of the buffer you hear, not the last probe. |
 
 **Sketch** (`OfflineStubBackend`) is the CPU fallback. It honors the tempo. Its
@@ -59,7 +59,7 @@ ACE renders one BPM per call, so switches come in two kinds:
   a transition (riser/stop → impact → new tempo). Hard cut, no tempo ramp.
 
 Done since: A-1 `acf9bf1` (section roles, "Redo as…", trap), FIX-1 `e55c1de`
-(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default). User verified Redo, clearer builds, no vocals.
+(bridge survives ACE `"N/A"` metas after repaint), P-1 `84db6eb` (paragraph captions, structure-tag lyrics, 96-bar default), Redo strength + best-of-3 `7a21e57` (`repaint_mode`/`repaint_strength`, `batchSize` candidates, **Pick 1 2 3**). User verified Redo, clearer builds, no vocals.
 
 | # | Ticket | What |
 |---|---|---|

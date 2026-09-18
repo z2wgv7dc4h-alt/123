@@ -32,6 +32,12 @@ use_cot_caption use_cot_language allow_lm_batch` (plus a few analysis fields).
 (turbo: on, `double`; non-turbo: off). Our `dcwEnabled` / `dcwMode` fields have
 no effect. `use_cot_metas` is not exposed (always on outside sample mode).
 
+**Repaint controls**: `repaint_mode` (`conservative`/`balanced`/`aggressive`) and
+`repaint_strength` (0–1) tune how freely ACE rewrites the repainted window. With
+`batch_size > 1` the task result lists one file per candidate; the bridge
+downloads every file and returns them as `candidates`, so the browser can offer
+best-of-N without re-rendering (`7a21e57`).
+
 ## Gotchas (each one caused real bad output here)
 
 | Gotcha | Evidence | Rule |
