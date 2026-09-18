@@ -16,6 +16,8 @@ import { HELP } from '../lib/helpCopy';
 import { SectionJumpChips } from './SectionJumpChips';
 
 const PEAK_BINS = 240;
+/** Best-of-N take labels: Take A, B, C, D… */
+const TAKE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
 
 /** Decode mix stem blob/url → peak envelope (AudioContext decode only — no Tone synth). */
 async function decodePeaks(
@@ -177,6 +179,9 @@ export function Waveform() {
   const scrubbingRef = useRef(false);
   const [hoverRatio, setHoverRatio] = useState<number | null>(null);
   const nudgeBar = useStudioStore((s) => s.nudgeBar);
+  const busy = useStudioStore((s) => s.busy);
+  const pickCandidate = useStudioStore((s) => s.pickCandidate);
+  const activeCandidate = useStudioStore((s) => s.activeCandidate);
   const jobId = result?.jobId;
 
   const viewWindow = () => {
@@ -414,6 +419,24 @@ export function Waveform() {
           </span>
         ) : null}
       </div>
+      {result.candidates && result.candidates.length > 1 ? (
+        <div className="waveform-takes" role="group" aria-label="Generated takes">
+          <span className="hint">Take</span>
+          {result.candidates.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              className={`btn tiny ghost${activeCandidate === i ? ' on' : ''}`}
+              disabled={busy}
+              aria-pressed={activeCandidate === i}
+              title={`Hear take ${TAKE_LETTERS[i] ?? i + 1} — no re-render`}
+              onClick={() => void pickCandidate(i)}
+            >
+              {TAKE_LETTERS[i] ?? String(i + 1)}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {mixerDirty && (
         <p className="waveform-dirty-note" role="note">
           Waveform is the original render — listen for mute/solo/gain tweaks

@@ -133,6 +133,20 @@ const GENRE_NAMES: Record<GenreId, string> = {
   trap: 'trap',
 };
 
+/**
+ * Genre production sentence, inserted just before the mix close. Concrete
+ * mix/engineering words are what ACE's own example captions use (ACE-NOTES
+ * "Captions and lyrics") and they steer the DiT's timbre better than more
+ * instrument nouns.
+ */
+export const PRODUCTION_WORDS: Record<GenreId, string> = {
+  dnb: 'Crisp snappy snare with a short bright tail, sidechained reese that ducks under the kick, clean mono sub below 60 Hz, wide airy top end.',
+  dubstep: 'Heavy half-time snare, aggressive mid-bass growls with movement, deep clean sub, loud modern festival mix.',
+  trap: 'Hard-hitting 808s with long tails, crisp rolling hats, punchy clap, clean low end.',
+  jungle: 'Crunchy chopped breaks, warm deep sub, vintage rave atmosphere.',
+  halftime: 'Heavy spacious half-time drums, weighty reese, deep sub, dark cinematic mix.',
+};
+
 const ROLE_NOUN: Record<SectionRole, string> = {
   intro: 'intro',
   build: 'build-up',
@@ -256,6 +270,7 @@ export function buildAceCaption(input: AceCaptionInput): string {
   if (input.layers?.extraDrums) addExtras('extra breakbeat layers, dense percussion fills');
 
   if (extras.length) sentences.push(`It also features ${joinList(extras)}.`);
+  sentences.push(PRODUCTION_WORDS[genre]);
   sentences.push('The mix is polished and club-ready, with no vocals.');
   return sentences.join(' ');
 }

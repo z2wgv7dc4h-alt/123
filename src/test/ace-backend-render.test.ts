@@ -8,6 +8,7 @@ import {
   ACE_DEFAULT_CHECKPOINT,
   ACE_DCW_ENABLED,
   ACE_DCW_MODE,
+  ACE_TEXT2MUSIC_BATCH_SIZE,
   aceDcwEnabled,
   ACE_COVER_STRENGTH,
   ACE_COVER_STRENGTH_MIN,
@@ -130,6 +131,9 @@ describe('AceStepBackend full GPU path', () => {
     const body = sentBody as unknown as Record<string, unknown>;
     expect(body.thinking).toBe(true);
     expect(body.inferenceSteps).toBe(8);
+    // Generate = best-of-4: the bridge returns every take as a candidate.
+    expect(ACE_TEXT2MUSIC_BATCH_SIZE).toBe(4);
+    expect(body.batchSize).toBe(4);
     // section map still sent; bridge sets lyrics to exactly [Instrumental].
     expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);

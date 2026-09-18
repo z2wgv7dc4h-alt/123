@@ -7,6 +7,8 @@ import {
   DEFAULT_SAMPLE_RATE,
   clampProductBpm,
   GENRES,
+  COHERENCE_LM_TEMPERATURE,
+  type Coherence,
   type GenreId,
   type ProductTier,
   type FlowStep,
@@ -307,8 +309,13 @@ export interface StudioState {
   takeHistory: RenderResult[];
   /** Apply loudness mastering to Studio (ACE) mixes (default true). */
   masterOn: boolean;
+  /** LM coherence preset — maps to ACE lm_temperature (Tight/Balanced/Wild). */
+  coherence: Coherence;
+  /** Which best-of-N take is currently heard (0 = A, the default). */
+  activeCandidate: number;
   setProductTier: (t: ProductTier) => void;
   setMasterOn: (v: boolean) => void;
+  setCoherence: (c: Coherence) => void;
   setSeed: (n: number) => void;
   setKeepSeed: (v: boolean) => void;
   setBpm: (n: number) => void;
@@ -551,6 +558,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   aceCheckpoint: null,
   moreOpen: false,
   masterOn: true,
+  coherence: 'balanced',
+  activeCandidate: 0,
   exportBitDepth: DEFAULT_BIT_DEPTH,
   flowStep: 'idle',
   mixerDirty: false,
@@ -652,6 +661,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   setStyleRefMode: (m) => set({ styleRefMode: m === 'cover' ? 'cover' : 'reference' }),
   setMoreOpen: (v) => set({ moreOpen: v }),
   setMasterOn: (v) => set({ masterOn: Boolean(v) }),
+  setCoherence: (c) => set({ coherence: c }),
   setExportBitDepth: (d) => set({ exportBitDepth: d === 24 ? 24 : 16 }),
   setVibeIntensity: (n) =>
     set((s) => {
@@ -1179,6 +1189,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           lora: s.loraPackId ? [{ packId: s.loraPackId, scale: 0.7 }] : undefined,
           stemSchemaVersion: 'v0',
           master: live.masterOn,
+          lmTemperature: COHERENCE_LM_TEMPERATURE[live.coherence ?? 'balanced'],
           // Belt-and-suspenders: never send styleReference without explicit ownership attest
           styleReference: editPlan
             ? undefined
@@ -1223,6 +1234,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         psAfter === 'ready' || psAfter === 'stopped' ? psAfter : 'ready';
       set({
         result,
+        activeCandidate: 0,
         previousResult: preserved.result ?? get().previousResult,
         takeHistory: opts?.edit && preserved.result ? [...preserved.takeHistory, preserved.result] : [],
         loopRegion: null,
@@ -1402,6 +1414,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const next: RenderResult = { ...result, stems };
     set({
       result: next,
+      activeCandidate: index,
       takeHistory: [...takeHistory, result],
       warnings: [...get().warnings, `Picked Redo candidate ${index + 1} — no re-render`],
       flowStep: 'generated',
@@ -1472,6 +1485,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const prev = takeHistory[takeHistory.length - 1]!;
     set({
       result: prev,
+      activeCandidate: 0,
       takeHistory: takeHistory.slice(0, -1),
       bars: prev.structure?.bars ?? get().bars,
       editedSections: null,
@@ -1565,6 +1579,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     if (!previousResult) return;
     set({
       result: previousResult,
+      activeCandidate: 0,
       previousResult: result,
       loopRegion: null,
       abFlashback: false,
@@ -1842,6 +1857,7 @@ if (import.meta.hot) {
       ownerConfirmed: saved.ownerConfirmed as boolean,
       vibeIntensity: saved.vibeIntensity as number,
       result: saved.result as StudioState['result'],
+      activeCandidate: 0,
       previousResult: (saved.previousResult as StudioState['previousResult']) ?? null,
       loopRegion: (saved.loopRegion as StudioState['loopRegion']) ?? null,
       mixer: saved.mixer as StudioState['mixer'],

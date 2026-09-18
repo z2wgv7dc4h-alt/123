@@ -1,4 +1,5 @@
 import { backendRegistry } from '@/core/registry';
+import type { Coherence } from '@/core/types';
 import { listLoraPacks, loraNotes, useStudioStore } from '../hooks/useStudioStore';
 import { loraPackManager } from '@/core/lora';
 import { useMemo, useState } from 'react';
@@ -42,6 +43,8 @@ export function PowerExtras() {
   const setExportBitDepth = useStudioStore((s) => s.setExportBitDepth);
   const masterOn = useStudioStore((s) => s.masterOn);
   const setMasterOn = useStudioStore((s) => s.setMasterOn);
+  const coherence = useStudioStore((s) => s.coherence);
+  const setCoherence = useStudioStore((s) => s.setCoherence);
   const [trainMsg, setTrainMsg] = useState<string | null>(null);
   const backends = backendRegistry.list();
   const packs = listLoraPacks();
@@ -84,6 +87,21 @@ export function PowerExtras() {
           title="Apply loudness mastering (-9 LUFS, -1 dB ceiling) to Studio takes"
         />
         <span>Master for loudness (Studio)</span>
+      </label>
+
+      <label className="coherence-select">
+        <span className="label-with-tip">
+          <span className="label-with-tip-text">Coherence (Studio LM)</span>
+        </span>
+        <select
+          value={coherence}
+          onChange={(e) => setCoherence(e.target.value as Coherence)}
+          title="LM sampling temperature: Tight 0.6 · Balanced 0.7 · Wild 0.9 (clamped 0.3-1.0)"
+        >
+          <option value="tight">Tight · 0.6</option>
+          <option value="balanced">Balanced · 0.7 (default)</option>
+          <option value="wild">Wild · 0.9</option>
+        </select>
       </label>
 
       <div className="backend-badges" aria-label="Audio path badges">

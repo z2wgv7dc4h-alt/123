@@ -3,7 +3,8 @@
  * Captions, presets, genre picker and tempo defaults; the retired dubstep shape.
  */
 import { describe, expect, it, afterEach } from 'vitest';
-import { buildAceCaption } from '../core/prompt/buildAceCaption';
+import { buildAceCaption, PRODUCTION_WORDS } from '../core/prompt/buildAceCaption';
+import type { GenreId } from '../core/types';
 import { GENRES } from '../core/types';
 import { GENRE_TEMPLATES, templateParams } from '../ui/lib/genreTemplates';
 import { SONG_SHAPES } from '../ui/lib/songShapes';
@@ -46,6 +47,18 @@ describe('genre captions', () => {
     const cap = buildAceCaption({ ...knobs, genre: 'jungle' });
     expect(cap.startsWith('An instrumental jungle track')).toBe(true);
     expect(cap).toMatch(/amen/);
+  });
+
+  it('adds the genre production sentence just before the mix close', () => {
+    const genres: GenreId[] = ['dnb', 'dubstep', 'trap', 'jungle', 'halftime'];
+    for (const genre of genres) {
+      const cap = buildAceCaption({ ...knobs, genre });
+      expect(cap).toContain(PRODUCTION_WORDS[genre]);
+      expect(cap.indexOf(PRODUCTION_WORDS[genre])).toBeLessThan(cap.indexOf('The mix is polished'));
+    }
+    expect(PRODUCTION_WORDS.dnb).toMatch(/reese.*ducks under the kick/i);
+    expect(PRODUCTION_WORDS.dnb).toMatch(/mono sub below 60 Hz/i);
+    expect(PRODUCTION_WORDS.trap).toMatch(/808s with long tails/i);
   });
 });
 

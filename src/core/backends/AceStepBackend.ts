@@ -116,6 +116,11 @@ export function clampCoverStrength(value?: number | null): number {
  * so the user can pick one; the bridge caps it at 4. Strength is 0..1.
  */
 export const ACE_REDO_BATCH_SIZE = 3;
+/**
+ * Generate best-of-4 in one GPU task: the bridge returns every ACE batch
+ * result file as `candidates`, so the browser picks a take without re-rendering.
+ */
+export const ACE_TEXT2MUSIC_BATCH_SIZE = 4;
 export const ACE_REPAINT_STRENGTH_DEFAULT = 0.5;
 export function clampRepaintStrength(value?: number | null): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return ACE_REPAINT_STRENGTH_DEFAULT;
@@ -374,6 +379,9 @@ export class AceStepBackend implements AudioBackend {
           useAdg: sampler.useAdg,
           guidanceScale: ACE_GUIDANCE_SCALE,
           shift: ACE_SHIFT,
+          ...(typeof job.lmTemperature === 'number' && Number.isFinite(job.lmTemperature)
+            ? { lmTemperature: job.lmTemperature }
+            : {}),
           dcwEnabled: aceDcwEnabled(checkpoint ?? ACE_DEFAULT_CHECKPOINT, Boolean(srcAudioBase64)),
           dcwMode: ACE_DCW_MODE,
           ...(job.edit
@@ -394,7 +402,10 @@ export class AceStepBackend implements AudioBackend {
                   srcAudioFileName: job.styleReference?.fileName ?? 'style-ref.wav',
                   audioCoverStrength: clampCoverStrength(job.styleReference?.coverStrength),
                 }
-              : {}),
+              : {
+                  // Best-of-4 generated takes in one GPU task.
+                  batchSize: ACE_TEXT2MUSIC_BATCH_SIZE,
+                }),
           // Reference mode: text2music timbre/mix guidance, task_type unchanged.
           // Rides alongside the repaint `src_audio` when both are present.
           ...(refAudioBase64

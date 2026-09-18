@@ -28,7 +28,8 @@ describe('P-1 paragraph captions', () => {
     expect(cap.match(/drum and bass/g)!.length).toBe(1);
     const words = cap.split(/\s+/).length;
     expect(words).toBeGreaterThan(40);
-    expect(words).toBeLessThan(140);
+    // Production sentence added; keep a generous ceiling (ACE examples run 60-110).
+    expect(words).toBeLessThan(170);
     expect(cap).not.toMatch(/bpm|guitar/i);
   });
 

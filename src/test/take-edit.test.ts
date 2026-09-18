@@ -195,19 +195,22 @@ describe('take edit store actions', () => {
     const candA = new Blob([new Uint8Array([1])], { type: 'audio/wav' });
     const candB = new Blob([new Uint8Array([2])], { type: 'audio/wav' });
     const redoTake = { ...fakeStudioResult, candidates: [candA, candB] } as RenderResult;
-    useStudioStore.setState({ result: redoTake, takeHistory: [] });
+    useStudioStore.setState({ result: redoTake, takeHistory: [], activeCandidate: 0 });
 
     await useStudioStore.getState().pickCandidate(1);
 
     expect(renderSpy).not.toHaveBeenCalled();
     const next = useStudioStore.getState().result!;
     expect(next.stems.find((s) => s.id === 'mix')!.blob).toBe(candB);
+    // Picking = a new take version (pushes history) and marks which take is heard.
     expect(useStudioStore.getState().takeHistory).toEqual([redoTake]);
+    expect(useStudioStore.getState().activeCandidate).toBe(1);
 
     await useStudioStore.getState().undoTakeEdit();
     expect(renderSpy).not.toHaveBeenCalled();
     expect(useStudioStore.getState().result).toBe(redoTake);
     expect(useStudioStore.getState().takeHistory.length).toBe(0);
+    expect(useStudioStore.getState().activeCandidate).toBe(0);
   });
 
   it('pickCandidate ignores a result with no candidates', async () => {

@@ -74,7 +74,6 @@ export function SectionTimeline() {
   const previewState = useStudioStore((s) => s.previewState);
   const redoSection = useStudioStore((s) => s.redoSection);
   const arrangeSection = useStudioStore((s) => s.arrangeSection);
-  const pickCandidate = useStudioStore((s) => s.pickCandidate);
   const undoTakeEdit = useStudioStore((s) => s.undoTakeEdit);
   const takeHistory = useStudioStore((s) => s.takeHistory);
 
@@ -233,23 +232,6 @@ export function SectionTimeline() {
             {renderedBars > 0 && bars !== renderedBars
               ? `Playing ${renderedBars} · next ${bars}`
               : 'Edited'}
-          </span>
-        )}
-        {studioTake && !!result?.candidates && result.candidates.length > 1 && (
-          <span className="timeline-candidates" role="group" aria-label="Pick redo candidate">
-            <span className="hint">Pick</span>
-            {result.candidates.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                className="btn tiny ghost"
-                disabled={busy}
-                title={`Use Redo candidate ${i + 1} (no re-render)`}
-                onClick={() => void pickCandidate(i)}
-              >
-                {i + 1}
-              </button>
-            ))}
           </span>
         )}
       </div>

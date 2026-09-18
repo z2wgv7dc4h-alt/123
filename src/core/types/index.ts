@@ -149,6 +149,14 @@ export interface LoRAPack {
 /** How freely ACE may rewrite the repainted window (bridge repaint_mode). */
 export type RepaintMode = 'conservative' | 'balanced' | 'aggressive';
 
+/** LM coherence preset (More panel) — maps to ACE's lm_temperature. */
+export type Coherence = 'tight' | 'balanced' | 'wild';
+export const COHERENCE_LM_TEMPERATURE: Record<Coherence, number> = {
+  tight: 0.6,
+  balanced: 0.7,
+  wild: 0.9,
+};
+
 export interface RenderJob {
   /** Arrangement preset (intro length, breakdown, etc.). */
   songShape?: SongShapeId;
@@ -229,6 +237,8 @@ export interface RenderJob {
   };
   /** Apply loudness mastering to Studio mix (default true). */
   master?: boolean;
+  /** LM sampling temperature (coherence). Bridge default 0.7, clamped 0.3-1.0. */
+  lmTemperature?: number;
 }
 
 export type StemId = 'kick' | 'snare' | 'hats' | 'perc' | 'bass' | 'mix' | 'drums' | 'other';

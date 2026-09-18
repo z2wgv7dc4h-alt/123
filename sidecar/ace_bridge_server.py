@@ -190,6 +190,22 @@ REPAINT_MODE_DEFAULT = "balanced"
 BATCH_SIZE_DEFAULT = 1
 BATCH_SIZE_MAX = 4
 
+# LM sampling temperature (More panel "coherence"). Gradio's LM CFG/temperature
+# defaults are ~0.7-1.0; below 0.3 the LM loses novelty, above 1.0 it rambles.
+LM_TEMPERATURE_DEFAULT = 0.7
+LM_TEMPERATURE_MIN = 0.3
+LM_TEMPERATURE_MAX = 1.0
+
+
+def clamp_lm_temperature(value: object) -> float:
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return LM_TEMPERATURE_DEFAULT
+    if num != num:  # NaN
+        return LM_TEMPERATURE_DEFAULT
+    return max(LM_TEMPERATURE_MIN, min(LM_TEMPERATURE_MAX, num))
+
 
 def clamp_repaint_strength(value: object) -> float:
     try:
@@ -348,6 +364,8 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
         "use_cot_language": False,
         # Gradio's LM CFG default (API default is 2.5); Gradio output was clearer.
         "lm_cfg_scale": 2.0,
+        # Coherence knob from the More panel, clamped to ACE's sane window.
+        "lm_temperature": clamp_lm_temperature(req.get("lmTemperature")),
         "bpm": bpm,
         "audio_duration": duration_sec,
         "time_signature": "4",

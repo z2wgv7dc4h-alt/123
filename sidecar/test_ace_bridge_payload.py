@@ -155,6 +155,20 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertEqual(bridge.build_render_payload({"batchSize": 3})["batch_size"], 3)
         self.assertEqual(bridge.build_render_payload({})["batch_size"], 1)
         self.assertEqual(bridge.build_render_payload({"batchSize": 99})["batch_size"], 4)
+        # Best-of-4 generated takes: the browser sends batchSize 4.
+        self.assertEqual(bridge.build_render_payload({"batchSize": 4})["batch_size"], 4)
+
+    def test_lm_temperature_default_and_clamp(self):
+        self.assertEqual(bridge.clamp_lm_temperature(None), 0.7)
+        self.assertEqual(bridge.clamp_lm_temperature("0.9"), 0.9)
+        self.assertEqual(bridge.clamp_lm_temperature(0.1), 0.3)
+        self.assertEqual(bridge.clamp_lm_temperature(9), 1.0)
+        self.assertEqual(bridge.clamp_lm_temperature("junk"), 0.7)
+        self.assertEqual(bridge.clamp_lm_temperature(float("nan")), 0.7)
+        self.assertEqual(bridge.build_render_payload({})["lm_temperature"], 0.7)
+        self.assertEqual(bridge.build_render_payload({"lmTemperature": 0.9})["lm_temperature"], 0.9)
+        self.assertEqual(bridge.build_render_payload({"lmTemperature": 0.0})["lm_temperature"], 0.3)
+        self.assertEqual(bridge.build_render_payload({"lmTemperature": 5})["lm_temperature"], 1.0)
 
     def test_build_candidates_returns_every_result_file(self):
         import io, wave
