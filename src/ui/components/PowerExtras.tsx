@@ -1,6 +1,6 @@
 import { backendRegistry } from '@/core/registry';
 import { getAceSidecarBase } from '@/core/backends';
-import type { Coherence, MasterTarget, SamplerMethod } from '@/core/types';
+import type { Coherence, ExportManifest, MasterTarget, SamplerMethod } from '@/core/types';
 import { loraNotes, useStudioStore } from '../hooks/useStudioStore';
 import { useEffect, useMemo, useState } from 'react';
 import { HELP } from '../lib/helpCopy';
@@ -54,6 +54,21 @@ export function PowerExtras() {
   const setMasterOn = useStudioStore((s) => s.setMasterOn);
   const masterTarget = useStudioStore((s) => s.masterTarget);
   const setMasterTarget = useStudioStore((s) => s.setMasterTarget);
+  const recreateFromManifest = useStudioStore((s) => s.recreateFromManifest);
+  const [recreateMsg, setRecreateMsg] = useState<string | null>(null);
+
+  const onRecreateFile = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text()) as ExportManifest;
+      if (!parsed || typeof parsed !== 'object' || !('seed' in parsed) || !parsed.prompt) {
+        throw new Error('Not a DnB Studio manifest.json');
+      }
+      setRecreateMsg(null);
+      await recreateFromManifest(parsed);
+    } catch (e) {
+      setRecreateMsg(e instanceof Error ? e.message : String(e));
+    }
+  };
   const coherence = useStudioStore((s) => s.coherence);
   const setCoherence = useStudioStore((s) => s.setCoherence);
   const sampler = useStudioStore((s) => s.sampler);
@@ -149,6 +164,27 @@ export function PowerExtras() {
           <option value="dynamic">Dynamic · -14 LUFS</option>
         </select>
       </label>
+
+      <label className="recreate-manifest">
+        <span className="label-with-tip">
+          <span className="label-with-tip-text">Recreate from manifest.json</span>
+        </span>
+        <input
+          type="file"
+          accept="application/json,.json"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onRecreateFile(f);
+            e.target.value = '';
+          }}
+          title="Load a ZIP's manifest.json to re-render with its exact params"
+        />
+      </label>
+      {recreateMsg && (
+        <p className="warn" role="status">
+          {recreateMsg}
+        </p>
+      )}
 
       <label className="coherence-select">
         <span className="label-with-tip">

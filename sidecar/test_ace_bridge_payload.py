@@ -486,5 +486,48 @@ class JsonResponseDisconnectTest(unittest.TestCase):
             self.assertEqual(len(lines), 1)
 
 
+class ProgressEndpointTest(unittest.TestCase):
+    def setUp(self):
+        bridge._PROGRESS.clear()
+
+    def test_progress_stage_mapping(self):
+        self.assertEqual(bridge.progress_stage(0, False), "LM planning")
+        self.assertEqual(bridge.progress_stage(1, False), "diffusion")
+        self.assertEqual(bridge.progress_stage(1, True), "decode")
+        self.assertEqual(bridge.progress_stage(2, False), "failed")
+        self.assertEqual(bridge.progress_stage("n/a", False), "LM planning")
+
+    def test_set_and_build_progress(self):
+        with mock.patch.object(bridge.time, "time", return_value=100.0):
+            rec = bridge.set_progress(
+                "j1", task_id="t1", status=1, started_at=90.0, entry={"progress": 0.5}
+            )
+        self.assertEqual(rec["jobId"], "j1")
+        self.assertEqual(rec["taskId"], "t1")
+        self.assertEqual(rec["stage"], "diffusion")
+        self.assertEqual(rec["elapsedSec"], 10.0)
+        self.assertEqual(rec["progress"], 0.5)
+
+        status, body = bridge.build_progress_response("j1")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["stage"], "diffusion")
+        self.assertTrue(body["hasGpu"])
+
+        status2, body2 = bridge.build_progress_response("missing")
+        self.assertEqual(status2, 404)
+        self.assertEqual(body2["error"], "progress_not_found")
+
+    def test_progress_records_stage_from_entries(self):
+        started = 100.0
+        bridge.set_progress("j2", task_id="t2", status=0, started_at=started, entry={"status": 0})
+        self.assertEqual(bridge.build_progress_response("j2")[1]["stage"], "LM planning")
+
+        files = bridge.parse_result_files({"result": '[{"file": "/out.wav", "metas": {}}]'})
+        bridge.set_progress(
+            "j2", task_id="t2", status=1, has_files=bool(files), entry={"status": 1}, started_at=started
+        )
+        self.assertEqual(bridge.build_progress_response("j2")[1]["stage"], "decode")
+
+
 if __name__ == "__main__":
     unittest.main()

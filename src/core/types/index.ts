@@ -295,6 +295,43 @@ export interface AcePayloadSnapshot {
   model: string;
 }
 
+/** Exact ACE params for one render — enough to recreate it from a manifest. */
+export interface AceRequestRecord {
+  caption: string;
+  lyrics: string;
+  bpm: number;
+  seed: number;
+  model: string;
+  thinking: boolean;
+  inferenceSteps: number;
+  useAdg: boolean;
+  guidanceScale: number;
+  shift: number;
+  lmTemperature: number;
+  lmNegativePrompt?: string;
+  sampler: SamplerMethod;
+  masterTarget: MasterTarget;
+  /** Present when this was a repaint/edit render. */
+  repaint?: {
+    startSec: number;
+    endSec: number;
+    mode: RepaintMode;
+    strength: number;
+  };
+  /** Style-reference fingerprint hash (no raw audio). */
+  referenceHash?: string;
+}
+
+/** Live render progress reported by the bridge (GET /progress/<jobId>). */
+export interface RenderProgress {
+  jobId: string;
+  taskId?: string;
+  status: number;
+  stage: 'LM planning' | 'diffusion' | 'decode' | 'done' | 'failed';
+  elapsedSec: number;
+  progress?: number;
+}
+
 /** Where bar 1 actually starts in rendered audio (R-3). */
 export interface BarGrid {
   offsetSec: number;
@@ -421,6 +458,12 @@ export interface ExportManifest {
    * e.g. drums bus formula; perc elemental export when structure plans perc.
    */
   notes?: string[];
+  /** Exact ACE request used for this take (recreate/audit). Studio only. */
+  aceRequest?: AceRequestRecord;
+  /** Loudness mastering report (Studio only). */
+  master?: MasterReport;
+  /** Export filenames for the two mix renders (mastered + raw float). */
+  mixFiles?: { mastered: string; raw: string };
 }
 
 export interface AudioBackend {

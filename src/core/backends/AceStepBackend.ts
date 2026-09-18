@@ -15,6 +15,7 @@ import type {
   StemId,
   MasterReport,
   StudioCandidate,
+  AceRequestRecord,
 } from '../types';
 import { buildExportManifest } from '../export/manifest.ts';
 import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
@@ -344,6 +345,37 @@ export class AceStepBackend implements AudioBackend {
       model: checkpoint ?? ACE_DEFAULT_CHECKPOINT,
     };
 
+    // Exact ACE request (minus audio blobs) for the manifest / Recreate.
+    const aceLyrics = buildAceLyrics(structure.sections.map((s) => s.name));
+    const aceRequest: AceRequestRecord = {
+      caption,
+      lyrics: aceLyrics,
+      bpm: job.bpm,
+      seed: job.seed,
+      model: checkpoint ?? ACE_DEFAULT_CHECKPOINT,
+      thinking,
+      inferenceSteps: sampler.inferenceSteps,
+      useAdg: sampler.useAdg,
+      guidanceScale: ACE_GUIDANCE_SCALE,
+      shift: ACE_SHIFT,
+      lmTemperature: typeof job.lmTemperature === 'number' ? job.lmTemperature : 0.7,
+      sampler: job.sampler ?? 'ode',
+      masterTarget: job.masterTarget ?? 'balanced',
+      ...(job.edit
+        ? {
+            repaint: {
+              startSec: job.edit.startSec,
+              endSec: job.edit.endSec,
+              mode: job.edit.mode ?? 'balanced',
+              strength: clampRepaintStrength(job.edit.strength),
+            },
+          }
+        : {}),
+      ...(job.styleReference && 'hash' in job.styleReference && job.styleReference.hash
+        ? { referenceHash: job.styleReference.hash }
+        : {}),
+    };
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ACE_RENDER_TIMEOUT_MS);
     let res: Response;
@@ -405,7 +437,7 @@ export class AceStepBackend implements AudioBackend {
               }
             : {}),
           // ACE lyrics = timeline: song-map structure tags, no words.
-          lyrics: buildAceLyrics(structure.sections.map((s) => s.name)),
+          lyrics: aceLyrics,
           prompt: {
             text: caption,
             tags: buildAceTags({
@@ -691,6 +723,8 @@ export class AceStepBackend implements AudioBackend {
       // as `src_audio` (cover, not a take edit) or as `reference_audio`.
       acePathActive: Boolean((srcAudioBase64 && !job.edit) || refAudioBase64),
       notes,
+      aceRequest,
+      ...(primary.master ? { master: primary.master } : {}),
     });
 
     return {

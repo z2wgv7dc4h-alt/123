@@ -11,6 +11,8 @@ import {
   type Coherence,
   type SamplerMethod,
   type MasterTarget,
+  type RenderProgress,
+  type ExportManifest,
   type GenreId,
   type ProductTier,
   type FlowStep,
@@ -36,7 +38,7 @@ import {
   type PreviewState,
 } from '@/core/audio';
 import { analyzeUserAudio, mapVibeToParams } from '@/core/styleRef';
-import { exportAll, exportZip, buildSketchNotes, decodeWavChannels, encodeWav } from '@/core/export';
+import { exportAll, exportZip, buildSketchNotes, decodeWavChannels, encodeWav, recreateParamsFromManifest } from '@/core/export';
 import {
   shouldShowExportDawTip,
   markExportDawTipSeen,
@@ -238,6 +240,8 @@ export interface StudioState {
   promptText: string;
   backendId: string;
   busy: boolean;
+  /** Live bridge render progress (Studio) — elapsed + stage, not a blind spinner. */
+  renderProgress: RenderProgress | null;
   error: string | null;
   warnings: string[];
   result: RenderResult | null;
@@ -365,6 +369,8 @@ export interface StudioState {
   }) => Promise<void>;
   /** P-3: repaint every drop section, best-of-2, auto-pick the top score. */
   polishDrops: () => Promise<void>;
+  /** Load an exported manifest and re-render with its exact params. */
+  recreateFromManifest: (manifest: ExportManifest) => Promise<void>;
   generateAgain: () => Promise<void>;
   vary: () => Promise<void>;
   redoSection: (index: number, style?: SectionStyle) => Promise<void>;
@@ -599,6 +605,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   promptText: DEFAULT_DESCRIPTORS.slice(0, 4).join(', '),
   backendId: 'offline-stub',
   busy: false,
+  renderProgress: null,
   error: null,
   warnings: [],
   result: null,
@@ -1274,6 +1281,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       }
 
       let heartbeat: { stop: () => void } | undefined;
+      let progressTimer: ReturnType<typeof setInterval> | undefined;
       if (isAcePath) {
         await acquireRenderWakeLock();
         heartbeat = startRenderHeartbeat(getAceSidecarBase(), () => {
@@ -1283,6 +1291,21 @@ export const useStudioStore = create<StudioState>((set, get) => ({
             4000,
           );
         });
+        // Poll the bridge for real elapsed/stage instead of a blind spinner.
+        const sidecar = getAceSidecarBase();
+        const pollProgress = () => {
+          void (async () => {
+            try {
+              const res = await fetch(`${sidecar}/progress/${encodeURIComponent(jobId)}`);
+              if (res.ok) set({ renderProgress: (await res.json()) as RenderProgress });
+            } catch {
+              /* bridge not reachable yet */
+            }
+          })();
+        };
+        set({ renderProgress: null });
+        pollProgress();
+        progressTimer = setInterval(pollProgress, 1500);
       }
       let result: RenderResult;
       try {
@@ -1334,6 +1357,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         });
       } finally {
         heartbeat?.stop();
+        if (progressTimer) clearInterval(progressTimer);
+        set({ renderProgress: null });
         if (isAcePath) await releaseRenderWakeLock();
       }
       // Polish drops / best-of: hear the top-scored candidate (no extra history).
@@ -1594,6 +1619,26 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         3200,
       );
     }
+  },
+
+  recreateFromManifest: async (manifest) => {
+    const params = recreateParamsFromManifest(manifest);
+    const lmTemp = params.lmTemperature;
+    const coherence: Coherence =
+      lmTemp == null ? get().coherence : lmTemp <= 0.65 ? 'tight' : lmTemp >= 0.8 ? 'wild' : 'balanced';
+    set({
+      seed: params.seed >>> 0,
+      bpm: clampProductBpm(params.bpm || DEFAULT_BPM),
+      promptText: params.promptText,
+      energy: params.energy,
+      darkness: params.darkness,
+      coherence,
+      keepSeed: true,
+      ...(params.masterTarget ? { masterTarget: params.masterTarget } : {}),
+      ...(params.sampler ? { sampler: params.sampler } : {}),
+    });
+    await get().generate();
+    if (!get().error) pushToast('Recreated from manifest — hit Play', 'success', 3200);
   },
 
   separateStems: async () => {

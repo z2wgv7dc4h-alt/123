@@ -10,6 +10,7 @@ export function StatusPanel() {
   const warnings = useStudioStore((s) => s.warnings);
   const result = useStudioStore((s) => s.result);
   const busy = useStudioStore((s) => s.busy);
+  const renderProgress = useStudioStore((s) => s.renderProgress);
   const mixerDirty = useStudioStore((s) => s.mixerDirty);
 
   return (
@@ -17,7 +18,15 @@ export function StatusPanel() {
       <h2>Status <HelpTip text={HELP.statusPanel} ariaLabel="About status panel" /></h2>
       {busy && (
         <>
-          <p className="hint">Creating your sketch…</p>
+          <p className="hint">
+            {renderProgress
+              ? `Rendering · ${renderProgress.stage} · ${renderProgress.elapsedSec.toFixed(0)}s elapsed${
+                  typeof renderProgress.progress === 'number'
+                    ? ` · ${Math.round(renderProgress.progress <= 1 ? renderProgress.progress * 100 : renderProgress.progress)}%`
+                    : ''
+                }`
+              : 'Creating your sketch…'}
+          </p>
           <div className="gen-progress" role="progressbar" aria-label="Generating" aria-valuetext="Creating your sketch" aria-busy="true">
             <span className="gen-progress-bar" />
           </div>

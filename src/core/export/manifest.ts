@@ -5,6 +5,10 @@ import type {
   StructureMap,
   StyleReferenceProvenance,
   RealBreakLoopProvenance,
+  AceRequestRecord,
+  MasterReport,
+  MasterTarget,
+  SamplerMethod,
 } from '../types/index.ts';
 import { DEFAULT_PPQ } from '../types/index.ts';
 
@@ -47,6 +51,12 @@ export function buildExportManifest(opts: {
   notes?: string[];
   /** Set when a real breakbeat loop was blended into the mix (Sketch only). */
   realBreakLoop?: RealBreakLoopProvenance;
+  /** Exact ACE request (Studio) for recreate/audit. */
+  aceRequest?: AceRequestRecord;
+  /** Loudness mastering report (Studio). */
+  master?: MasterReport;
+  /** Export filenames for the mastered + raw float mixes. */
+  mixFiles?: { mastered: string; raw: string };
 }): ExportManifest {
   const { job, structure, stems, backendId, checkpointId, bpmMeasured, gpuUsed } = opts;
   const acePathActive = opts.acePathActive === true;
@@ -87,5 +97,37 @@ export function buildExportManifest(opts: {
     ...(styleReference ? { styleReference } : {}),
     ...(opts.realBreakLoop ? { realBreakLoop: opts.realBreakLoop } : {}),
     ...(opts.notes?.length ? { notes: [...opts.notes] } : {}),
+    ...(opts.aceRequest ? { aceRequest: opts.aceRequest } : {}),
+    ...(opts.master ? { master: opts.master } : {}),
+    ...(opts.mixFiles ? { mixFiles: opts.mixFiles } : {}),
+  };
+}
+
+/** Params needed to recreate a take from its manifest — used by the Recreate UI. */
+export function recreateParamsFromManifest(manifest: ExportManifest): {
+  seed: number;
+  bpm: number;
+  promptText: string;
+  energy: number;
+  darkness: number;
+  masterTarget?: MasterTarget;
+  sampler?: SamplerMethod;
+  lmTemperature?: number;
+} {
+  const req = manifest.aceRequest;
+  return {
+    seed: manifest.seed,
+    bpm: manifest.bpmTarget || manifest.bpmMeasured,
+    // aceRequest.caption is the exact posted text; fall back to the prompt text.
+    promptText: req?.caption ?? manifest.prompt.text,
+    energy: manifest.prompt.energy,
+    darkness: manifest.prompt.darkness,
+    ...(req
+      ? {
+          masterTarget: req.masterTarget,
+          sampler: req.sampler,
+          lmTemperature: req.lmTemperature,
+        }
+      : {}),
   };
 }

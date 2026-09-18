@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
-BRIDGE_BUILD = "2026-09-18-lora"
+BRIDGE_BUILD = "2026-09-18-progress"
 
 # Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
 # bridge never auto-installs it. Without it /stems returns 501 + install hint.
@@ -54,6 +54,68 @@ _ARTIST_BLOCK = ()  # artist style descriptors allowed
 
 _MIX_CACHE: dict[str, tuple[bytes, str]] = {}
 _MIX_CACHE_MAX = 8
+
+# Live render progress per browser jobId (GET /progress/<jobId>).
+_PROGRESS: dict[str, dict] = {}
+_PROGRESS_MAX = 32
+
+
+def progress_stage(status: object, has_files: bool) -> str:
+    """Human stage for the UI. ACE status: 0 queued, 1 running, 2 failed."""
+    if has_files:
+        return "decode"
+    try:
+        s = int(status)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        s = 0
+    if s == 2:
+        return "failed"
+    if s == 1:
+        return "diffusion"
+    return "LM planning"
+
+
+def _progress_fraction(entry: object) -> float | None:
+    if not isinstance(entry, dict):
+        return None
+    for key in ("progress", "percent", "pct"):
+        val = entry.get(key)
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            return float(val)
+    return None
+
+
+def set_progress(
+    job_id: str,
+    *,
+    task_id: str | None = None,
+    status: object = 0,
+    has_files: bool = False,
+    entry: object = None,
+    started_at: float | None = None,
+    stage: str | None = None,
+) -> dict:
+    elapsed = time.time() - (started_at if started_at is not None else time.time())
+    rec = {
+        "jobId": job_id,
+        "taskId": task_id,
+        "status": int(status) if isinstance(status, (int, float)) else 0,
+        "stage": stage or progress_stage(status, has_files),
+        "elapsedSec": round(max(0.0, elapsed), 1),
+        "progress": _progress_fraction(entry),
+    }
+    _PROGRESS[job_id] = rec
+    while len(_PROGRESS) > _PROGRESS_MAX:
+        _PROGRESS.pop(next(iter(_PROGRESS)))
+    return rec
+
+
+def build_progress_response(job_id: str) -> tuple[int, dict]:
+    rec = _PROGRESS.get(job_id)
+    if not rec:
+        return 404, {"error": "progress_not_found", "jobId": job_id}
+    return 200, {**rec, "hasGpu": True}
+
 
 
 def scrub_artist(text: str) -> str:
@@ -849,6 +911,11 @@ class Handler(BaseHTTPRequestHandler):
             status, body = build_loras_response()
             json_response(self, status, body)
             return
+        if path.startswith("/progress/"):
+            job_id = urllib.parse.unquote(path[len("/progress/") :])
+            status, body = build_progress_response(job_id)
+            json_response(self, status, body)
+            return
         if path.startswith("/mix/"):
             job_id = urllib.parse.unquote(path[len("/mix/") :])
             entry = _MIX_CACHE.get(job_id)
@@ -946,6 +1013,8 @@ class Handler(BaseHTTPRequestHandler):
         #   thinking are unchanged, so this stays a text2music render.
         # Both may ride together (repaint from a take + a reference palette).
         upload_files = collect_upload_files(req)
+        started_at = time.time()
+        set_progress(job_id, status=0, started_at=started_at)
         try:
             if req.get("srcAudioBase64"):
                 payload = apply_source_task(payload, req)
@@ -981,6 +1050,7 @@ class Handler(BaseHTTPRequestHandler):
                     },
                 )
                 return
+            set_progress(job_id, task_id=task_id, status=0, started_at=started_at)
 
             audio_urls: list[str] = []
             metas = {}
@@ -1005,6 +1075,14 @@ class Handler(BaseHTTPRequestHandler):
                 entry = entries[0]
                 status = entry.get("status")
                 files = parse_result_files(entry)
+                set_progress(
+                    job_id,
+                    task_id=task_id,
+                    status=status if status is not None else 0,
+                    has_files=bool(files),
+                    entry=entry,
+                    started_at=started_at,
+                )
                 if status == 2:
                     json_response(
                         self,
@@ -1039,6 +1117,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
 
             batch_size = int(payload.get("batch_size") or BATCH_SIZE_DEFAULT)
+            set_progress(
+                job_id,
+                task_id=task_id,
+                status=1,
+                has_files=True,
+                started_at=started_at,
+                stage="done",
+            )
             audio_bytes = download_bytes(audio_urls[0])
             b64 = base64.b64encode(audio_bytes).decode("ascii")
             mix_url = cache_mix(job_id, audio_bytes, "wav")

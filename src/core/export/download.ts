@@ -41,15 +41,31 @@ export type ExportZipOpts = {
   sketchNotes?: string | SketchNotesInput;
 };
 
-/** Bundle stems + manifest + MIDI into one ZIP download. */
-export async function exportZip(
+/**
+ * Build the full ZIP entry list (pure, testable): mastered mix, raw float mix,
+ * every stem, manifest, MIDI and sketch notes.
+ */
+export async function buildExportEntries(
   result: RenderResult,
   prefix?: string,
   opts?: ExportZipOpts,
-): Promise<void> {
+): Promise<ZipEntry[]> {
   const p = prefix ?? `dnb_${result.seed}`;
   const bitDepth = opts?.bitDepth ?? 16;
   const entries: ZipEntry[] = [];
+  const mixFile = `${p}_mix_mastered.wav`;
+  const rawFile = `${p}_mix_raw.wav`;
+
+  // Mastered mix is what Play hears (mix stem), re-encoded to the export depth.
+  const mixStem = result.stems.find((s) => s.id === 'mix');
+  if (mixStem?.blob) {
+    const mastered = await ensureWavBitDepth(mixStem.blob, bitDepth);
+    entries.push({ name: mixFile, data: await blobToUint8(mastered) });
+  }
+  // Raw ACE mix stays byte-for-byte (32-bit float as returned) for remastering.
+  if (result.rawMixBlob) {
+    entries.push({ name: rawFile, data: await blobToUint8(result.rawMixBlob) });
+  }
 
   for (const stem of result.stems) {
     if (!stem.blob) continue;
@@ -62,7 +78,11 @@ export async function exportZip(
     entries.push({ name: `${p}_mix_as_heard.wav`, data: await blobToUint8(heard) });
   }
 
-  const manifest: ExportManifest = { ...result.manifest, bitDepth };
+  const manifest: ExportManifest = {
+    ...result.manifest,
+    bitDepth,
+    mixFiles: { mastered: mixFile, raw: rawFile },
+  };
   const manifestJson = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
   entries.push({ name: `${p}_manifest.json`, data: manifestJson });
 
@@ -93,7 +113,17 @@ export async function exportZip(
       data: new TextEncoder().encode(notesText),
     });
   }
+  return entries;
+}
 
+/** Bundle stems + manifest + MIDI into one ZIP download. */
+export async function exportZip(
+  result: RenderResult,
+  prefix?: string,
+  opts?: ExportZipOpts,
+): Promise<void> {
+  const p = prefix ?? `dnb_${result.seed}`;
+  const entries = await buildExportEntries(result, prefix, opts);
   if (!entries.length) throw new Error('Nothing to export');
   triggerDownload(buildZip(entries), `${p}_export.zip`);
 }
