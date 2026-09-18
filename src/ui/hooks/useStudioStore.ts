@@ -544,23 +544,43 @@ function maybeToastRemixLive(get: () => StudioState): void {
   pushToast(HELP.remixLive, 'info', 4200);
 }
 
-/** Swap every stem to a candidate blob (heard mix), preserving duration/sr. */
+/** Swap every stem to a candidate's mastered mix, keeping raw/grid/report in sync. */
 function withMixCandidate(result: RenderResult, index: number): RenderResult {
-  const blob = result.candidates?.[index];
-  if (!blob) return result;
+  const candidate = result.candidates?.[index];
+  if (!candidate) return result;
   const mix = result.stems.find((s) => s.id === 'mix');
   const durationSec = mix?.durationSec ?? 0;
   const sampleRateHz = mix?.sampleRateHz ?? DEFAULT_SAMPLE_RATE;
   const bitDepth = mix?.bitDepth ?? DEFAULT_BIT_DEPTH;
   const stems = result.stems.map((s) => ({
     ...s,
-    blob,
-    url: URL.createObjectURL(blob),
+    blob: candidate.mix,
+    url: URL.createObjectURL(candidate.mix),
     durationSec,
     sampleRateHz,
     bitDepth,
   }));
-  return { ...result, stems };
+  return {
+    ...result,
+    stems,
+    rawMixBlob: candidate.raw,
+    barGrid: candidate.barGrid,
+    master: candidate.master,
+  };
+}
+
+/** Release blob URLs for a result that no longer has any takeHistory reference. */
+function revokeResultUrls(result: RenderResult | null | undefined): void {
+  if (!result || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
+  for (const s of result.stems) {
+    if (typeof s.url === 'string' && s.url.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(s.url);
+      } catch {
+        /* already revoked */
+      }
+    }
+  }
 }
 
 export const useStudioStore = create<StudioState>((set, get) => ({
@@ -1103,6 +1123,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         );
         return;
       }
+      if (editPlan.warning) pushToast(editPlan.warning, 'warn', 5000);
     }
     // Studio/ACE without GPU: fail-soft to Sketch audio — never soft-pass as live Studio
     if ((s.backendId.startsWith('ace-step') && !s.aceHasGpu) || (s.productTier === 'studio' && !s.aceHasGpu)) {
@@ -1340,7 +1361,11 @@ export const useStudioStore = create<StudioState>((set, get) => ({
         loopRegion: null,
         waveformZoom: false,
         abFlashback: false,
-        warnings: [...(preserved.warnings), ...result.warnings],
+        warnings: [
+          ...preserved.warnings,
+          ...(editPlan?.warning ? [editPlan.warning] : []),
+          ...result.warnings,
+        ],
         busy: false,
         flowStep: 'generated',
         mixerDirty: dirty,
@@ -1495,23 +1520,12 @@ export const useStudioStore = create<StudioState>((set, get) => ({
   pickCandidate: async (index) => {
     const { result, busy, takeHistory } = get();
     if (busy || !result?.candidates?.length) return;
-    const blob = result.candidates[index];
-    if (index < 0 || !blob) return;
-    const mix = result.stems.find((s) => s.id === 'mix');
-    const durationSec = mix?.durationSec ?? 0;
-    const sampleRateHz = mix?.sampleRateHz ?? 48000;
-    const bitDepth = mix?.bitDepth ?? 16;
-    // Every lane in a batch Redo shares the mix placeholder — swap them all so
-    // the picked candidate is what Play actually hears.
-    const stems = result.stems.map((s) => ({
-      ...s,
-      blob,
-      url: URL.createObjectURL(blob),
-      durationSec,
-      sampleRateHz,
-      bitDepth,
-    }));
-    const next: RenderResult = { ...result, stems };
+    const candidate = result.candidates[index];
+    if (index < 0 || !candidate) return;
+    // Swap stems to the candidate's mastered mix; raw/barGrid/master follow so
+    // the next Redo edits this candidate's own raw audio.
+    const next = withMixCandidate(result, index);
+    const durationSec = next.stems.find((s) => s.id === 'mix')?.durationSec ?? 0;
     set({
       result: next,
       activeCandidate: index,
@@ -1621,6 +1635,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     const { takeHistory, mixer, busy } = get();
     if (busy || !takeHistory.length) return;
     const prev = takeHistory[takeHistory.length - 1]!;
+    const discarded = get().result;
     set({
       result: prev,
       activeCandidate: 0,
@@ -1631,6 +1646,8 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       abFlashback: false,
       flowStep: 'generated',
     });
+    // The discarded take is no longer reachable from takeHistory — free its URLs.
+    if (discarded && discarded !== prev) revokeResultUrls(discarded);
     previewPlayer.clearStemCache();
     previewPlayer.onState = (ps) => set({ previewState: ps });
     try {

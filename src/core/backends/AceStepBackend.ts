@@ -14,6 +14,7 @@ import type {
   StemFile,
   StemId,
   MasterReport,
+  StudioCandidate,
 } from '../types';
 import { buildExportManifest } from '../export/manifest.ts';
 import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
@@ -504,60 +505,128 @@ export class AceStepBackend implements AudioBackend {
     const sr = job.sampleRateHz;
     const bitDepth = job.bitDepth;
 
-    // Best-of-N Redo: bridge returns one wavBase64 per ACE batch result.
-    const candidateBlobs: Blob[] = (data.candidates ?? [])
-      .map((c) => (typeof c?.wavBase64 === 'string' && c.wavBase64 ? b64ToBlob(c.wavBase64) : null))
-      .filter((b): b is Blob => b !== null);
-
-    // Score every candidate and reorder best-first so Take A is the best take.
-    let candidateScores: number[] | undefined;
-    if (candidateBlobs.length > 1) {
-      try {
-        const scores: number[] = [];
-        for (const blob of candidateBlobs) {
-          const decoded = decodeWavChannels(await blob.arrayBuffer());
-          scores.push(
-            scoreTake({
-              channels: decoded.channels,
-              sampleRateHz: decoded.sampleRate,
-              bpm: structure.bpm,
-              genre: job.genre ?? 'dnb',
-              structure,
-            }).total,
-          );
-        }
-        const ranked = candidateBlobs
-          .map((_, i) => i)
-          .sort((a, b) => scores[b]! - scores[a]!);
-        const orderedBlobs = ranked.map((i) => candidateBlobs[i]!);
-        candidateScores = ranked.map((i) => scores[i]!);
-        candidateBlobs.length = 0;
-        candidateBlobs.push(...orderedBlobs);
-      } catch {
-        candidateScores = undefined; // non-WAV stub — keep the bridge order
-      }
-    }
-
     // Decode failures are surfaced, never silent — otherwise R-5 mastering,
     // R-3 barGrid and E-1 splices quietly no-op on real takes.
     const decodeWarnings: string[] = [];
 
-    // R-3: where bar 1 really starts — computed from RAW mix before mastering
-    let barGrid: BarGrid | undefined;
-    let masterReport: MasterReport | undefined;
-    let rawMixBlob: Blob | undefined;
-    let activeMixB64 = mixB64;
+    // Reference tone match (any style-ref mode) when the file decodes.
+    let reference: { channels: Float32Array[]; sampleRate: number } | undefined;
+    if (styleAudio) {
+      try {
+        const refDecoded = decodeWavChannels(await styleAudio.arrayBuffer());
+        reference = { channels: refDecoded.channels, sampleRate: refDecoded.sampleRate };
+      } catch {
+        /* reference not decodable — fall back to the genre tilt */
+      }
+    }
 
-    try {
-      const bin = atob(mixB64);
+    const bytesFromB64 = (b64: string): Uint8Array => {
+      const bin = atob(b64);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const decoded = decodeWavToMono(bytes.buffer);
-      barGrid = estimateBarGrid(decoded.mono, decoded.sampleRateHz, structure.bpm);
-    } catch (e) {
-      barGrid = undefined; // not WAV (or test stub) → edits use offset 0
-      decodeWarnings.push(`Bar grid skipped: ${e instanceof Error ? e.message : String(e)}`);
+      return bytes;
+    };
+    const b64FromBytes = (bytes: Uint8Array): string => {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+      return btoa(binary);
+    };
+
+    type ProcessedCandidate = StudioCandidate & { rawB64: string; mixB64: string; score: number };
+
+    // EVERY candidate gets its own raw decode, bar grid and master pass, so
+    // picking any take keeps edits (rawMixBlob) and R-3 grid in sync.
+    const processCandidate = async (rawB64: string): Promise<ProcessedCandidate> => {
+      const rawBytes = bytesFromB64(rawB64);
+      let decoded: ReturnType<typeof decodeWavChannels> | undefined;
+      let decodeError: string | undefined;
+      try {
+        decoded = decodeWavChannels(rawBytes.buffer);
+      } catch (e) {
+        decodeError = e instanceof Error ? e.message : String(e);
+        decodeWarnings.push(`Candidate decode skipped: ${decodeError}`);
+      }
+      let candidateGrid: BarGrid | undefined;
+      try {
+        const mono = decodeWavToMono(rawBytes.buffer);
+        candidateGrid = estimateBarGrid(mono.mono, mono.sampleRateHz, structure.bpm);
+      } catch (e) {
+        decodeWarnings.push(`Bar grid skipped: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      let mixB64 = rawB64;
+      let candidateMaster: MasterReport | undefined;
+      if (job.master !== false && decoded && decoded.channels.length === 2) {
+        try {
+          const mastered = masterStereo(
+            decoded.channels[0]!,
+            decoded.channels[1]!,
+            decoded.sampleRate,
+            {
+              ...(reference ? { reference } : {}),
+              genre: job.genre ?? 'dnb',
+            },
+          );
+          const masteredWav = encodeWav([mastered.left, mastered.right], sr, 16);
+          mixB64 = b64FromBytes(new Uint8Array(await masteredWav.arrayBuffer()));
+          candidateMaster = mastered.report;
+        } catch (e) {
+          decodeWarnings.push(
+            `Mastering skipped: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      } else if (job.master !== false && !decoded) {
+        decodeWarnings.push(`Mastering skipped: ${decodeError ?? 'unsupported WAV'}`);
+      }
+      const score = decoded
+        ? scoreTake({
+            channels: decoded.channels,
+            sampleRateHz: decoded.sampleRate,
+            bpm: structure.bpm,
+            genre: job.genre ?? 'dnb',
+            structure,
+          }).total
+        : 0;
+      return {
+        raw: b64ToBlob(rawB64),
+        mix: b64ToBlob(mixB64),
+        ...(candidateGrid ? { barGrid: candidateGrid } : {}),
+        ...(candidateMaster ? { master: candidateMaster } : {}),
+        rawB64,
+        mixB64,
+        score,
+      };
+    };
+
+    const rawCandidateB64 = (data.candidates ?? [])
+      .map((c) => (typeof c?.wavBase64 === 'string' && c.wavBase64 ? c.wavBase64 : null))
+      .filter((b): b is string => b !== null);
+    const rawList = rawCandidateB64.length ? rawCandidateB64 : [mixB64];
+    let processed: ProcessedCandidate[] = [];
+    for (const rawB64 of rawList) processed.push(await processCandidate(rawB64));
+
+    // Rank best-first so Take A is the best-scoring take.
+    let candidateScores: number[] | undefined;
+    if (processed.length > 1) {
+      processed.sort((a, b) => b.score - a.score);
+      candidateScores = processed.map((c) => c.score);
     }
+    const primary = processed[0]!;
+    const candidateBlobs: StudioCandidate[] =
+      processed.length > 1
+        ? processed.map((c) => ({
+            raw: c.raw,
+            mix: c.mix,
+            ...(c.barGrid ? { barGrid: c.barGrid } : {}),
+            ...(c.master ? { master: c.master } : {}),
+          }))
+        : [];
+
+    // Candidate A drives the heard take, its stems and edits. Keep rawMixBlob
+    // for the single un-mastered path only (no candidate list to fall back on).
+    const activeMixB64 = primary.mixB64;
+    const barGrid = primary.barGrid;
+    const masterReport = primary.master;
+    const rawMixBlob = processed.length > 1 || primary.master ? primary.raw : undefined;
 
     const order: StemId[] = ['kick', 'snare', 'hats', 'bass', 'drums', 'mix'];
     const stems: StemFile[] = [];
@@ -587,62 +656,16 @@ export class AceStepBackend implements AudioBackend {
       payloadLine,
       ...bridgeWarnings,
       ...decodeWarnings,
+      ...(primary.master
+        ? [
+            `Mastered to -9 LUFS (measured ${primary.master.lufsAfter.toFixed(1)}, ` +
+              `peak ${primary.master.peakDbAfter.toFixed(1)} dBFS)`,
+          ]
+        : []),
       'Studio ACE (GPU) â€” original generation; not an artist clone',
       'Stem lanes may share mix until ACE lego/extract is wired',
     ];
 
-    // Apply mastering to Studio mix if enabled (default true)
-    if (job.master !== false) {
-      try {
-        const bin = atob(mixB64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        const decoded = decodeWavChannels(bytes.buffer);
-        if (decoded.channels.length === 2) {
-          // Reference tone match (any style-ref mode) when the file decodes.
-          let reference: { channels: Float32Array[]; sampleRate: number } | undefined;
-          if (styleAudio) {
-            try {
-              const refDecoded = decodeWavChannels(await styleAudio.arrayBuffer());
-              reference = { channels: refDecoded.channels, sampleRate: refDecoded.sampleRate };
-            } catch {
-              /* reference not decodable — fall back to the genre tilt */
-            }
-          }
-          const mastered = masterStereo(decoded.channels[0]!, decoded.channels[1]!, decoded.sampleRate, {
-            ...(reference ? { reference } : {}),
-            genre: job.genre ?? 'dnb',
-          });
-          // Save raw mix for edits
-          rawMixBlob = b64ToBlob(mixB64);
-          // Re-encode mastered audio to 16-bit WAV
-          const masteredWav = encodeWav([mastered.left, mastered.right], sr, 16);
-          const masteredBytes = new Uint8Array(await masteredWav.arrayBuffer());
-          let masteredBinary = '';
-          for (let i = 0; i < masteredBytes.length; i++) {
-            masteredBinary += String.fromCharCode(masteredBytes[i]!);
-          }
-          activeMixB64 = btoa(masteredBinary);
-          masterReport = mastered.report;
-
-          const noteText =
-            `Mastered to -9 LUFS (measured ${mastered.report.lufsAfter.toFixed(1)}, ` +
-            `peak ${mastered.report.peakDbAfter.toFixed(1)} dBFS)`;
-          warnings.push(noteText);
-        }
-      } catch (e) {
-        // Decode/encode failed (test stub, unsupported WAV, etc.) — keep the
-        // raw mix but tell the user, instead of silently skipping mastering.
-        warnings.push(`Mastering skipped: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
-
-    // Re-build stems with active mix (mastered or raw)
-    stems.length = 0;
-    for (const id of order) {
-      const fromStem = data.stems?.find((s) => s.id === id)?.wavBase64 || activeMixB64;
-      stems.push(stemFromB64(id, fromStem, durationSec, sr, bitDepth));
-    }
     const notes = [
       'ACE GPU mix via localhost bridge; structure/MIDI from hard-grid-v0',
       'Stem elementals currently mirror mix (honest â€” not OfflineStub synth)',

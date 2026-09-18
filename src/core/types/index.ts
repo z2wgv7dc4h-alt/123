@@ -307,6 +307,16 @@ export interface MasterReport {
   maxCorrectionDb: number;
 }
 
+/** One best-of-N candidate, fully processed (raw + mastered + grid + report). */
+export interface StudioCandidate {
+  /** Unmastered ACE result — the source for take edits. */
+  raw: Blob;
+  /** Mastered mix (or raw when mastering is off) — what Play hears. */
+  mix: Blob;
+  barGrid?: BarGrid;
+  master?: MasterReport;
+}
+
 export interface RenderResult {
   jobId: string;
   seed: number;
@@ -327,8 +337,8 @@ export interface RenderResult {
   barGrid?: BarGrid;
   /** Unmastered ACE mix (raw, for edits). Present when mastering was applied. */
   rawMixBlob?: Blob;
-  /** Best-of-N Redo mixes. Present when a batch render returned >1 candidate. */
-  candidates?: Blob[];
+  /** Best-of-N candidate mixes (best first). Present when a batch render returned >1. */
+  candidates?: StudioCandidate[];
   /** Score per candidate (aligned with `candidates`, best first). */
   candidateScores?: number[];
   /**

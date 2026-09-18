@@ -32,6 +32,8 @@ export type TakeEditPlan = {
   seed: number;
   bpm: number;
   style?: SectionStyle;
+  /** Present when the raw mix was missing and the mastered mix was used. */
+  warning?: string;
 };
 
 /** Map structure section names to caption roles. */
@@ -107,8 +109,15 @@ export function isStudioTake(result: RenderResult | null | undefined): boolean {
 export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEditPlan | null {
   if (!isStudioTake(result)) return null;
   const structure = result.structure!;
-  // Use rawMixBlob (unmastered) if available, else the mastered mix blob
-  const source = result.rawMixBlob ?? result.stems.find((s) => s.id === 'mix')!.blob!;
+  // Prefer the RAW ACE mix so a Redo repaints from un-mastered audio. Studio
+  // takes always carry it now; if an old take lacks it, fall back to the
+  // mastered mix and surface a warning.
+  const mixSource = result.stems.find((s) => s.id === 'mix')!.blob!;
+  const rawSource = result.rawMixBlob ?? null;
+  const source = rawSource ?? mixSource;
+  const sourceWarning = rawSource
+    ? undefined
+    : 'No raw mix for this take — editing the mastered mix (tone may drift)';
   const bpm = result.bpmMeasured || structure.bpm;
   const spb = secondsPerBar(bpm);
   const off = gridOffsetSec(result);
@@ -146,6 +155,7 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
       seed: result.seed,
       bpm,
       style,
+      ...(sourceWarning ? { warning: sourceWarning } : {}),
     };
   }
   const last = structure.sections.length - 1;
@@ -160,5 +170,6 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
     structureRef: extendStructure(structure, last, req.deltaBars),
     seed: result.seed,
     bpm,
+    ...(sourceWarning ? { warning: sourceWarning } : {}),
   };
 }
