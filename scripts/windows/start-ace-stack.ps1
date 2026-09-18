@@ -34,6 +34,9 @@ if (-not (Test-Path $bridge)) {
 $env:ACESTEP_QUANTIZATION = "false"
 $env:ACESTEP_COMPILE = "false"
 $env:ACESTEP_USE_FLASH_ATTENTION = "false"
+# huggingface-cli's deprecation notice has an emoji; without utf-8 it crashes on
+# the Windows cp1252 console and the XL-turbo download would "fail" instantly.
+$env:PYTHONIOENCODING = "utf-8"
 if (-not $env:ACESTEP_LM_BACKEND) { $env:ACESTEP_LM_BACKEND = "pt" }
 # DiT: XL-turbo (4B) is the default Studio model — ACE README rates turbo and
 # xl-turbo Very High; CPU offload keeps 4B inside 16 GB. Falls back to plain
