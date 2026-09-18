@@ -690,14 +690,18 @@ def ace_health_ok() -> bool:
 
 def json_response(handler: BaseHTTPRequestHandler, status: int, body: dict) -> None:
     raw = json.dumps(body).encode("utf-8")
-    handler.send_response(status)
-    handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Content-Length", str(len(raw)))
-    handler.send_header("Access-Control-Allow-Origin", cors_origin(handler))
-    handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
-    handler.end_headers()
-    handler.wfile.write(raw)
+    try:
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json; charset=utf-8")
+        handler.send_header("Content-Length", str(len(raw)))
+        handler.send_header("Access-Control-Allow-Origin", cors_origin(handler))
+        handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        handler.send_header("Access-Control-Allow-Headers", "Content-Type")
+        handler.end_headers()
+        handler.wfile.write(raw)
+    except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+        # The browser navigated away or the poll aborted — not a bridge error.
+        print("[ace-bridge] client disconnected before response")
 
 
 def extract_task_id(data) -> str | None:

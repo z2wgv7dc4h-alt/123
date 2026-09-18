@@ -454,5 +454,37 @@ class LoraEndpointsTest(unittest.TestCase):
         )
 
 
+class JsonResponseDisconnectTest(unittest.TestCase):
+    class _BrokenWFile:
+        def __init__(self, exc):
+            self._exc = exc
+
+        def write(self, _data):
+            raise self._exc
+
+    class _Handler:
+        headers = {}
+
+        def __init__(self, exc):
+            self.wfile = JsonResponseDisconnectTest._BrokenWFile(exc)
+
+        def send_response(self, *_a):
+            pass
+
+        def send_header(self, *_a):
+            pass
+
+        def end_headers(self):
+            pass
+
+    def test_client_disconnect_is_logged_once_not_raised(self):
+        for exc in (BrokenPipeError(), ConnectionResetError(), ConnectionAbortedError()):
+            with mock.patch("builtins.print") as printed:
+                bridge.json_response(self._Handler(exc), 200, {"ok": True})
+            lines = [str(c.args[0]) for c in printed.call_args_list if c.args]
+            self.assertIn("[ace-bridge] client disconnected before response", lines)
+            self.assertEqual(len(lines), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

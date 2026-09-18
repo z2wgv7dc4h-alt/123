@@ -54,9 +54,26 @@ describe('listening report helpers', () => {
       { name: 'silent', seed: 1, durationSec: 0, integratedLufs: -Infinity, samplePeakDbFS: -Infinity },
     ]);
     const lines = csv.trimEnd().split('\n');
-    expect(lines[0]).toBe('name,seed,durationSec,integratedLufs,samplePeakDbFS');
-    expect(lines[1]).toBe('dnb-festival,17400,88.27,-9.50,-1.20');
-    expect(lines[2]).toBe('silent,1,0.00,,');
+    expect(lines[0]).toBe('name,seed,durationSec,integratedLufs,samplePeakDbFS,error');
+    expect(lines[1]).toBe('dnb-festival,17400,88.27,-9.50,-1.20,');
+    expect(lines[2]).toBe('silent,1,0.00,,,');
     expect(csv.endsWith('\n')).toBe(true);
+  });
+
+  it('records failures in the CSV and escapes commas in the error', () => {
+    const csv = listeningReportCsv([
+      {
+        name: 'neuro',
+        seed: 90210,
+        durationSec: 0,
+        integratedLufs: -Infinity,
+        samplePeakDbFS: -Infinity,
+        error: 'bridge /render HTTP 502: upstream failed, retry',
+      },
+    ]);
+    const lines = csv.trimEnd().split('\n');
+    expect(lines[1]).toBe(
+      'neuro,90210,0.00,,,"bridge /render HTTP 502: upstream failed, retry"',
+    );
   });
 });

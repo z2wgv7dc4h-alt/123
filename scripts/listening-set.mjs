@@ -113,6 +113,8 @@ function payloadFor(prompt, seed) {
     bpm: prompt.bpm,
     bpmTolerance: 2,
     durationBars,
+    // One take per prompt — the set is for listening, not best-of scoring.
+    batchSize: 1,
     sampleRateHz,
     bitDepth: 16,
     channels: 2,
@@ -145,18 +147,31 @@ function payloadFor(prompt, seed) {
   };
 }
 
+/** XL-turbo + CPU offload can run long; give each render a hard 15 min cap. */
+const RENDER_TIMEOUT_MS = 900_000;
+
 async function renderOnce(payload) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), RENDER_TIMEOUT_MS);
   let res;
   try {
     res = await fetch(`${bridge}/render`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload),
+      signal: ctrl.signal,
     });
   } catch (e) {
+    const why = ctrl.signal.aborted
+      ? `timed out after ${RENDER_TIMEOUT_MS / 1000}s`
+      : e instanceof Error
+        ? e.message
+        : String(e);
     throw new Error(
-      `bridge unreachable at ${bridge} (${e instanceof Error ? e.message : e}). Start scripts/windows/start-ace-stack.ps1.`,
+      `bridge unreachable at ${bridge} (${why}). Start scripts/windows/start-ace-stack.ps1.`,
     );
+  } finally {
+    clearTimeout(timer);
   }
   if (res.status === 503) {
     throw new Error('ACE GPU path offline (bridge 503) — start the ACE stack first.');
@@ -170,6 +185,17 @@ async function renderOnce(payload) {
   return data;
 }
 
+/** One retry on any failure (transient bridge/GPU hiccup). */
+async function renderWithRetry(payload) {
+  try {
+    return await renderOnce(payload);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[listening] retrying once after: ${msg}`);
+    return await renderOnce(payload);
+  }
+}
+
 const date = new Date().toISOString().slice(0, 10);
 const outDir = join(root, 'exports', 'listening', date);
 await mkdir(outDir, { recursive: true });
@@ -180,7 +206,22 @@ for (const prompt of prompts) {
   for (const seed of seeds) {
     const payload = payloadFor(prompt, seed);
     process.stdout.write(`[listening] ${prompt.name}${samplerSuffix} seed ${seed} ... `);
-    const data = await renderOnce(payload);
+    let data;
+    try {
+      data = await renderWithRetry(payload);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(`FAILED (${msg})`);
+      rows.push({
+        name: `${prompt.name}${samplerSuffix}`,
+        seed,
+        durationSec: 0,
+        integratedLufs: -Infinity,
+        samplePeakDbFS: -Infinity,
+        error: msg,
+      });
+      continue;
+    }
     const bytes = Buffer.from(data.mixWavBase64, 'base64');
     const wavName = `${prompt.name}${samplerSuffix}_${seed}.wav`;
     await writeFile(join(outDir, wavName), bytes);
@@ -197,13 +238,15 @@ for (const prompt of prompts) {
         `${row.durationSec.toFixed(1)}s · ${row.integratedLufs.toFixed(1)} LUFS · ${row.samplePeakDbFS.toFixed(1)} dBFS`,
       );
     } catch (e) {
-      console.log(`wrote ${wavName} (report skipped: ${e instanceof Error ? e.message : e})`);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(`wrote ${wavName} (report skipped: ${msg})`);
       rows.push({
         name: `${prompt.name}${samplerSuffix}`,
         seed,
         durationSec: 0,
         integratedLufs: -Infinity,
         samplePeakDbFS: -Infinity,
+        error: `report skipped: ${msg}`,
       });
     }
   }

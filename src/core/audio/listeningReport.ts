@@ -11,6 +11,8 @@ export type ListeningReportRow = {
   durationSec: number;
   integratedLufs: number;
   samplePeakDbFS: number;
+  /** Present on a failed render so report.csv records what happened. */
+  error?: string;
 };
 
 /** Max absolute sample across all channels, in dBFS (silence → -Infinity). */
@@ -55,11 +57,23 @@ function fmt(n: number): string {
   return Number.isFinite(n) ? n.toFixed(2) : '';
 }
 
-/** CSV for the listening set: header + one row per render. */
+/** Quote a CSV field when it holds a comma, quote or newline (error messages). */
+function csvField(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** CSV for the listening set: header + one row per render (failures included). */
 export function listeningReportCsv(rows: readonly ListeningReportRow[]): string {
-  const header = 'name,seed,durationSec,integratedLufs,samplePeakDbFS';
+  const header = 'name,seed,durationSec,integratedLufs,samplePeakDbFS,error';
   const lines = rows.map((r) =>
-    [r.name, r.seed, fmt(r.durationSec), fmt(r.integratedLufs), fmt(r.samplePeakDbFS)].join(','),
+    [
+      csvField(r.name),
+      r.seed,
+      fmt(r.durationSec),
+      fmt(r.integratedLufs),
+      fmt(r.samplePeakDbFS),
+      csvField(r.error ?? ''),
+    ].join(','),
   );
   return [header, ...lines].join('\n') + '\n';
 }
