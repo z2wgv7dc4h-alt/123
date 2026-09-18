@@ -5,6 +5,7 @@ import {
   ACE_SIDECAR_RENDER_URL,
   ACE_GUIDANCE_SCALE,
   ACE_SHIFT,
+  ACE_DEFAULT_CHECKPOINT,
   ACE_DCW_ENABLED,
   ACE_DCW_MODE,
   aceDcwEnabled,
@@ -92,7 +93,7 @@ describe('AceStepBackend full GPU path', () => {
     expect(mix?.blob).toBeTruthy();
   });
 
-  it('sends named inference params; turbo default when no probe', async () => {
+  it('sends named inference params; xl-turbo default when no probe', async () => {
     const fakeWav = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]);
     let binary = '';
     fakeWav.forEach((b) => {
@@ -133,7 +134,8 @@ describe('AceStepBackend full GPU path', () => {
     expect(body.structureRef).toBeTruthy();
     expect(body.guidanceScale).toBe(ACE_GUIDANCE_SCALE);
     expect(body.shift).toBe(ACE_SHIFT);
-    // No probe => default turbo, so DCW stays on (base/SFT text2music is off).
+    // No probe => default XL-turbo, so DCW stays on (base/SFT text2music is off).
+    expect(ACE_DEFAULT_CHECKPOINT).toBe('acestep-v15-xl-turbo');
     expect(body.dcwEnabled).toBe(true);
     expect(body.dcwMode).toBe(ACE_DCW_MODE);
     expect(aceDcwEnabled('acestep-v15-turbo', false)).toBe(ACE_DCW_ENABLED);

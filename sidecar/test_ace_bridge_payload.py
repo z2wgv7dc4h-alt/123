@@ -61,6 +61,18 @@ class BuildRenderPayloadTest(unittest.TestCase):
         self.assertEqual(p["inference_steps"], 8)
         self.assertIs(p["use_adg"], False)
 
+    def test_xl_turbo_is_a_turbo_variant(self):
+        # is_turbo_model must match "xl-turbo" (8 steps, no ADG) and the bridge
+        # default DiT is now XL-turbo.
+        self.assertTrue(bridge.is_turbo_model("acestep-v15-xl-turbo"))
+        self.assertTrue(bridge.is_turbo_model("ACESTEP-V15-XL-TURBO"))
+        self.assertFalse(bridge.is_turbo_model("acestep-v15-base"))
+        self.assertEqual(bridge.DEFAULT_DIT_MODEL, "acestep-v15-xl-turbo")
+        p = bridge.build_render_payload({"checkpointId": "acestep-v15-xl-turbo", "useAdg": True})
+        self.assertEqual(p["inference_steps"], 8)
+        self.assertIs(p["use_adg"], False)
+        self.assertIs(p["dcw_enabled"], True)
+
     def test_cover_strength_default_and_clamp(self):
         self.assertEqual(bridge.clamp_cover_strength(None), 0.55)
         self.assertEqual(bridge.clamp_cover_strength(0.45), 0.45)

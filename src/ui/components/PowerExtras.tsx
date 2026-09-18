@@ -10,25 +10,24 @@ import { HelpTip } from './HelpTip';
 // never from this list. Order = quality preference.
 const STUDIO_MODELS = [
   {
+    id: 'acestep-v15-xl-turbo',
+    label: 'Studio XL turbo',
+    hint: '4B, best quality — default',
+  },
+  {
     id: 'acestep-v15-sft',
     label: 'Studio SFT',
-    hint: 'Best detail — used automatically when on disk',
+    hint: 'High detail — optional',
   },
   {
     id: 'acestep-v15-base',
     label: 'Studio base',
-    hint: 'High quality, 64 steps — default when SFT is absent',
+    hint: 'High quality, 64 steps — optional',
   },
   {
     id: 'acestep-v15-turbo',
     label: 'Studio turbo',
     hint: 'Fast, 8 steps — only when you pick it',
-  },
-  {
-    id: 'acestep-v15-xl-base',
-    label: 'Studio XL',
-    hint: 'Largest model — needs more VRAM; not installed here',
-    status: 'later' as const,
   },
 ] as const;
 

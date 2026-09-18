@@ -12,9 +12,13 @@ From `README.md` (model tables):
 | `acestep-v15-base` | 50 | yes | all, incl. extract / lego / complete | Medium |
 | `acestep-v15-sft` | 50 | yes | text2music, cover, repaint | High |
 | `acestep-v15-turbo` | 8 | no | text2music, cover, repaint | **Very High** |
-| `acestep-v15-xl-turbo` | 8 | no | text2music, cover, repaint | Very High (larger) |
+| `acestep-v15-xl-turbo` | 8 | no | text2music, cover, repaint | **Very High (4B, default)** |
 
-**On disk**: base, turbo, LMs 0.6B and 1.7B. **Studio uses turbo.** Don't download
+**On disk**: base, turbo, xl-turbo (4B, default), LMs 0.6B and 1.7B. **Studio
+uses XL-turbo** with CPU offload to fit 16 GB; `start-ace-stack.ps1` downloads it
+on first run (`huggingface-cli download ACE-Step/acestep-v15-xl-turbo`) and falls
+back to plain turbo with a warning if that fails. XL + offload is slower, so the
+bridge polls for 600 s and the browser render timeout is 660 s. Don't download
 SFT for quality; it is rated below turbo.
 
 ## What `/release_task` honors over HTTP

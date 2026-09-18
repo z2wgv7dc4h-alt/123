@@ -35,8 +35,27 @@ $env:ACESTEP_QUANTIZATION = "false"
 $env:ACESTEP_COMPILE = "false"
 $env:ACESTEP_USE_FLASH_ATTENTION = "false"
 if (-not $env:ACESTEP_LM_BACKEND) { $env:ACESTEP_LM_BACKEND = "pt" }
-# DiT: turbo = ACE's highest-rated quality on disk (README: turbo Very High, sft High, base Medium).
-if (-not $env:ACESTEP_CONFIG_PATH) { $env:ACESTEP_CONFIG_PATH = "acestep-v15-turbo" }
+# DiT: XL-turbo (4B) is the default Studio model — ACE README rates turbo and
+# xl-turbo Very High; CPU offload keeps 4B inside 16 GB. Falls back to plain
+# turbo if the XL weights are missing and can't be downloaded.
+if (-not $env:ACESTEP_CONFIG_PATH) { $env:ACESTEP_CONFIG_PATH = "acestep-v15-xl-turbo" }
+$xlDir = Join-Path $aceRoot "checkpoints\acestep-v15-xl-turbo"
+if ($env:ACESTEP_CONFIG_PATH -eq "acestep-v15-xl-turbo" -and -not (Test-Path $xlDir)) {
+  Write-Host "XL-turbo checkpoint missing - downloading acestep-v15-xl-turbo (large 4B model)..." -ForegroundColor Yellow
+  Push-Location $aceRoot
+  try {
+    & uv run huggingface-cli download ACE-Step/acestep-v15-xl-turbo --local-dir checkpoints\acestep-v15-xl-turbo
+    $xlOk = ($LASTEXITCODE -eq 0)
+  } catch {
+    $xlOk = $false
+  } finally {
+    Pop-Location
+  }
+  if (-not $xlOk) {
+    Write-Warning "XL-turbo download failed - falling back to acestep-v15-turbo"
+    $env:ACESTEP_CONFIG_PATH = "acestep-v15-turbo"
+  }
+}
 Write-Host "DiT checkpoint: $($env:ACESTEP_CONFIG_PATH)" -ForegroundColor Cyan
 Write-Host "Starting ACE API on 127.0.0.1:8001 ..." -ForegroundColor Cyan
 $ace = Start-Process -PassThru -NoNewWindow -FilePath "uv" -ArgumentList @("run","acestep-api","--host","127.0.0.1","--port","8001") -WorkingDirectory $aceRoot

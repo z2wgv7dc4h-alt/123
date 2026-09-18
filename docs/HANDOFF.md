@@ -21,7 +21,7 @@ Read next: `docs/ACE-NOTES.md` (what ACE really does), `docs/UI-REVAMP.md`
 
 | Piece | State |
 |---|---|
-| DiT | `acestep-v15-turbo` by default (`start-ace-stack.ps1`, bridge `DEFAULT_DIT_MODEL`). ACE README rates turbo *Very High*, SFT *High*, base *Medium*. The bridge sends ACE's loaded model and ignores the browser's `checkpointId`. |
+| DiT | `acestep-v15-xl-turbo` (4B) by default (`start-ace-stack.ps1`, bridge `DEFAULT_DIT_MODEL`), with CPU offload on 16 GB. The start script downloads it on first run and falls back to plain turbo with a warning if that fails. ACE README rates turbo/xl-turbo *Very High*, SFT *High*, base *Medium*. The bridge sends ACE's loaded model and ignores the browser's `checkpointId`. |
 | LM | `acestep-5Hz-lm-1.7B`, auto-selected by ACE. |
 | text2music payload | `thinking: true`, `use_cot_caption: false`, `use_cot_language: false`, `lyrics` = song-map structure tags (`[Build - rising tension]`, `[Drop - explosive]` …; bridge keeps tag lines only, `[Instrumental]` fallback), `lm_cfg_scale: 2.0`, `bpm` = job tempo, duration from bars (cap 480 s). Turbo 8 steps; base/SFT 64 steps + ADG. |
 | Style reference | User-owned file only. Default `mode: 'reference'` (`a1f0aaa`): bridge sends it as multipart `reference_audio` on text2music — timbre/mix guidance; `task_type` and thinking unchanged. `cover` mode sends `src_audio` + `audioCoverStrength` (0.55, clamped 0.35–0.7) and skips the LM. Owner attestation gates both; a repaint take may ride with a reference. UI toggle: "Sound like (reference)" / "Remake it (cover)". |
@@ -44,7 +44,7 @@ real break loops are cut at 174, so they switch off more than 6 BPM away.
    bridges shared port 8766 and an old one answered every request (see
    ACE-NOTES "Gotchas").
 3. Check `http://127.0.0.1:8766/probe`: it should show `bridgeBuild`,
-   `checkpoint: acestep-v15-turbo` and `upstreamUp: true`.
+   `checkpoint: acestep-v15-xl-turbo` and `upstreamUp: true`.
 4. The first Generate lazy-loads the models (about 40 s).
 5. Real stems need Demucs in the bridge Python: `pip install demucs`. The start
    script does not auto-install; `/stems` returns 501 with that hint otherwise.
@@ -81,8 +81,7 @@ Open, unscheduled: S-5 (cover strength listening A/B), `05` (ACE-native
 S-7 `78f39d5`), `07` (raw samples).
 
 **Decisions waiting on the user**: LoRA (the only way to reliably match one
-artist's sound; training was previously out of scope), downloading
-`acestep-v15-xl-turbo` (larger, may be tight on 16 GB).
+artist's sound; training was previously out of scope).
 
 ## Don't
 

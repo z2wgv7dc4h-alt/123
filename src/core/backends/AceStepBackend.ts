@@ -53,8 +53,8 @@ export const ACE_BASE_INFERENCE_STEPS = 64;
 export const ACE_TURBO_INFERENCE_STEPS = 8;
 /** @deprecated name kept for tests — the base/SFT step count. */
 export const ACE_INFERENCE_STEPS = ACE_BASE_INFERENCE_STEPS;
-/** Studio default DiT when the probe did not name one: turbo (ACE README quality Very High). */
-export const ACE_DEFAULT_CHECKPOINT = 'acestep-v15-turbo';
+/** Studio default DiT when the probe did not name one: XL-turbo (4B, offload). */
+export const ACE_DEFAULT_CHECKPOINT = 'acestep-v15-xl-turbo';
 export const ACE_GUIDANCE_SCALE = 7.0;
 
 export function isTurboCheckpoint(checkpoint: string | null | undefined): boolean {
@@ -133,7 +133,8 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 export const ACE_PROBE_TIMEOUT_MS = 12000;
-export const ACE_RENDER_TIMEOUT_MS = 240_000;
+// XL-turbo + CPU offload is slower than plain turbo; allow 11 min.
+export const ACE_RENDER_TIMEOUT_MS = 660_000;
 export function getAceSidecarBase(): string {
   return aceSidecarBase();
 }

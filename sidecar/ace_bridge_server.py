@@ -24,7 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
-BRIDGE_BUILD = "2026-09-18-stems-ref-bestof3"
+BRIDGE_BUILD = "2026-09-18-xl-turbo"
 
 # Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
 # bridge never auto-installs it. Without it /stems returns 501 + install hint.
@@ -156,8 +156,9 @@ DEFAULT_PROMPT = (
     "rolling reese bass, sub bass, original composition"
 )
 
-# Studio default DiT: turbo (ACE README quality Very High).
-DEFAULT_DIT_MODEL = "acestep-v15-turbo"
+# Studio default DiT: XL-turbo (4B) — best-rated quality; CPU offload keeps it
+# inside 16 GB. Turbo/XL-turbo are both 8-step turbo variants ("turbo" match).
+DEFAULT_DIT_MODEL = "acestep-v15-xl-turbo"
 # ACE docs/en/INFERENCE.md: base/SFT "recommended 32-64", high quality tip is
 # "inference_steps=64 or higher" + use_adg=True. Turbo: "recommended 8".
 BASE_INFERENCE_STEPS = 64
@@ -782,7 +783,8 @@ class Handler(BaseHTTPRequestHandler):
             metas = {}
             dit_model = payload["model"]
             last = None
-            for _ in range(180):
+            # XL-turbo + CPU offload is slower than plain turbo; allow 10 min.
+            for _ in range(600):
                 time.sleep(1.0)
                 _, q_raw = http_json(
                     "POST",
