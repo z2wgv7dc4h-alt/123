@@ -38,6 +38,12 @@ no effect. `use_cot_metas` is not exposed (always on outside sample mode).
 downloads every file and returns them as `candidates`, so the browser can offer
 best-of-N without re-rendering (`7a21e57`).
 
+**Audio uploads** (multipart file fields, separate from the JSON): `src_audio`
+makes ACE switch `task_type` to cover/repaint and skip the LM; `reference_audio`
+guides timbre/mix while the request stays text2music with thinking on. The bridge
+sends one multipart body with both when a repaint take and a reference are
+attached (`a1f0aaa`).
+
 ## Gotchas (each one caused real bad output here)
 
 | Gotcha | Evidence | Rule |
