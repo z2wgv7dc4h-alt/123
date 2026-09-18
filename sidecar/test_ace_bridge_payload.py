@@ -529,5 +529,77 @@ class ProgressEndpointTest(unittest.TestCase):
         self.assertEqual(bridge.build_progress_response("j2")[1]["stage"], "decode")
 
 
+class FinishChainTest(unittest.TestCase):
+    def test_genre_target_lufs(self):
+        self.assertEqual(bridge.genre_target_lufs("dnb"), -9.5)
+        self.assertEqual(bridge.genre_target_lufs("liquid"), -12.0)
+        self.assertEqual(bridge.genre_target_lufs("nope"), -9.5)
+        self.assertEqual(bridge.genre_target_lufs("dnb", -11.0), -11.0)
+
+    def test_mono_below_cutoff_collapses_low_band(self):
+        import numpy as np
+
+        sr = 4000
+        n = 4000
+        left = np.full(n, 0.8)
+        right = np.full(n, -0.2)
+        ol, orr = bridge.mono_below_cutoff(left, right, sr, cutoff_hz=200.0)
+        # Steady state both channels carry the same mono low band (~0.3).
+        self.assertAlmostEqual(float(ol[-1]), 0.3, places=2)
+        self.assertAlmostEqual(float(orr[-1]), 0.3, places=2)
+        self.assertAlmostEqual(float(ol[-1]), float(orr[-1]), places=4)
+
+    def test_sidechain_envelope_attacks_and_releases(self):
+        import numpy as np
+
+        sr = 1000
+        key = np.concatenate([np.ones(100), np.zeros(400)])
+        env = bridge.sidechain_envelope(key, sr, attack_ms=5.0, release_ms=80.0)
+        self.assertGreater(float(env[0]), 0.0)
+        self.assertGreater(float(env[99]), 0.5)
+        self.assertLess(float(env[-1]), float(env[99]))  # released back down
+        self.assertGreaterEqual(float(env.min()), 0.0)
+
+    def test_finish_requires_mix(self):
+        status, body = bridge.build_finish_response({})
+        self.assertEqual(status, 400)
+        self.assertEqual(body["error"], "missing_mix")
+
+    def test_finish_missing_deps_501(self):
+        with mock.patch.object(bridge, "finish_missing_deps", return_value=["pedalboard"]):
+            status, body = bridge.build_finish_response({"mixWavBase64": "AAAA"})
+        self.assertEqual(status, 501)
+        self.assertEqual(body["installHint"], bridge.FINISH_DEPS_HINT)
+        self.assertEqual(body["missing"], ["pedalboard"])
+
+    def test_finish_response_mocked(self):
+        canned = {
+            "wavBase64": "AAA",
+            "report": {
+                "lufs": -9.5,
+                "truePeak": -1.0,
+                "crest": 6.0,
+                "stagesApplied": ["demucs_ft", "pedalboard_master"],
+            },
+        }
+        calls = {}
+
+        def fake_process(mix, genre, target, ref):
+            calls.update({"mix": mix, "genre": genre, "target": target, "ref": ref})
+            return canned
+
+        with mock.patch.object(bridge, "finish_missing_deps", return_value=[]):
+            status, body = bridge.build_finish_response(
+                {"mixWavBase64": "AAAA", "genre": "dnb", "targetLufs": -8, "refWavBase64": "REF"},
+                process=fake_process,
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(body["report"]["lufs"], -9.5)
+        self.assertEqual(body["report"]["stagesApplied"][-1], "pedalboard_master")
+        self.assertEqual(calls["genre"], "dnb")
+        self.assertEqual(calls["target"], -8)
+        self.assertEqual(calls["ref"], "REF")
+
+
 if __name__ == "__main__":
     unittest.main()

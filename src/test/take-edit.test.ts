@@ -300,4 +300,31 @@ describe('take edit store actions', () => {
     await useStudioStore.getState().undoTakeEdit();
     expect(useStudioStore.getState().takeHistory.length).toBe(1);
   });
+
+  it('finishTake becomes a new take version and keeps the un-finished raw', async () => {
+    const raw = new Blob([new Uint8Array([9, 9, 9])], { type: 'audio/wav' });
+    const finished = new Blob([new Uint8Array([7, 7, 7])], { type: 'audio/wav' });
+    const finishSpy = vi.spyOn(aceStepBackend, 'finish').mockResolvedValue({
+      blob: finished,
+      report: { lufs: -9.5, truePeak: -1, crest: 6, stagesApplied: ['demucs_ft', 'pedalboard_master'] },
+    });
+    useStudioStore.setState({
+      result: { ...fakeStudioResult, rawMixBlob: raw } as RenderResult,
+      takeHistory: [],
+      busy: false,
+    });
+
+    await useStudioStore.getState().finishTake();
+
+    expect(finishSpy).toHaveBeenCalledTimes(1);
+    const next = useStudioStore.getState().result!;
+    expect(next.stems.find((s) => s.id === 'mix')!.blob).toBe(finished);
+    // Raw (un-finished) mix is untouched so edits still start from it.
+    expect(next.rawMixBlob).toBe(raw);
+    expect(next.finish?.lufs).toBe(-9.5);
+    expect(useStudioStore.getState().takeHistory).toEqual([
+      expect.objectContaining({ rawMixBlob: raw }),
+    ]);
+    expect(useStudioStore.getState().busy).toBe(false);
+  });
 });

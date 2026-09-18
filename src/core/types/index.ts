@@ -342,6 +342,14 @@ export interface BarGrid {
   bpm: number;
 }
 
+/** Result of the bridge's club Finish chain (Demucs + pedalboard/pyloudnorm). */
+export interface FinishReport {
+  lufs: number | null;
+  truePeak: number;
+  crest: number;
+  stagesApplied: string[];
+}
+
 /** Loudness mastering report. */
 export interface MasterReport {
   lufsBefore: number;
@@ -397,6 +405,8 @@ export interface RenderResult {
   stemsReal?: boolean;
   /** Loudness mastering report (Studio). Present when mastering was applied. */
   master?: MasterReport;
+  /** Club Finish report (bridge Demucs + pedalboard/pyloudnorm). */
+  finish?: FinishReport;
 }
 
 /**

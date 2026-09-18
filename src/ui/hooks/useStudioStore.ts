@@ -8,6 +8,7 @@ import {
   clampProductBpm,
   GENRES,
   COHERENCE_LM_TEMPERATURE,
+  MASTER_TARGET_LUFS,
   type Coherence,
   type SamplerMethod,
   type MasterTarget,
@@ -371,6 +372,8 @@ export interface StudioState {
   }) => Promise<void>;
   /** P-3: repaint every drop section, best-of-2, auto-pick the top score. */
   polishDrops: () => Promise<void>;
+  /** Club Finish: bridge Demucs + pedalboard/pyloudnorm master, new take version. */
+  finishTake: () => Promise<void>;
   /** Load an exported manifest and re-render with its exact params. */
   recreateFromManifest: (manifest: ExportManifest) => Promise<void>;
   generateAgain: () => Promise<void>;
@@ -1650,6 +1653,68 @@ export const useStudioStore = create<StudioState>((set, get) => ({
     });
     await get().generate();
     if (!get().error) pushToast('Recreated from manifest — hit Play', 'success', 3200);
+  },
+
+  finishTake: async () => {
+    const { result, busy } = get();
+    if (busy) return;
+    if (!result || !isStudioTake(result)) {
+      pushToast('Finish (club) needs a Studio (GPU) take', 'warn', 3600);
+      return;
+    }
+    const source = result.rawMixBlob ?? result.stems.find((s) => s.id === 'mix')?.blob;
+    if (!source) {
+      pushToast('No Studio mix to finish', 'warn', 3200);
+      return;
+    }
+    set({ busy: true, error: null });
+    try {
+      const ref = get().vibeFile && get().ownerConfirmed ? get().vibeFile! : undefined;
+      const { blob, report } = await aceStepBackend.finish(source, {
+        genre: get().genre,
+        targetLufs: MASTER_TARGET_LUFS[get().masterTarget],
+        ...(ref ? { reference: ref } : {}),
+      });
+      const mix = result.stems.find((s) => s.id === 'mix');
+      const durationSec = mix?.durationSec ?? 0;
+      const sampleRateHz = mix?.sampleRateHz ?? DEFAULT_SAMPLE_RATE;
+      const stems = result.stems.map((s) => ({
+        ...s,
+        blob,
+        url: URL.createObjectURL(blob),
+        durationSec,
+        sampleRateHz,
+        bitDepth: 24 as const,
+      }));
+      const note =
+        `Finished (club) · ${report.lufs != null ? `${report.lufs.toFixed(1)} LUFS` : 'loudness —'} · ` +
+        `${report.truePeak.toFixed(1)} dBTP · ${report.stagesApplied.join(' → ')}`;
+      // New take version: mix = finished, rawMixBlob stays the un-finished raw.
+      const next: RenderResult = {
+        ...result,
+        stems,
+        warnings: [...get().warnings, note],
+        finish: report,
+      };
+      set({
+        result: next,
+        takeHistory: [...get().takeHistory, result],
+        activeCandidate: 0,
+        busy: false,
+        loopRegion: null,
+        abFlashback: false,
+        flowStep: 'generated',
+      });
+      previewPlayer.clearStemCache();
+      previewPlayer.onState = (ps) => set({ previewState: ps });
+      await loadPreviewFromMixer(next, get().mixer);
+      previewPlayer.setAuthoritativeDuration(durationSec);
+      pushToast('Club finish ready — hit Play', 'success', 3200);
+    } catch (e) {
+      const msg = formatStudioError(e instanceof Error ? e.message : String(e));
+      set({ busy: false, error: msg });
+      pushToast(msg, 'error', 0);
+    }
   },
 
   separateStems: async () => {

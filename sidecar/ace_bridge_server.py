@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -24,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = "0.0.0.0"
 PORT = 8766
-BRIDGE_BUILD = "2026-09-18-progress"
+BRIDGE_BUILD = "2026-09-18-finish"
 
 # Real stem separation (POST /stems). Demucs v4 htdemucs is MIT-licensed; the
 # bridge never auto-installs it. Without it /stems returns 501 + install hint.
@@ -155,8 +156,10 @@ def demucs_available() -> bool:
         return False
 
 
-def separate_stems_demucs(mix_bytes: bytes, timeout: float = 300.0) -> list[dict]:
-    """Run Demucs htdemucs on a temp WAV; return [{id, wavBase64, durationSec}].
+def separate_stems_demucs(
+    mix_bytes: bytes, timeout: float = 300.0, model: str = DEMUCS_MODEL
+) -> list[dict]:
+    """Run Demucs (`model`) on a temp WAV; return [{id, wavBase64, durationSec}].
 
     GPU is used when torch reports CUDA, else CPU. The temp dir is always
     cleaned up. Only the four htdemucs stems are read back."""
@@ -166,7 +169,7 @@ def separate_stems_demucs(mix_bytes: bytes, timeout: float = 300.0) -> list[dict
         with open(in_path, "wb") as fh:
             fh.write(mix_bytes)
         out_dir = os.path.join(tmpdir, "out")
-        cmd = [sys.executable, "-m", "demucs", "-n", DEMUCS_MODEL, "-o", out_dir]
+        cmd = [sys.executable, "-m", "demucs", "-n", model, "-o", out_dir]
         if not torch_cuda():
             cmd += ["-d", "cpu"]
         cmd.append(in_path)
@@ -212,6 +215,306 @@ def build_stems_response(req: dict) -> tuple[int, dict]:
     if not stems:
         return 502, {"error": "demucs_no_stems", "message": "Demucs returned no stems"}
     return 200, {"stems": stems, "model": DEMUCS_MODEL}
+
+
+# ---- Finish (club) chain --------------------------------------------------
+# POST /finish: Demucs htdemucs_ft stem rebalance + pedalboard/pyloudnorm master.
+FINISH_DEPS_HINT = "pip install pedalboard pyloudnorm demucs"
+DEMUCS_FINETUNED_MODEL = "htdemucs_ft"
+FINISH_GENRE_TARGETS = {
+    "dnb": -9.5,
+    "liquid": -12.0,
+    "dubstep": -7.0,
+    "trap": -8.0,
+    "jungle": -10.0,
+}
+FINISH_LOW_CUTOFF_HZ = 120.0
+FINISH_SIDECHAIN_KEY_HZ = 150.0
+FINISH_DUCK_DB = 3.5
+FINISH_TRUE_PEAK_CEILING_DBTP = -1.0
+
+
+def finish_missing_deps() -> list[str]:
+    missing: list[str] = []
+    for mod in ("pedalboard", "pyloudnorm", "demucs"):
+        try:
+            __import__(mod)
+        except Exception:
+            missing.append(mod)
+    return missing
+
+
+def finish_deps_available() -> bool:
+    return not finish_missing_deps()
+
+
+def genre_target_lufs(genre: object, override: object = None) -> float:
+    if isinstance(override, (int, float)) and not isinstance(override, bool):
+        return float(override)
+    return FINISH_GENRE_TARGETS.get(
+        str(genre or "dnb").strip().lower(), FINISH_GENRE_TARGETS["dnb"]
+    )
+
+
+def _lowpass(samples, sample_rate, cutoff_hz):
+    import numpy as np
+    from scipy.signal import butter, lfilter
+
+    x = np.asarray(samples, dtype=np.float64)
+    nyq = max(1.0, sample_rate / 2.0)
+    b, a = butter(1, max(1e-5, min(0.99, cutoff_hz / nyq)), btype="low")
+    return lfilter(b, a, x)
+
+
+def mono_below_cutoff(left, right, sample_rate, cutoff_hz=FINISH_LOW_CUTOFF_HZ):
+    """Collapse everything below `cutoff_hz` to mono; keep stereo above it."""
+    import numpy as np
+
+    left = np.asarray(left, dtype=np.float64)
+    right = np.asarray(right, dtype=np.float64)
+    low_l = _lowpass(left, sample_rate, cutoff_hz)
+    low_r = _lowpass(right, sample_rate, cutoff_hz)
+    low_mono = 0.5 * (low_l + low_r)
+    return (left - low_l + low_mono, right - low_r + low_mono)
+
+
+def sidechain_envelope(key, sample_rate, attack_ms=5.0, release_ms=80.0):
+    """Envelope follower (5 ms attack / 80 ms release) over |key|."""
+    import numpy as np
+
+    key = np.abs(np.asarray(key, dtype=np.float64))
+    atk = 1.0 - math.exp(-1.0 / max(1.0, sample_rate * attack_ms / 1000.0))
+    rel = 1.0 - math.exp(-1.0 / max(1.0, sample_rate * release_ms / 1000.0))
+    env = np.empty_like(key)
+    e = 0.0
+    for i in range(key.size):
+        target = float(key[i])
+        coeff = atk if target > e else rel
+        e += coeff * (target - e)
+        env[i] = e
+    return env
+
+
+def apply_sidechain_duck(
+    channels,
+    key,
+    sample_rate,
+    depth_db=FINISH_DUCK_DB,
+    cutoff_hz=FINISH_SIDECHAIN_KEY_HZ,
+):
+    """Duck only the low band of `channels` by up to `depth_db`, keyed by `key`."""
+    import numpy as np
+
+    env = sidechain_envelope(key, sample_rate)
+    peak = float(env.max()) if env.size else 0.0
+    norm = env / peak if peak > 1e-9 else env
+    floor = 10.0 ** (-float(depth_db) / 20.0)
+    out = []
+    for ch in channels:
+        ch = np.asarray(ch, dtype=np.float64)
+        low = _lowpass(ch, sample_rate, cutoff_hz)
+        gain = 1.0 - (1.0 - floor) * norm
+        out.append((ch - low) + low * gain)
+    return out
+
+
+def _decode_wav_channels(data: bytes):
+    import numpy as np
+
+    with wave.open(io.BytesIO(data), "rb") as w:
+        sr = w.getframerate()
+        nch = w.getnchannels()
+        sw = w.getsampwidth()
+        raw = w.readframes(w.getnframes())
+    if sw == 2:
+        arr = np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32768.0
+    elif sw == 3:
+        b = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3).astype(np.int32)
+        v = b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)
+        v = np.where(v & 0x800000, v | ~0xFFFFFF, v)
+        arr = v.astype(np.float64) / 8388608.0
+    elif sw == 4:
+        arr = np.frombuffer(raw, dtype="<i4").astype(np.float64) / 2147483648.0
+    else:
+        raise ValueError(f"unsupported sample width {sw}")
+    return arr.reshape(-1, nch).T, sr
+
+
+def _encode_wav24(channels, sample_rate) -> bytes:
+    import numpy as np
+
+    ch = np.atleast_2d(np.asarray(channels, dtype=np.float64))
+    interleaved = np.clip(ch.T, -1.0, 1.0).reshape(-1)
+    ints = np.round(interleaved * 8388607.0).astype(np.int64)
+    u = (ints & 0xFFFFFF).astype(np.uint32)
+    b = np.empty((u.size, 3), dtype=np.uint8)
+    b[:, 0] = u & 0xFF
+    b[:, 1] = (u >> 8) & 0xFF
+    b[:, 2] = (u >> 16) & 0xFF
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(ch.shape[0])
+        w.setsampwidth(3)
+        w.setframerate(int(sample_rate))
+        w.writeframes(b.tobytes())
+    return buf.getvalue()
+
+
+def measured_lufs(channels, sample_rate) -> float:
+    import numpy as np
+    import pyloudnorm as pyln
+
+    data = np.asarray(channels, dtype=np.float64).T
+    return float(pyln.Meter(sample_rate).integrated_loudness(data))
+
+
+def true_peak_dbtp(channels, sample_rate, oversample: int = 4) -> float:
+    """4× oversampled true peak (dBTP) via polyphase resampling."""
+    import numpy as np
+    from scipy.signal import resample_poly
+
+    peak = 0.0
+    for ch in channels:
+        up = resample_poly(np.asarray(ch, dtype=np.float64), oversample, 1)
+        if up.size:
+            peak = max(peak, float(np.max(np.abs(up))))
+    return 20.0 * math.log10(peak) if peak > 0 else -120.0
+
+
+def _pedalboard_master(channels, sample_rate):
+    """Gentle glue comp + -1 dB @300 Hz bell + +1.5 dB shelf >8 kHz."""
+    import numpy as np
+    from pedalboard import (
+        Compressor,
+        HighShelfFilter,
+        Pedalboard,
+        PeakFilter,
+    )
+
+    board = Pedalboard(
+        [
+            Compressor(threshold_db=-12.0, ratio=2.0, attack_ms=20.0, release_ms=150.0),
+            PeakFilter(cutoff_frequency_hz=300.0, gain_db=-1.0, q=1.0),
+            HighShelfFilter(cutoff_frequency_hz=8000.0, gain_db=1.5, q=0.7),
+        ]
+    )
+    return np.asarray(board(np.asarray(channels, dtype=np.float32), sample_rate), dtype=np.float64)
+
+
+def process_finish(
+    mix_b64: str, genre: object, target_lufs: object = None, ref_b64: object = None
+) -> dict:
+    """Heavy Finish chain. Kept injectable so tests can mock the DSP."""
+    import numpy as np
+
+    mix_bytes = base64.b64decode(mix_b64)
+    stems = separate_stems_demucs(mix_bytes, model=DEMUCS_FINETUNED_MODEL)
+    by_id = {str(s.get("id")): s for s in stems}
+    for need in ("drums", "bass", "other"):
+        if need not in by_id:
+            raise ValueError(f"Demucs returned no {need} stem")
+
+    drums, sr = _decode_wav_channels(base64.b64decode(by_id["drums"]["wavBase64"]))
+    bass, _ = _decode_wav_channels(base64.b64decode(by_id["bass"]["wavBase64"]))
+    other, _ = _decode_wav_channels(base64.b64decode(by_id["other"]["wavBase64"]))
+    n = min(drums.shape[1], bass.shape[1], other.shape[1])
+    drums, bass, other = drums[:, :n], bass[:, :n], other[:, :n]
+
+    stages = ["demucs_ft"]
+    # 2. Drums: parallel compression (4:1 fast, 30% blend) + transient + 1.5 dB.
+    from pedalboard import Compressor, Pedalboard
+
+    heavy = Pedalboard(
+        [Compressor(threshold_db=-18.0, ratio=4.0, attack_ms=2.0, release_ms=55.0)]
+    )(drums.astype(np.float32), sr)
+    drums = 0.7 * drums + 0.3 * np.asarray(heavy, dtype=np.float64)
+    transient = Pedalboard(
+        [Compressor(threshold_db=-12.0, ratio=2.0, attack_ms=30.0, release_ms=120.0)]
+    )(drums.astype(np.float32), sr)
+    drums = np.asarray(transient, dtype=np.float64) * (10.0 ** (1.5 / 20.0))
+    stages += ["drums_parallel_comp", "drums_transient", "drums_+1.5dB"]
+
+    # 3. Bass: mono <120 Hz, sidechain-duck low band from the drums low band.
+    if bass.shape[0] >= 2:
+        bass = np.stack(mono_below_cutoff(bass[0], bass[1], sr))
+    key_mono = drums.mean(axis=0)
+    key_low = _lowpass(key_mono, sr, FINISH_SIDECHAIN_KEY_HZ)
+    ducked = apply_sidechain_duck([bass[0], bass[-1]], key_low, sr)
+    bass = np.stack(ducked)
+    stages += ["bass_mono<120Hz", "bass_duck<150Hz"]
+
+    mix = drums + bass + other
+
+    # 4. Reference match or pedalboard master.
+    if ref_b64:
+        try:
+            import matchering as mg  # type: ignore
+
+            tmpdir = tempfile.mkdtemp(prefix="dnb-finish-")
+            try:
+                tgt = os.path.join(tmpdir, "target.wav")
+                ref = os.path.join(tmpdir, "ref.wav")
+                out = os.path.join(tmpdir, "out.wav")
+                with open(tgt, "wb") as fh:
+                    fh.write(_encode_wav24(mix, sr))
+                with open(ref, "wb") as fh:
+                    fh.write(base64.b64decode(ref_b64))
+                mg.process(target=tgt, reference=ref, results=[mg.pcm24(out)])
+                mix, sr = _decode_wav_channels(open(out, "rb").read())
+                stages.append("matchering")
+            finally:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+        except Exception:
+            mix = _pedalboard_master(mix, sr)
+            stages.append("pedalboard_master(matchering_unavailable)")
+    else:
+        mix = _pedalboard_master(mix, sr)
+        stages.append("pedalboard_master")
+    stages.append("loudness_target")
+
+    # 5. Loudness to genre target, then true-peak ceiling (<= -1 dBTP).
+    target = genre_target_lufs(genre, target_lufs)
+    lufs = measured_lufs(mix, sr)
+    if math.isfinite(lufs):
+        mix = mix * (10.0 ** ((target - lufs) / 20.0))
+    tp = true_peak_dbtp(mix, sr)
+    if tp > FINISH_TRUE_PEAK_CEILING_DBTP:
+        mix = mix * (10.0 ** ((FINISH_TRUE_PEAK_CEILING_DBTP - tp) / 20.0))
+    tp = true_peak_dbtp(mix, sr)
+    lufs = measured_lufs(mix, sr)
+    peak = float(np.max(np.abs(mix))) if mix.size else 0.0
+    rms = float(np.sqrt(np.mean(mix**2))) if mix.size else 0.0
+    crest = 20.0 * math.log10(peak / rms) if rms > 1e-9 and peak > 0 else 0.0
+    stages.append("true_peak_limit")
+    return {
+        "wavBase64": base64.b64encode(_encode_wav24(mix, sr)).decode("ascii"),
+        "report": {
+            "lufs": round(lufs, 2) if math.isfinite(lufs) else None,
+            "truePeak": round(tp, 2),
+            "crest": round(crest, 2),
+            "stagesApplied": stages,
+        },
+    }
+
+
+def build_finish_response(req: dict, process=process_finish) -> tuple[int, dict]:
+    """Pure /finish response: 400 no mix, 501 missing deps, 200 finished WAV."""
+    mix_b64 = req.get("mixWavBase64")
+    if not mix_b64:
+        return 400, {"error": "missing_mix", "message": "Send mixWavBase64"}
+    missing = finish_missing_deps()
+    if missing:
+        return 501, {
+            "error": "finish_deps_missing",
+            "message": f"Finish needs {', '.join(missing)} — run: {FINISH_DEPS_HINT}",
+            "installHint": FINISH_DEPS_HINT,
+            "missing": missing,
+        }
+    try:
+        result = process(mix_b64, req.get("genre"), req.get("targetLufs"), req.get("refWavBase64"))
+    except Exception as e:  # noqa: BLE001 - surface any DSP/Demucs failure
+        return 502, {"error": "finish_failed", "message": str(e)}
+    return 200, result
 
 DEFAULT_PROMPT = (
     "drum and bass, instrumental, two-step breakbeat, tight punchy drums, "
@@ -945,6 +1248,17 @@ class Handler(BaseHTTPRequestHandler):
                 return
             # Demucs is local — no ACE/GPU health gate here.
             status, body = build_stems_response(req)
+            json_response(self, status, body)
+            return
+        if path == "/finish":
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                req = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            except Exception:
+                json_response(self, 400, {"error": "bad_json"})
+                return
+            # Finish is local DSP — no ACE/GPU health gate here.
+            status, body = build_finish_response(req)
             json_response(self, status, body)
             return
         if path in ("/lora", "/lora/off"):

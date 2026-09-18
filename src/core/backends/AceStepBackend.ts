@@ -17,6 +17,8 @@ import type {
   StudioCandidate,
   AceRequestRecord,
   RealBreakLoopProvenance,
+  FinishReport,
+  GenreId,
 } from '../types';
 import { buildExportManifest } from '../export/manifest.ts';
 import { structureEngine, deriveBreakDensity } from '../structure/StructureEngine.ts';
@@ -155,9 +157,14 @@ export function getAceSidecarStemsUrl(): string {
   return `${aceSidecarBase()}/stems`;
 }
 
+export function getAceSidecarFinishUrl(): string {
+  return `${aceSidecarBase()}/finish`;
+}
+
 /** Demucs htdemucs output is 4-track; only these map to our StemIds. */
 export const DEMUCS_STEM_IDS = ['drums', 'bass', 'other'] as const;
 export const DEMUCS_TIMEOUT_MS = 300_000;
+export const FINISH_TIMEOUT_MS = 600_000;
 
 function failSoftNotes(extra?: string): string[] {
   const notes = [
@@ -868,6 +875,66 @@ export class AceStepBackend implements AudioBackend {
       });
     }
     return stems;
+  }
+
+  /**
+   * Club Finish: bridge runs Demucs htdemucs_ft + pedalboard/pyloudnorm (or
+   * Matchering when a reference is sent). Returns the finished WAV + report.
+   */
+  async finish(
+    mix: Blob,
+    opts?: { genre?: GenreId; targetLufs?: number; reference?: Blob },
+  ): Promise<{ blob: Blob; report: FinishReport }> {
+    const mixWavBase64 = await blobToBase64(mix);
+    const refWavBase64 = opts?.reference ? await blobToBase64(opts.reference) : undefined;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), FINISH_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(getAceSidecarFinishUrl(), {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          mixWavBase64,
+          genre: opts?.genre ?? 'dnb',
+          ...(typeof opts?.targetLufs === 'number' ? { targetLufs: opts.targetLufs } : {}),
+          ...(refWavBase64 ? { refWavBase64 } : {}),
+        }),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`ACE sidecar /finish failed (${msg}). Start the ACE stack on the GPU PC.`);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (res.status === 501) {
+      let hint = 'pip install pedalboard pyloudnorm demucs';
+      try {
+        const detail = (await res.json()) as { installHint?: string };
+        if (detail?.installHint) hint = detail.installHint;
+      } catch {
+        /* keep default hint */
+      }
+      throw new Error(`Finish needs bridge Python packages — run: ${hint}`);
+    }
+    if (!res.ok) {
+      let detail = '';
+      try {
+        detail = await res.text();
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`ACE sidecar /finish HTTP ${res.status}: ${detail.slice(0, 400)}`);
+    }
+
+    const data = (await res.json()) as { wavBase64?: string; report?: FinishReport };
+    if (!data.wavBase64) throw new Error('bridge /finish returned no wavBase64');
+    return {
+      blob: b64ToBlob(data.wavBase64),
+      report: data.report ?? { lufs: null, truePeak: -1, crest: 0, stagesApplied: [] },
+    };
   }
 }
 
