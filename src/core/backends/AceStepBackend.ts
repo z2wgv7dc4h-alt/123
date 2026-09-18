@@ -111,6 +111,17 @@ export function clampCoverStrength(value?: number | null): number {
   return Math.min(ACE_COVER_STRENGTH_MAX, Math.max(ACE_COVER_STRENGTH_MIN, value));
 }
 
+/**
+ * Redo repaint controls. `batchSize` asks ACE for best-of-N mixes in one task
+ * so the user can pick one; the bridge caps it at 4. Strength is 0..1.
+ */
+export const ACE_REDO_BATCH_SIZE = 3;
+export const ACE_REPAINT_STRENGTH_DEFAULT = 0.5;
+export function clampRepaintStrength(value?: number | null): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ACE_REPAINT_STRENGTH_DEFAULT;
+  return Math.min(1, Math.max(0, value));
+}
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let binary = '';
@@ -339,6 +350,10 @@ export class AceStepBackend implements AudioBackend {
                 taskType: 'repaint',
                 repaintStartSec: job.edit.startSec,
                 repaintEndSec: job.edit.endSec,
+                repaintMode: job.edit.mode ?? 'balanced',
+                repaintStrength: clampRepaintStrength(job.edit.strength),
+                // Best-of-3: bridge returns every result file as a candidate.
+                batchSize: ACE_REDO_BATCH_SIZE,
               }
             : srcAudioBase64
               ? {
@@ -414,6 +429,7 @@ export class AceStepBackend implements AudioBackend {
       gpuUsed?: boolean;
       mixWavBase64?: string;
       warnings?: string[];
+      candidates?: Array<{ wavBase64?: string; durationSec?: number }>;
       stems?: Array<{
         id?: string;
         wavBase64?: string;
@@ -433,6 +449,11 @@ export class AceStepBackend implements AudioBackend {
       (structure.samplesPerBar * structure.bars) / job.sampleRateHz;
     const sr = job.sampleRateHz;
     const bitDepth = job.bitDepth;
+
+    // Best-of-N Redo: bridge returns one wavBase64 per ACE batch result.
+    const candidateBlobs: Blob[] = (data.candidates ?? [])
+      .map((c) => (typeof c?.wavBase64 === 'string' && c.wavBase64 ? b64ToBlob(c.wavBase64) : null))
+      .filter((b): b is Blob => b !== null);
 
     // R-3: where bar 1 really starts — computed from RAW mix before mastering
     let barGrid: BarGrid | undefined;
@@ -566,6 +587,7 @@ export class AceStepBackend implements AudioBackend {
       manifest,
       barGrid,
       ...(rawMixBlob ? { rawMixBlob } : {}),
+      ...(candidateBlobs.length > 1 ? { candidates: candidateBlobs } : {}),
       ...(masterReport ? { master: masterReport } : {}),
     };
   }

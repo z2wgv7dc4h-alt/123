@@ -9,6 +9,7 @@ import {
   sectionWindowSec,
   extendStructure,
   planTakeEdit,
+  clampRedoStrength,
 } from '../ui/lib/takeEdit';
 import { useStudioStore } from '../ui/hooks/useStudioStore';
 import { aceStepBackend } from '../core/backends';
@@ -101,6 +102,20 @@ describe('takeEdit pure planning', () => {
     expect(plan!.structureRef).toBe(baseStructure);
   });
 
+  it('planTakeEdit redo carries repaint mode + clamped strength', () => {
+    const custom = planTakeEdit(fakeStudioResult, {
+      kind: 'redo',
+      sectionIndex: 1,
+      style: { strength: 0.8 },
+    });
+    expect(custom!.edit.mode).toBe('balanced');
+    expect(custom!.edit.strength).toBe(0.8);
+    const dflt = planTakeEdit(fakeStudioResult, { kind: 'redo', sectionIndex: 1 });
+    expect(dflt!.edit.strength).toBe(0.5);
+    expect(clampRedoStrength(0.1)).toBe(0.2);
+    expect(clampRedoStrength(5)).toBe(1);
+  });
+
   it('planTakeEdit extend only matches the last section', () => {
     const plan = planTakeEdit(fakeStudioResult, { kind: 'extend', sectionIndex: 2, deltaBars: 16 });
     expect(plan).not.toBeNull();
@@ -174,5 +189,30 @@ describe('take edit store actions', () => {
     useStudioStore.setState({ result: { ...fakeStudioResult, backendId: 'offline-stub' } as RenderResult });
     await useStudioStore.getState().redoSection(1);
     expect(renderSpy).not.toHaveBeenCalled();
+  });
+
+  it('pickCandidate swaps the heard take to the chosen candidate without a render', async () => {
+    const candA = new Blob([new Uint8Array([1])], { type: 'audio/wav' });
+    const candB = new Blob([new Uint8Array([2])], { type: 'audio/wav' });
+    const redoTake = { ...fakeStudioResult, candidates: [candA, candB] } as RenderResult;
+    useStudioStore.setState({ result: redoTake, takeHistory: [] });
+
+    await useStudioStore.getState().pickCandidate(1);
+
+    expect(renderSpy).not.toHaveBeenCalled();
+    const next = useStudioStore.getState().result!;
+    expect(next.stems.find((s) => s.id === 'mix')!.blob).toBe(candB);
+    expect(useStudioStore.getState().takeHistory).toEqual([redoTake]);
+
+    await useStudioStore.getState().undoTakeEdit();
+    expect(renderSpy).not.toHaveBeenCalled();
+    expect(useStudioStore.getState().result).toBe(redoTake);
+    expect(useStudioStore.getState().takeHistory.length).toBe(0);
+  });
+
+  it('pickCandidate ignores a result with no candidates', async () => {
+    await useStudioStore.getState().pickCandidate(0);
+    expect(renderSpy).not.toHaveBeenCalled();
+    expect(useStudioStore.getState().result).toBe(fakeStudioResult);
   });
 });

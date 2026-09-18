@@ -311,6 +311,8 @@ export interface StudioState {
   generateAgain: () => Promise<void>;
   vary: () => Promise<void>;
   redoSection: (index: number, style?: SectionStyle) => Promise<void>;
+  /** Best-of-N Redo: swap the heard mix to a candidate — new take version, no render. */
+  pickCandidate: (index: number) => Promise<void>;
   extendLastSection: (index: number, deltaBars: number) => Promise<void>;
   undoTakeEdit: () => Promise<void>;
   play: () => Promise<void>;
@@ -1283,6 +1285,47 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   redoSection: (index, style) =>
     get().generate({ edit: { kind: 'redo', sectionIndex: index, ...(style ? { style } : {}) } }),
+
+  pickCandidate: async (index) => {
+    const { result, busy, takeHistory } = get();
+    if (busy || !result?.candidates?.length) return;
+    const blob = result.candidates[index];
+    if (index < 0 || !blob) return;
+    const mix = result.stems.find((s) => s.id === 'mix');
+    const durationSec = mix?.durationSec ?? 0;
+    const sampleRateHz = mix?.sampleRateHz ?? 48000;
+    const bitDepth = mix?.bitDepth ?? 16;
+    // Every lane in a batch Redo shares the mix placeholder — swap them all so
+    // the picked candidate is what Play actually hears.
+    const stems = result.stems.map((s) => ({
+      ...s,
+      blob,
+      url: URL.createObjectURL(blob),
+      durationSec,
+      sampleRateHz,
+      bitDepth,
+    }));
+    const next: RenderResult = { ...result, stems };
+    set({
+      result: next,
+      takeHistory: [...takeHistory, result],
+      warnings: [...get().warnings, `Picked Redo candidate ${index + 1} — no re-render`],
+      flowStep: 'generated',
+      loopRegion: null,
+      abFlashback: false,
+    });
+    previewPlayer.clearStemCache();
+    previewPlayer.onState = (ps) => set({ previewState: ps });
+    try {
+      await loadPreviewFromMixer(next, get().mixer);
+      previewPlayer.setAuthoritativeDuration(durationSec);
+      pushToast(`Candidate ${index + 1} selected — hit Play`, 'success', 2600);
+    } catch (e) {
+      const msg = formatStudioError(e instanceof Error ? e.message : String(e));
+      set({ error: msg });
+      pushToast(msg, 'error', 0);
+    }
+  },
 
   extendLastSection: (index, deltaBars) =>
     get().generate({ edit: { kind: 'extend', sectionIndex: index, deltaBars } }),

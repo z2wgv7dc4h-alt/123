@@ -146,6 +146,9 @@ export interface LoRAPack {
   status: 'stub' | 'ready' | 'training' | 'failed';
 }
 
+/** How freely ACE may rewrite the repainted window (bridge repaint_mode). */
+export type RepaintMode = 'conservative' | 'balanced' | 'aggressive';
+
 export interface RenderJob {
   /** Arrangement preset (intro length, breakdown, etc.). */
   songShape?: SongShapeId;
@@ -212,6 +215,10 @@ export interface RenderJob {
     source: Blob;
     startSec: number;
     endSec: number;
+    /** How far ACE may move the audio in the window. Default balanced. */
+    mode?: RepaintMode;
+    /** Repaint strength 0..1 (bridge default 0.5; UI range 0.2-1). */
+    strength?: number;
   };
   /** Apply loudness mastering to Studio mix (default true). */
   master?: boolean;
@@ -290,6 +297,8 @@ export interface RenderResult {
   barGrid?: BarGrid;
   /** Unmastered ACE mix (raw, for edits). Present when mastering was applied. */
   rawMixBlob?: Blob;
+  /** Best-of-N Redo mixes. Present when a batch render returned >1 candidate. */
+  candidates?: Blob[];
   /** Loudness mastering report (Studio). Present when mastering was applied. */
   master?: MasterReport;
 }

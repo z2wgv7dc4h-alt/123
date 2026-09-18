@@ -100,6 +100,42 @@ def clamp_cover_strength(value: object) -> float:
     return max(COVER_STRENGTH_MIN, min(COVER_STRENGTH_MAX, num))
 
 
+# Redo (repaint) strength: how far ACE may move the audio inside the window.
+# 0 = barely touch it, 1 = regenerate freely. Browser default 0.5.
+REPAINT_STRENGTH_DEFAULT = 0.5
+REPAINT_STRENGTH_MIN = 0.0
+REPAINT_STRENGTH_MAX = 1.0
+REPAINT_MODES = ("conservative", "balanced", "aggressive")
+REPAINT_MODE_DEFAULT = "balanced"
+
+# Best-of-N redos: ACE batch_size. Cap at 4 so one redo cannot hog the GPU.
+BATCH_SIZE_DEFAULT = 1
+BATCH_SIZE_MAX = 4
+
+
+def clamp_repaint_strength(value: object) -> float:
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return REPAINT_STRENGTH_DEFAULT
+    if num != num:  # NaN
+        return REPAINT_STRENGTH_DEFAULT
+    return max(REPAINT_STRENGTH_MIN, min(REPAINT_STRENGTH_MAX, num))
+
+
+def normalize_repaint_mode(value: object) -> str:
+    mode = str(value or "").strip().lower()
+    return mode if mode in REPAINT_MODES else REPAINT_MODE_DEFAULT
+
+
+def clamp_batch_size(value: object) -> int:
+    try:
+        num = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return BATCH_SIZE_DEFAULT
+    return max(BATCH_SIZE_DEFAULT, min(BATCH_SIZE_MAX, num))
+
+
 def safe_float(value: object, fallback: float) -> float:
     """ACE metas can be 'N/A' (LM skipped on repaint/cover) — never crash on them."""
     try:
@@ -130,7 +166,11 @@ def format_payload_note(dit_model: str, payload: dict) -> str:
     if task_type == "cover":
         note += f", audio_cover_strength={payload['audio_cover_strength']}"
     elif task_type == "repaint":
-        note += f", repaint={payload['repainting_start']}-{payload['repainting_end']}s"
+        note += (
+            f", repaint={payload['repainting_start']}-{payload['repainting_end']}s"
+            f", repaint_mode={payload.get('repaint_mode', REPAINT_MODE_DEFAULT)}"
+            f", repaint_strength={payload.get('repaint_strength', REPAINT_STRENGTH_DEFAULT)}"
+        )
     return note
 
 
@@ -147,6 +187,8 @@ def apply_source_task(payload: dict, req: dict) -> dict:
         end = req.get("repaintEndSec")
         out["repainting_end"] = float(end) if end is not None else -1.0
         out["chunk_mask_mode"] = "explicit"
+        out["repaint_mode"] = normalize_repaint_mode(req.get("repaintMode"))
+        out["repaint_strength"] = clamp_repaint_strength(req.get("repaintStrength"))
         # Length comes from the source (+ padding past its end), not the plan.
         out.pop("audio_duration", None)
         out.pop("audio_cover_strength", None)
@@ -234,7 +276,7 @@ def build_render_payload(req: dict, model_default: str | None = None) -> dict:
         "audio_format": "wav",
         "use_random_seed": False,
         "seed": seed,
-        "batch_size": 1,
+        "batch_size": clamp_batch_size(req.get("batchSize")),
         "inference_steps": int(
             req.get("inferenceSteps") or (TURBO_INFERENCE_STEPS if turbo else BASE_INFERENCE_STEPS)
         ),
@@ -409,23 +451,46 @@ def parse_result_files(entry: dict) -> list[dict]:
 
 
 def audio_url_from_files(files: list[dict]) -> str | None:
+    urls = audio_urls_from_files(files)
+    return urls[0] if urls else None
+
+
+def audio_urls_from_files(files: list[dict]) -> list[str]:
+    """Every playable result file in order — a batch render returns several."""
+    urls: list[str] = []
     for f in files:
         file_field = f.get("file") or f.get("path") or f.get("url")
         if not file_field:
             continue
         s = str(file_field)
         if s.startswith("http"):
-            return s
-        if s.startswith("/"):
-            return f"{ACE_API}{s}"
-        return f"{ACE_API}/v1/audio?path={urllib.parse.quote(s, safe='')}"
-    return None
+            urls.append(s)
+        elif s.startswith("/"):
+            urls.append(f"{ACE_API}{s}")
+        else:
+            urls.append(f"{ACE_API}/v1/audio?path={urllib.parse.quote(s, safe='')}")
+    return urls
 
 
 def download_bytes(url: str, timeout: float = 120.0) -> bytes:
     req = urllib.request.Request(url, headers={"Accept": "*/*"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
+
+
+def build_candidates(audio_urls: list[str], batch_size: int, download=download_bytes) -> list[dict]:
+    """Download every batch result file into {wavBase64, durationSec}.
+    The downloader is injectable so the payload contract is unit-testable."""
+    out: list[dict] = []
+    for url in audio_urls[: max(1, batch_size)]:
+        data = download(url)
+        out.append(
+            {
+                "wavBase64": base64.b64encode(data).decode("ascii"),
+                "durationSec": wav_duration_sec(data),
+            }
+        )
+    return out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -593,7 +658,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
 
-            audio_url = None
+            audio_urls: list[str] = []
             metas = {}
             dit_model = payload["model"]
             last = None
@@ -627,14 +692,14 @@ class Handler(BaseHTTPRequestHandler):
                     )
                     return
                 if status == 1 or files:
-                    audio_url = audio_url_from_files(files)
+                    audio_urls = audio_urls_from_files(files)
                     if files:
                         metas = files[0].get("metas") or {}
                         dit_model = files[0].get("dit_model") or dit_model
-                    if audio_url:
+                    if audio_urls:
                         break
 
-            if not audio_url:
+            if not audio_urls:
                 json_response(
                     self,
                     504,
@@ -648,12 +713,15 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 return
 
-            audio_bytes = download_bytes(audio_url)
+            batch_size = int(payload.get("batch_size") or BATCH_SIZE_DEFAULT)
+            audio_bytes = download_bytes(audio_urls[0])
             b64 = base64.b64encode(audio_bytes).decode("ascii")
             mix_url = cache_mix(job_id, audio_bytes, "wav")
             metas = metas if isinstance(metas, dict) else {}
             bpm_measured = safe_float(metas.get("bpm"), float(bpm))
             duration_out = wav_duration_sec(audio_bytes) or safe_float(metas.get("duration"), float(duration_sec))
+            # Best-of-N: download every result file so the browser can pick one.
+            candidates = build_candidates(audio_urls, batch_size) if batch_size > 1 else []
 
             stem_ids = ["mix", "drums", "bass", "kick", "snare", "hats"]
             stems = [
@@ -697,6 +765,7 @@ class Handler(BaseHTTPRequestHandler):
                     "mixdownPreviewWav": "mix",
                     "taskId": task_id,
                     "aceTaskId": task_id,
+                    **({"candidates": candidates} if candidates else {}),
                 },
             )
         except urllib.error.HTTPError as e:

@@ -1,7 +1,17 @@
 import type { GenreId, RenderJob, RenderResult, SectionRole, StructureMap } from '@/core/types';
 import { BAR_GRID_MIN_CONFIDENCE } from '@/core/audio/downbeatGrid';
 
-export type SectionStyle = { role?: SectionRole; genre?: GenreId; words?: string };
+export type SectionStyle = { role?: SectionRole; genre?: GenreId; words?: string; strength?: number };
+
+/** Redo "Change amount" — ACE repaint_strength. UI range 0.2-1, default 0.5. */
+export const REDO_STRENGTH_DEFAULT = 0.5;
+export const REDO_STRENGTH_MIN = 0.2;
+export const REDO_STRENGTH_MAX = 1;
+
+export function clampRedoStrength(value?: number | null): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return REDO_STRENGTH_DEFAULT;
+  return Math.min(REDO_STRENGTH_MAX, Math.max(REDO_STRENGTH_MIN, value));
+}
 
 export type TakeEditRequest =
   | { kind: 'redo'; sectionIndex: number; style?: SectionStyle }
@@ -98,7 +108,19 @@ export function planTakeEdit(result: RenderResult, req: TakeEditRequest): TakeEd
     if (!w) return null;
     const sec = structure.sections[req.sectionIndex]!;
     const style: SectionStyle = { ...req.style, role: req.style?.role ?? roleForSectionName(sec.name) };
-    return { edit: { kind: 'repaint', source, ...w }, structureRef: structure, seed: result.seed, bpm, style };
+    return {
+      edit: {
+        kind: 'repaint',
+        source,
+        ...w,
+        mode: 'balanced',
+        strength: clampRedoStrength(req.style?.strength),
+      },
+      structureRef: structure,
+      seed: result.seed,
+      bpm,
+      style,
+    };
   }
   const last = structure.sections.length - 1;
   if (req.sectionIndex !== last || req.deltaBars <= 0) return null;

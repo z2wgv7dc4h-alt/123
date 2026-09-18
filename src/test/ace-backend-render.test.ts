@@ -12,6 +12,7 @@ import {
   ACE_COVER_STRENGTH_MIN,
   ACE_COVER_STRENGTH_MAX,
   clampCoverStrength,
+  clampRepaintStrength,
 } from '../core/backends/AceStepBackend';
 import { deriveBreakDensity } from '../core/structure/StructureEngine';
 
@@ -347,9 +348,55 @@ describe('AceStepBackend audio2audio (cover) path', () => {
     expect(body.taskType).toBe('repaint');
     expect(body.repaintStartSec).toBe(80);
     expect(body.repaintEndSec).toBe(102);
+    // Redo strength + best-of-3: defaults balanced/0.5, batch 3.
+    expect(body.repaintMode).toBe('balanced');
+    expect(body.repaintStrength).toBe(0.5);
+    expect(body.batchSize).toBe(3);
     expect(body.srcAudioBase64).toBeTruthy();
     expect(body.audioCoverStrength).toBeUndefined();
     expect(result.acePayload?.thinking).toBe(false);
     expect(result.manifest.styleReference?.acePathActive ?? false).toBe(false);
+  });
+
+  it('edit.repaint forwards mode/strength and returns parsed candidates', async () => {
+    const b64a = b64of(fakeWav);
+    const b64b = b64of(new Uint8Array([82, 73, 70, 70, 1, 2, 3, 4, 87, 65, 86, 69]));
+    const b64c = b64of(new Uint8Array([82, 73, 70, 70, 9, 9, 9, 9, 87, 65, 86, 69]));
+    let sent: Record<string, unknown> | null = null;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === ACE_SIDECAR_RENDER_URL) {
+        sent = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({
+          jobId: 'j', seed: 7, gpuUsed: true, mixWavBase64: b64a,
+          candidates: [
+            { wavBase64: b64a, durationSec: 4 },
+            { wavBase64: b64b, durationSec: 4 },
+            { wavBase64: b64c, durationSec: 4 },
+          ],
+        }), { status: 200 });
+      }
+      throw new Error('unexpected fetch');
+    }) as typeof fetch;
+    const result = await backend.render({
+      jobId: 'j', seed: 7, bpm: 174, bpmTolerance: 2, durationBars: 64,
+      sampleRateHz: 48000, bitDepth: 16, channels: 2,
+      prompt: { descriptors: [], energy: 0.9, darkness: 0.4, chaos: 0.3, text: 'festival drum and bass' },
+      stemSchemaVersion: 'v0',
+      edit: {
+        kind: 'repaint', source: new Blob([fakeWav], { type: 'audio/wav' }),
+        startSec: 80, endSec: 102, mode: 'aggressive', strength: 0.9,
+      },
+    });
+    expect((sent as unknown as Record<string, unknown>).repaintMode).toBe('aggressive');
+    expect((sent as unknown as Record<string, unknown>).repaintStrength).toBe(0.9);
+    expect(result.candidates).toHaveLength(3);
+  });
+
+  it('clampRepaintStrength defaults 0.5 and clamps to 0..1', () => {
+    expect(clampRepaintStrength(undefined)).toBe(0.5);
+    expect(clampRepaintStrength(0.7)).toBe(0.7);
+    expect(clampRepaintStrength(-1)).toBe(0);
+    expect(clampRepaintStrength(4)).toBe(1);
+    expect(clampRepaintStrength(Number.NaN)).toBe(0.5);
   });
 });

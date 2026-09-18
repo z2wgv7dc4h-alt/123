@@ -6,7 +6,7 @@ import { barsToDurationSec, formatDurationMmSs, sectionClickRatio } from '../lib
 import { DEFAULT_BPM } from '@/core/types';
 import { retailStructureLabel } from '../lib/retailLabels';
 import { totalBarsOf } from '../lib/structureEdit';
-import { isStudioTake, REDO_PRESETS } from '../lib/takeEdit';
+import { isStudioTake, REDO_PRESETS, REDO_STRENGTH_DEFAULT, REDO_STRENGTH_MAX, REDO_STRENGTH_MIN } from '../lib/takeEdit';
 import { BAR_GRID_MIN_CONFIDENCE } from '@/core/audio/downbeatGrid';
 
 const SECTION_CLASS: Record<string, string> = {
@@ -71,6 +71,7 @@ export function SectionTimeline() {
   const seekPreview = useStudioStore((s) => s.seekPreview);
   const previewState = useStudioStore((s) => s.previewState);
   const redoSection = useStudioStore((s) => s.redoSection);
+  const pickCandidate = useStudioStore((s) => s.pickCandidate);
   const extendLastSection = useStudioStore((s) => s.extendLastSection);
   const undoTakeEdit = useStudioStore((s) => s.undoTakeEdit);
   const takeHistory = useStudioStore((s) => s.takeHistory);
@@ -93,6 +94,7 @@ export function SectionTimeline() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [redoPresetId, setRedoPresetId] = useState('auto');
   const [redoWords, setRedoWords] = useState('');
+  const [redoStrength, setRedoStrength] = useState(REDO_STRENGTH_DEFAULT);
 
   useEffect(() => {
     setSelectedIndex(null);
@@ -207,6 +209,23 @@ export function SectionTimeline() {
               : 'Edited'}
           </span>
         )}
+        {studioTake && !!result?.candidates && result.candidates.length > 1 && (
+          <span className="timeline-candidates" role="group" aria-label="Pick redo candidate">
+            <span className="hint">Pick</span>
+            {result.candidates.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                className="btn tiny ghost"
+                disabled={busy}
+                title={`Use Redo candidate ${i + 1} (no re-render)`}
+                onClick={() => void pickCandidate(i)}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </span>
+        )}
       </div>
       <p className="hint timeline-drag-hint">
         {studioTake
@@ -280,6 +299,20 @@ export function SectionTimeline() {
                         disabled={busy}
                         onChange={(e) => setRedoWords(e.target.value)}
                       />
+                      <label className="redo-strength" title="How much ACE may change this part">
+                        <span className="redo-strength-label">Change amount</span>
+                        <input
+                          type="range"
+                          min={REDO_STRENGTH_MIN}
+                          max={REDO_STRENGTH_MAX}
+                          step={0.1}
+                          value={redoStrength}
+                          disabled={busy}
+                          aria-label="Change amount"
+                          onChange={(e) => setRedoStrength(Number(e.target.value))}
+                        />
+                        <span className="redo-strength-value">{redoStrength.toFixed(1)}</span>
+                      </label>
                       <button
                         type="button"
                         className="btn tiny ghost"
@@ -288,7 +321,11 @@ export function SectionTimeline() {
                         onClick={() => {
                           const preset = REDO_PRESETS.find((p) => p.id === redoPresetId)?.style ?? {};
                           const words = redoWords.trim();
-                          void redoSection(index, { ...preset, ...(words ? { words } : {}) });
+                          void redoSection(index, {
+                            ...preset,
+                            strength: redoStrength,
+                            ...(words ? { words } : {}),
+                          });
                         }}
                       >
                         Redo
