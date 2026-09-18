@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Play, Pause, Square } from 'lucide-react';
 import { previewPlayer } from '@/core/audio';
 import { useStudioStore, canPlayPreview } from '../hooks/useStudioStore';
 import {
@@ -376,7 +377,11 @@ export function Waveform() {
             aria-describedby={!canPlay ? 'help-play-disabled' : undefined}
             onClick={() => void play()}
           >
-            <span aria-hidden="true">{previewState === 'playing' ? '❚❚' : '▶'}</span>
+            {previewState === 'playing' ? (
+              <Pause size={16} aria-hidden="true" />
+            ) : (
+              <Play size={16} aria-hidden="true" />
+            )}
           </button>
           {!canPlay ? (
             <span id="help-play-disabled" className="sr-only">
@@ -393,7 +398,7 @@ export function Waveform() {
             title="Stop mix preview (Space)"
             onClick={() => stop()}
           >
-            <span aria-hidden="true">■</span>
+            <Square size={16} aria-hidden="true" />
           </button>
         </span>
         {durationSec > 0 ? (
@@ -482,9 +487,6 @@ export function Waveform() {
           <span className="label-with-tip-text waveform-clock" aria-live="off">
             {durationSec > 0 ? (
               <>
-                <span className="waveform-clock-elapsed">
-                  {formatElapsedTotal(progress * durationSec, durationSec)}
-                </span>
                 <span className="waveform-clock-bar">
                   {formatBarSectionClockLine(progress, bars, sections, durationSec)}
                 </span>

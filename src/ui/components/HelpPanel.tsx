@@ -86,7 +86,7 @@ export function HelpPanel() {
         here. No YouTube / artist clones. Files stay in this browser.
       </p>
       <details className="help-why174">
-        <summary>Why ~174?</summary>
+        <summary>Why these tempos?</summary>
         <p className="help-note">
           {GLOSSARY_BLURBS.why174} {HELP.why174}
         </p>
@@ -150,7 +150,7 @@ export function HelpPanel() {
             <strong>Browser sketch</strong> — {GLOSSARY_BLURBS.browserSketch}
           </li>
           <li>
-            <strong>~174 BPM</strong> — {GLOSSARY_BLURBS.bpm174} {GLOSSARY_BLURBS.why174}
+            <strong>Tempo</strong> — {GLOSSARY_BLURBS.bpm174} {GLOSSARY_BLURBS.why174}
           </li>
         </ul>
       </details>

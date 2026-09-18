@@ -8,6 +8,8 @@
   color-scheme: dark;
   /* Club/Rave direction: neon magenta + cyan + acid green on near-black. */
   --bg: #030005;
+  --surface: rgba(14, 18, 28, 0.95);
+  --glass: rgba(14, 22, 34, 0.72);
   --panel: rgba(14, 8, 22, 0.86);
   --panel-solid: #0c0714;
   --panel-elevated: rgba(21, 10, 32, 0.94);
@@ -15,6 +17,7 @@
   --border-soft: rgba(167, 38, 255, 0.1);
   --border-glow: rgba(255, 46, 232, 0.4);
   --text: #f5f0fa;
+  --text-dim: #a596b8;
   --muted: #a596b8;
   --muted-2: #7a7086;
   --accent: #00e5ff;
@@ -83,6 +86,16 @@ body {
 .header {
   display: flex; justify-content: space-between; gap: var(--space-4); align-items: flex-start;
   margin-bottom: var(--space-3);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 229, 255, 0.14);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-left: calc(-1 * var(--space-4));
+  margin-right: calc(-1 * var(--space-4));
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
 }
 .header h1 {
   margin: 0.3rem 0 0;
@@ -467,10 +480,10 @@ details summary:hover { color: var(--text); }
   letter-spacing: 0.02em;
 }
 
-.btn.pulse { animation: pulse-glow 1.2s ease-in-out infinite; }
+.btn.pulse { animation: pulse-glow 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 6px 18px rgba(91, 63, 217, 0.35); }
-  50% { box-shadow: 0 6px 26px rgba(0, 229, 255, 0.45); }
+  0%, 100% { box-shadow: 0 8px 22px rgba(255, 46, 232, 0.38), inset 0 1px 0 rgba(255,255,255,0.18); }
+  50% { box-shadow: 0 12px 32px rgba(255, 46, 232, 0.52), inset 0 1px 0 rgba(255,255,255,0.18); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -546,8 +559,9 @@ details summary:hover { color: var(--text); }
   padding: 0.65rem 0.75rem 0.75rem;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background:
-    linear-gradient(180deg, rgba(20, 24, 36, 0.95), rgba(10, 13, 20, 0.9));
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 .waveform-head {
@@ -3418,4 +3432,30 @@ details summary:hover { color: var(--text); }
 }
 .app.simple .transport-clock.compact .transport-clock-elapsed {
   font-size: 0.9rem;
+}
+
+/* UI-7: mobile at 400px — no horizontal overflow */
+@media (max-width: 400px) {
+  .app { padding: 0.75rem 0.5rem 2rem; }
+  .header {
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-left: calc(-1 * 0.5rem);
+    margin-right: calc(-1 * 0.5rem);
+    padding: 0.75rem 0.5rem;
+  }
+  .header h1 { font-size: clamp(1.25rem, 4vw, 1.5rem); }
+  .transport { flex-direction: column; }
+  .transport-cluster { width: 100%; }
+  .transport .pill { width: 100%; }
+  .help-tip-bubble {
+    left: 0;
+    right: 0;
+    transform: none;
+    max-width: calc(100vw - 1rem);
+  }
+  .help-tip-bubble--top::after,
+  .help-tip-bubble--bottom::after { left: 1rem; }
+  .btn-play-compact, .btn-stop-compact { min-width: 2rem; }
+  .waveform-meta { font-size: 0.65rem; }
 }

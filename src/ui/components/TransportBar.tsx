@@ -280,7 +280,6 @@ export function ExportControls() {
       {exportCoachOpen && result ? (
         <span className="first-export-coach" role="status">
           Ready to Export ZIP?
-          <HelpTip text={HELP.firstExportCoach} ariaLabel="About first Export tip" />
           <button type="button" className="btn tiny ghost" onClick={dismissExportCoach}>
             Got it
           </button>
