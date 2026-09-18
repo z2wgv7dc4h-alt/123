@@ -180,6 +180,8 @@ export interface RenderJob {
   prompt: StylePrompt;
   structureRef?: StructureMap;
   lora?: LoRAPackRef[];
+  /** Override the backend's default batch size (e.g. Polish drops = 2). */
+  batchSize?: number;
   stemSchemaVersion: 'v0';
   /** Which stems to regenerate (Power Mode). Empty = all. */
   regenStems?: StemId[];
@@ -299,6 +301,10 @@ export interface MasterReport {
   gainDb: number;
   /** True when the post-limiter mid/side stereo-width stage ran. */
   widthApplied: boolean;
+  /** True when a style-reference tone match ran (vs the default genre tilt). */
+  matchApplied: boolean;
+  /** Largest absolute tone-match / default-tilt correction applied, dB. */
+  maxCorrectionDb: number;
 }
 
 export interface RenderResult {
@@ -323,6 +329,8 @@ export interface RenderResult {
   rawMixBlob?: Blob;
   /** Best-of-N Redo mixes. Present when a batch render returned >1 candidate. */
   candidates?: Blob[];
+  /** Score per candidate (aligned with `candidates`, best first). */
+  candidateScores?: number[];
   /**
    * True when stems are real separations (e.g. Demucs), not the ACE mix
    * mirrored across lanes. Only then do mute/solo isolate actual parts.

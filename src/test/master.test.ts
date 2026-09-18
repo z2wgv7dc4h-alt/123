@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { integratedLufs, masterStereo } from '../core/audio/master';
+import { spectrumDb, oneThirdOctaveCenters, toneMatchGains, highShelfCoeffs } from '../core/audio/spectrum';
 import { encodeWav, decodeWavChannels } from '../core/export/wav';
 import { planTakeEdit } from '../ui/lib/takeEdit';
 import type { RenderResult } from '../core/types';
@@ -375,3 +376,93 @@ describe('AceStepBackend mastering integration', () => {
     expect(result.master).toBeUndefined();
   });
 });
+
+function biquad(
+  input: Float32Array,
+  c: { b0: number; b1: number; b2: number; a0: number; a1: number; a2: number },
+): Float32Array {
+  const out = new Float32Array(input.length);
+  const nb0 = c.b0 / c.a0;
+  const nb1 = c.b1 / c.a0;
+  const nb2 = c.b2 / c.a0;
+  const na1 = c.a1 / c.a0;
+  const na2 = c.a2 / c.a0;
+  let x1 = 0;
+  let x2 = 0;
+  let y1 = 0;
+  let y2 = 0;
+  for (let i = 0; i < input.length; i++) {
+    const x0 = input[i]!;
+    const y0 = nb0 * x0 + nb1 * x1 + nb2 * x2 - na1 * y1 - na2 * y2;
+    x2 = x1;
+    x1 = x0;
+    y2 = y1;
+    y1 = y0;
+    out[i] = y0;
+  }
+  return out;
+}
+
+describe('reference tone match', () => {
+  it('moves a darker take toward a brighter reference (>50% of gap closed)', () => {
+    const sr = 48000;
+    const n = sr * 3;
+    let seed = 12345;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+    const take = new Float32Array(n);
+    let lp = 0;
+    for (let i = 0; i < n; i++) {
+      lp += 0.04 * (rnd() - lp); // bass-heavy pink-ish
+      take[i] = lp * 0.8;
+    }
+    // Brighter reference: +4 dB shelf above 1.5 kHz on the same take.
+    const shelf = highShelfCoeffs(4, 1500, sr);
+    const reference = biquad(take, shelf);
+
+    const centers = oneThirdOctaveCenters();
+    const takeDb = spectrumDb([take, take.slice()], sr, centers);
+    const refDb = spectrumDb([reference, reference.slice()], sr, centers);
+
+    const out = masterStereo(take, take.slice(), sr, {
+      reference: { channels: [reference, reference.slice()], sampleRate: sr },
+      genre: 'dnb',
+    });
+    expect(out.report.matchApplied).toBe(true);
+    expect(out.report.maxCorrectionDb).toBeGreaterThan(0);
+    expect(out.report.maxCorrectionDb).toBeLessThanOrEqual(6);
+
+    const afterDb = spectrumDb([out.left, out.right], sr, centers);
+    const shape = (db: readonly number[]) => {
+      const mean = db.reduce((a, b) => a + b, 0) / db.length;
+      return db.map((x) => x - mean);
+    };
+    const refS = shape(refDb);
+    const takeS = shape(takeDb);
+    const afterS = shape(afterDb);
+    let gap = 0;
+    let remain = 0;
+    for (let i = 0; i < centers.length; i++) {
+      const fc = centers[i]!;
+      if (fc < 250 || fc > 10000) continue;
+      gap += Math.abs(refS[i]! - takeS[i]!);
+      remain += Math.abs(refS[i]! - afterS[i]!);
+    }
+    expect(gap).toBeGreaterThan(0);
+    expect(1 - remain / gap).toBeGreaterThan(0.5);
+  });
+
+  it('clamps tone-match gains to ±6 dB (±3 dB below 60 Hz)', () => {
+    const centers = oneThirdOctaveCenters();
+    const ref = centers.map(() => 20);
+    const take = centers.map(() => -20);
+    const gains = toneMatchGains(ref, take, centers);
+    for (let i = 0; i < centers.length; i++) {
+      const limit = centers[i]! < 60 ? 3 : 6;
+      expect(Math.abs(gains[i]!)).toBeLessThanOrEqual(limit + 1e-6);
+    }
+    expect(Math.max(...gains.map(Math.abs))).toBe(6);
+  });
+});
+
+
+

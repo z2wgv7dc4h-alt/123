@@ -241,4 +241,39 @@ describe('take edit store actions', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it('polishDrops repaints each drop once with role drop + batchSize 2', async () => {
+    const twoDrops = structureOf(
+      [
+        { name: 'intro', startBar: 0, lengthBars: 8 },
+        { name: 'drop', startBar: 8, lengthBars: 8 },
+        { name: 'break', startBar: 16, lengthBars: 4 },
+        { name: 'drop', startBar: 20, lengthBars: 8 },
+        { name: 'outro', startBar: 28, lengthBars: 4 },
+      ],
+      32,
+    );
+    useStudioStore.setState({
+      result: { ...fakeStudioResult, structure: twoDrops } as RenderResult,
+      takeHistory: [],
+    });
+
+    await useStudioStore.getState().polishDrops();
+
+    expect(renderSpy).toHaveBeenCalledTimes(2);
+    for (const call of renderSpy.mock.calls) {
+      const job = call[0] as {
+        sectionRole?: string;
+        batchSize?: number;
+        edit?: { kind: string };
+      };
+      expect(job.sectionRole).toBe('drop');
+      expect(job.edit?.kind).toBe('repaint');
+      expect(job.batchSize).toBe(2);
+    }
+    // One take version per drop; Undo steps back one drop at a time.
+    expect(useStudioStore.getState().takeHistory.length).toBe(2);
+    await useStudioStore.getState().undoTakeEdit();
+    expect(useStudioStore.getState().takeHistory.length).toBe(1);
+  });
 });

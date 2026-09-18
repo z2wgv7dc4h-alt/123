@@ -433,6 +433,9 @@ export function Waveform() {
               onClick={() => void pickCandidate(i)}
             >
               {TAKE_LETTERS[i] ?? String(i + 1)}
+              {typeof result.candidateScores?.[i] === 'number' ? (
+                <span className="take-score">{result.candidateScores[i]!.toFixed(2)}</span>
+              ) : null}
             </button>
           ))}
         </div>

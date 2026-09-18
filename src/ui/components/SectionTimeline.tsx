@@ -75,6 +75,7 @@ export function SectionTimeline() {
   const redoSection = useStudioStore((s) => s.redoSection);
   const arrangeSection = useStudioStore((s) => s.arrangeSection);
   const undoTakeEdit = useStudioStore((s) => s.undoTakeEdit);
+  const polishDrops = useStudioStore((s) => s.polishDrops);
   const takeHistory = useStudioStore((s) => s.takeHistory);
 
   const studioTake = isStudioTake(result);
@@ -225,6 +226,18 @@ export function SectionTimeline() {
                 Undo edit
               </button>
             )}
+            <button
+              type="button"
+              className="btn tiny ghost"
+              disabled={
+                busy ||
+                (result?.structure?.sections.filter((s) => s.name === 'drop').length ?? 0) === 0
+              }
+              title="Repaint every drop (best-of-2) and keep the top-scored take"
+              onClick={() => void polishDrops()}
+            >
+              Polish drops
+            </button>
           </>
         )}
         {editedSections && (

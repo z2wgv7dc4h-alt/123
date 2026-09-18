@@ -3,7 +3,75 @@
  * ITU-R BS.1770 LUFS measurement + glue compression + peak limiting.
  */
 
-import type { MasterReport } from '../types';
+import type { GenreId, MasterReport } from '../types';
+import {
+  oneThirdOctaveCenters,
+  spectrumDb,
+  toneMatchGains,
+  peakingCoeffs,
+  highShelfCoeffs,
+} from './spectrum';
+
+type ToneFilter = { kind: 'highshelf' | 'peaking'; fc: number; gainDb: number; q?: number };
+
+/** Gentle default tone tilt per genre when no reference is attached. */
+const GENRE_TONE_TARGETS: Record<GenreId, ToneFilter[]> = {
+  dnb: [
+    { kind: 'highshelf', fc: 8000, gainDb: 1.5 },
+    { kind: 'peaking', fc: 300, gainDb: -1.5, q: 1.0 },
+  ],
+  dubstep: [
+    { kind: 'highshelf', fc: 8000, gainDb: 1.5 },
+    { kind: 'peaking', fc: 300, gainDb: -1.5, q: 1.0 },
+  ],
+  halftime: [
+    { kind: 'highshelf', fc: 8000, gainDb: 1.5 },
+    { kind: 'peaking', fc: 300, gainDb: -1.5, q: 1.0 },
+  ],
+  jungle: [
+    { kind: 'highshelf', fc: 8000, gainDb: 1.0 },
+    { kind: 'peaking', fc: 300, gainDb: -1.0, q: 1.0 },
+  ],
+  trap: [
+    { kind: 'highshelf', fc: 9000, gainDb: 1.0 },
+    { kind: 'peaking', fc: 250, gainDb: -1.5, q: 1.0 },
+  ],
+};
+
+function applyFilters(
+  left: Float32Array,
+  right: Float32Array,
+  sampleRate: number,
+  filters: readonly ToneFilter[],
+): { left: Float32Array; right: Float32Array } {
+  let l = left;
+  let r = right;
+  for (const f of filters) {
+    const c =
+      f.kind === 'highshelf'
+        ? highShelfCoeffs(f.gainDb, f.fc, sampleRate)
+        : peakingCoeffs(f.gainDb, f.fc, sampleRate, f.q ?? 4.3);
+    l = biquad(l, c.b0, c.b1, c.b2, c.a0, c.a1, c.a2);
+    r = biquad(r, c.b0, c.b1, c.b2, c.a0, c.a1, c.a2);
+  }
+  return { left: l, right: r };
+}
+
+/** Turn per-band gains into a peaking-biquad cascade (skips near-zero bands). */
+function applyBandGains(
+  left: Float32Array,
+  right: Float32Array,
+  sampleRate: number,
+  centers: readonly number[],
+  gains: readonly number[],
+): { left: Float32Array; right: Float32Array } {
+  const filters: ToneFilter[] = [];
+  for (let i = 0; i < centers.length; i++) {
+    const g = gains[i] ?? 0;
+    if (Math.abs(g) >= 0.25) filters.push({ kind: 'peaking', fc: centers[i]!, gainDb: g });
+  }
+  return applyFilters(left, right, sampleRate, filters);
+}
 
 /**
  * One biquad section, direct form I. Coefficients are normalized by a0.
@@ -209,7 +277,14 @@ export function masterStereo(
   left: Float32Array,
   right: Float32Array,
   sampleRate: number,
-  opts?: { targetLufs?: number; ceilingDb?: number },
+  opts?: {
+    targetLufs?: number;
+    ceilingDb?: number;
+    /** Style-reference audio for tone match (any channels; averaged). */
+    reference?: { channels: Float32Array[]; sampleRate: number };
+    /** Genre target for the default tilt when no reference is attached. */
+    genre?: GenreId;
+  },
 ): {
   left: Float32Array;
   right: Float32Array;
@@ -225,13 +300,57 @@ export function masterStereo(
     return {
       left: new Float32Array(left),
       right: new Float32Array(right),
-      report: { lufsBefore: 0, lufsAfter: 0, peakDbAfter: ceilingDb, gainDb: 0, widthApplied: false },
+      report: {
+        lufsBefore: 0,
+        lufsAfter: 0,
+        peakDbAfter: ceilingDb,
+        gainDb: 0,
+        widthApplied: false,
+        matchApplied: false,
+        maxCorrectionDb: 0,
+      },
     };
   }
 
   let outL = new Float32Array(left);
   let outR = new Float32Array(right);
   let gainDb = 0;
+
+  // Reference tone match (or gentle default tilt) before the compressor.
+  let matchApplied = false;
+  let maxCorrectionDb = 0;
+  const centers = oneThirdOctaveCenters();
+  const ref = opts?.reference;
+  if (ref?.channels?.length) {
+    const refDb = spectrumDb(ref.channels, ref.sampleRate, centers);
+    // Closed loop: peaking biquads do not track 1/3-octave averages exactly,
+    // so match, re-measure and trim the residual. Cumulative gain per band
+    // still respects the ±6 dB (±3 below 60 Hz) clamp.
+    const cumulative = centers.map(() => 0);
+    let cur = { left: outL, right: outR };
+    for (let pass = 0; pass < 2; pass++) {
+      const takeDb = spectrumDb([cur.left, cur.right], sampleRate, centers);
+      const gains = toneMatchGains(refDb, takeDb, centers);
+      const applied = gains.map((g, i) => {
+        const limit = centers[i]! < 60 ? 3 : 6;
+        const total = Math.max(-limit, Math.min(limit, cumulative[i]! + g));
+        const delta = total - cumulative[i]!;
+        cumulative[i] = total;
+        return delta;
+      });
+      cur = applyBandGains(cur.left, cur.right, sampleRate, centers, applied);
+    }
+    outL = cur.left;
+    outR = cur.right;
+    maxCorrectionDb = cumulative.reduce((m, g) => Math.max(m, Math.abs(g)), 0);
+    matchApplied = true;
+  } else {
+    const filters = GENRE_TONE_TARGETS[opts?.genre ?? 'dnb'] ?? GENRE_TONE_TARGETS.dnb;
+    maxCorrectionDb = filters.reduce((m, f) => Math.max(m, Math.abs(f.gainDb)), 0);
+    const tilted = applyFilters(outL, outR, sampleRate, filters);
+    outL = tilted.left;
+    outR = tilted.right;
+  }
 
   // Glue compressor: gentle, stereo-linked, RMS detector
   // Attack 10 ms, release 120 ms, ratio 2:1, threshold 6 dB below track RMS
@@ -314,6 +433,8 @@ export function masterStereo(
       peakDbAfter: Number.isFinite(peakDbAfter) ? peakDbAfter : ceilingDb,
       gainDb,
       widthApplied: true,
+      matchApplied,
+      maxCorrectionDb,
     },
   };
 }

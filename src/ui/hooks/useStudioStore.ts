@@ -351,7 +351,16 @@ export interface StudioState {
   exclusiveSolo: (id: StemId) => void;
   setGainDb: (id: StemId, db: number) => void;
   resetMix: () => void;
-  generate: (opts?: { variation?: 'again' | 'vary'; edit?: TakeEditRequest }) => Promise<void>;
+  generate: (opts?: {
+    variation?: 'again' | 'vary';
+    edit?: TakeEditRequest;
+    /** Override backend batch size (Polish drops = 2). */
+    batchSize?: number;
+    /** Apply the top-scored candidate as the heard mix (no extra history entry). */
+    autoPickBest?: boolean;
+  }) => Promise<void>;
+  /** P-3: repaint every drop section, best-of-2, auto-pick the top score. */
+  polishDrops: () => Promise<void>;
   generateAgain: () => Promise<void>;
   vary: () => Promise<void>;
   redoSection: (index: number, style?: SectionStyle) => Promise<void>;
@@ -533,6 +542,25 @@ function maybeToastRemixLive(get: () => StudioState): void {
   if (remixToastJobId === result.jobId) return;
   remixToastJobId = result.jobId;
   pushToast(HELP.remixLive, 'info', 4200);
+}
+
+/** Swap every stem to a candidate blob (heard mix), preserving duration/sr. */
+function withMixCandidate(result: RenderResult, index: number): RenderResult {
+  const blob = result.candidates?.[index];
+  if (!blob) return result;
+  const mix = result.stems.find((s) => s.id === 'mix');
+  const durationSec = mix?.durationSec ?? 0;
+  const sampleRateHz = mix?.sampleRateHz ?? DEFAULT_SAMPLE_RATE;
+  const bitDepth = mix?.bitDepth ?? DEFAULT_BIT_DEPTH;
+  const stems = result.stems.map((s) => ({
+    ...s,
+    blob,
+    url: URL.createObjectURL(blob),
+    durationSec,
+    sampleRateHz,
+    bitDepth,
+  }));
+  return { ...result, stems };
 }
 
 export const useStudioStore = create<StudioState>((set, get) => ({
@@ -1248,6 +1276,7 @@ export const useStudioStore = create<StudioState>((set, get) => ({
           sampleRateHz: DEFAULT_SAMPLE_RATE,
           bitDepth: DEFAULT_BIT_DEPTH,
           channels: 2,
+          ...(opts?.batchSize ? { batchSize: opts.batchSize } : {}),
           prompt: editPlan?.style?.words
             ? { ...prompt, text: [editPlan.style.words, prompt.text].filter(Boolean).join(', ') }
             : prompt,
@@ -1278,6 +1307,10 @@ export const useStudioStore = create<StudioState>((set, get) => ({
       } finally {
         heartbeat?.stop();
         if (isAcePath) await releaseRenderWakeLock();
+      }
+      // Polish drops / best-of: hear the top-scored candidate (no extra history).
+      if (opts?.autoPickBest && result.candidates?.length) {
+        result = withMixCandidate(result, 0);
       }
       // New stems → drop decode cache; honor current mute/solo/gain immediately
       previewPlayer.clearStemCache();
@@ -1503,6 +1536,44 @@ export const useStudioStore = create<StudioState>((set, get) => ({
 
   extendLastSection: (index, deltaBars) =>
     get().generate({ edit: { kind: 'extend', sectionIndex: index, deltaBars } }),
+
+  polishDrops: async () => {
+    const { result, busy } = get();
+    if (busy) return;
+    if (!result || !isStudioTake(result)) {
+      pushToast('Polish drops needs a Studio (GPU) take', 'warn', 3600);
+      return;
+    }
+    const dropIndexes = result
+      .structure!.sections.map((s, i) => ({ name: s.name, i }))
+      .filter((x) => x.name === 'drop')
+      .map((x) => x.i);
+    if (!dropIndexes.length) {
+      pushToast('No drop sections to polish', 'warn', 3200);
+      return;
+    }
+    set({ busy: true, error: null });
+    let polished = 0;
+    // One repaint per drop, best-of-2, auto-picking the top take score. Each
+    // generate appends one takeHistory entry, so Undo steps back one drop.
+    for (const sectionIndex of dropIndexes) {
+      await get().generate({
+        edit: { kind: 'redo', sectionIndex, style: { role: 'drop' } },
+        batchSize: 2,
+        autoPickBest: true,
+      });
+      if (get().error) break;
+      polished++;
+    }
+    set({ busy: false });
+    if (polished) {
+      pushToast(
+        `Polished ${polished} drop section${polished === 1 ? '' : 's'} — hit Play`,
+        'success',
+        3200,
+      );
+    }
+  },
 
   separateStems: async () => {
     const { result, stemsBusy } = get();

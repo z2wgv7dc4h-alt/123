@@ -23,6 +23,7 @@ import { estimateBarGrid } from '../audio/downbeatGrid';
 import { decodeWavToMono } from '../audio/onsetGrid';
 import { decodeWavChannels, encodeWav } from '../export/wav';
 import { masterStereo } from '../audio/master';
+import { scoreTake } from '../audio/takeScore';
 
 const CAPS: BackendCaps = {
   fullSong: true,
@@ -394,8 +395,8 @@ export class AceStepBackend implements AudioBackend {
                 repaintEndSec: job.edit.endSec,
                 repaintMode: job.edit.mode ?? 'balanced',
                 repaintStrength: clampRepaintStrength(job.edit.strength),
-                // Best-of-3: bridge returns every result file as a candidate.
-                batchSize: ACE_REDO_BATCH_SIZE,
+                // Best-of-N: bridge returns every result file as a candidate.
+                batchSize: job.batchSize ?? ACE_REDO_BATCH_SIZE,
               }
             : srcAudioBase64
               ? {
@@ -404,8 +405,8 @@ export class AceStepBackend implements AudioBackend {
                   audioCoverStrength: clampCoverStrength(job.styleReference?.coverStrength),
                 }
               : {
-                  // Best-of-4 generated takes in one GPU task.
-                  batchSize: ACE_TEXT2MUSIC_BATCH_SIZE,
+                  // Best-of-N generated takes in one GPU task.
+                  batchSize: job.batchSize ?? ACE_TEXT2MUSIC_BATCH_SIZE,
                 }),
           // Reference mode: text2music timbre/mix guidance, task_type unchanged.
           // Rides alongside the repaint `src_audio` when both are present.
@@ -508,6 +509,35 @@ export class AceStepBackend implements AudioBackend {
       .map((c) => (typeof c?.wavBase64 === 'string' && c.wavBase64 ? b64ToBlob(c.wavBase64) : null))
       .filter((b): b is Blob => b !== null);
 
+    // Score every candidate and reorder best-first so Take A is the best take.
+    let candidateScores: number[] | undefined;
+    if (candidateBlobs.length > 1) {
+      try {
+        const scores: number[] = [];
+        for (const blob of candidateBlobs) {
+          const decoded = decodeWavChannels(await blob.arrayBuffer());
+          scores.push(
+            scoreTake({
+              channels: decoded.channels,
+              sampleRateHz: decoded.sampleRate,
+              bpm: structure.bpm,
+              genre: job.genre ?? 'dnb',
+              structure,
+            }).total,
+          );
+        }
+        const ranked = candidateBlobs
+          .map((_, i) => i)
+          .sort((a, b) => scores[b]! - scores[a]!);
+        const orderedBlobs = ranked.map((i) => candidateBlobs[i]!);
+        candidateScores = ranked.map((i) => scores[i]!);
+        candidateBlobs.length = 0;
+        candidateBlobs.push(...orderedBlobs);
+      } catch {
+        candidateScores = undefined; // non-WAV stub — keep the bridge order
+      }
+    }
+
     // Decode failures are surfaced, never silent — otherwise R-5 mastering,
     // R-3 barGrid and E-1 splices quietly no-op on real takes.
     const decodeWarnings: string[] = [];
@@ -569,7 +599,20 @@ export class AceStepBackend implements AudioBackend {
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         const decoded = decodeWavChannels(bytes.buffer);
         if (decoded.channels.length === 2) {
-          const mastered = masterStereo(decoded.channels[0]!, decoded.channels[1]!, decoded.sampleRate);
+          // Reference tone match (any style-ref mode) when the file decodes.
+          let reference: { channels: Float32Array[]; sampleRate: number } | undefined;
+          if (styleAudio) {
+            try {
+              const refDecoded = decodeWavChannels(await styleAudio.arrayBuffer());
+              reference = { channels: refDecoded.channels, sampleRate: refDecoded.sampleRate };
+            } catch {
+              /* reference not decodable — fall back to the genre tilt */
+            }
+          }
+          const mastered = masterStereo(decoded.channels[0]!, decoded.channels[1]!, decoded.sampleRate, {
+            ...(reference ? { reference } : {}),
+            genre: job.genre ?? 'dnb',
+          });
           // Save raw mix for edits
           rawMixBlob = b64ToBlob(mixB64);
           // Re-encode mastered audio to 16-bit WAV
@@ -650,7 +693,9 @@ export class AceStepBackend implements AudioBackend {
       manifest,
       barGrid,
       ...(rawMixBlob ? { rawMixBlob } : {}),
-      ...(candidateBlobs.length > 1 ? { candidates: candidateBlobs } : {}),
+      ...(candidateBlobs.length > 1
+        ? { candidates: candidateBlobs, ...(candidateScores ? { candidateScores } : {}) }
+        : {}),
       ...(masterReport ? { master: masterReport } : {}),
     };
   }
