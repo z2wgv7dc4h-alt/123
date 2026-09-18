@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "render:sample": "vitest run src/test/render-sample.test.ts",
+    "listen:set": "tsx scripts/listening-set.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
