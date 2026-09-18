@@ -87,9 +87,9 @@ describe('UI-5 top bar: Generate/Vary only, Play/Stop moved to the waveform card
     expect(html).not.toContain('btn-stop');
   });
 
-  it('keeps the same store handlers on Generate/Vary', () => {
+  it('UI-7 primary/ghost: keeps the same store handlers on Generate (primary) / Vary (ghost)', () => {
     expect(transportSrc).toMatch(/className=\{`btn primary btn-generate[\s\S]*?onClick=\{\(\) => void generate\(\)\}/);
-    expect(transportSrc).toMatch(/className="btn accent btn-vary-primary"[\s\S]*?onClick=\{\(\) => void vary\(\)\}/);
+    expect(transportSrc).toMatch(/className="btn ghost btn-vary-primary"[\s\S]*?onClick=\{\(\) => void vary\(\)\}/);
     expect(transportSrc).toMatch(/const generate = useStudioStore\(\(s\) => s\.generate\)/);
     expect(transportSrc).toMatch(/const vary = useStudioStore\(\(s\) => s\.vary\)/);
     // Play/Stop no longer live here (moved to the waveform card).

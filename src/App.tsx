@@ -115,22 +115,37 @@ export default function App() {
       </div>
 
       {moreOpen && (
-        <>
-          <ExportControls />
-          <StyleDropZone />
-          {result && <StemMixerCompact />}
-          {result && liveMixerOk && <LayersChips showSecondary />}
-          <ProductTierPanel />
-          <HelpPanel />
-          <main className="grid">
-            <ParamPanel />
-            <SurpriseMeButton />
-            <FavoritesPanel />
-            <StemMixer />
-            <StatusPanel />
+        <div className="more-sheet glass">
+          <details className="more-group" open>
+            <summary>Export</summary>
+            <ExportControls />
+          </details>
+          <details className="more-group" open>
+            <summary>Sound</summary>
             <PowerExtras />
-          </main>
-        </>
+          </details>
+          <details className="more-group" open>
+            <summary>Style reference</summary>
+            <StyleDropZone />
+          </details>
+          <details className="more-group" open>
+            <summary>Mixer &amp; stems</summary>
+            {result && <StemMixerCompact />}
+            {result && liveMixerOk && <LayersChips showSecondary />}
+            <StemMixer />
+          </details>
+          <details className="more-group" open>
+            <summary>Advanced</summary>
+            <ProductTierPanel />
+            <HelpPanel />
+            <main className="grid">
+              <ParamPanel />
+              <SurpriseMeButton />
+              <FavoritesPanel />
+              <StatusPanel />
+            </main>
+          </details>
+        </div>
       )}
 
       <footer className="footer">

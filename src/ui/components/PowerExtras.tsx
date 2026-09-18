@@ -76,6 +76,8 @@ export function PowerExtras() {
   const realBreakOn = useStudioStore((s) => s.layers.realBreak);
   const realBreakGainDb = useStudioStore((s) => s.realBreakGainDb);
   const setRealBreakGainDb = useStudioStore((s) => s.setRealBreakGainDb);
+  const result = useStudioStore((s) => s.result);
+  const finishTake = useStudioStore((s) => s.finishTake);
   const [loras, setLoras] = useState<LoraOption[]>([]);
   const [loraNote, setLoraNote] = useState<string | null>(null);
   const backends = backendRegistry.list();
@@ -117,8 +119,8 @@ export function PowerExtras() {
   return (
     <section className="panel section-accent-power">
       <h2>
-        Advanced
-        <HelpTip text={HELP.powerPanel} ariaLabel="About Advanced panel" />
+        Sound &amp; engine
+        <HelpTip text={HELP.powerPanel} ariaLabel="About sound and engine controls" />
       </h2>
 
       <p className="power-callout" role="note">
@@ -130,7 +132,6 @@ export function PowerExtras() {
       <label className="export-bit-depth">
         <span className="label-with-tip">
           <span className="label-with-tip-text">Export bit depth (Sketch)</span>
-          <HelpTip text={HELP.exportBitDepth} ariaLabel="About export bit depth" />
         </span>
         <select
           value={exportBitDepth}
@@ -167,6 +168,16 @@ export function PowerExtras() {
           <option value="dynamic">Dynamic · -14 LUFS</option>
         </select>
       </label>
+
+      <button
+        type="button"
+        className="btn ghost btn-finish"
+        disabled={!result || !String(result.backendId).startsWith('ace-step')}
+        onClick={() => void finishTake()}
+        title="Bridge Demucs stem rebalance + pedalboard/pyloudnorm club master (new take version)"
+      >
+        Finish (club)
+      </button>
 
       <label className="recreate-manifest">
         <span className="label-with-tip">
@@ -248,10 +259,6 @@ export function PowerExtras() {
                 : 'Studio (gated)'
               : 'Sketch CPU'}{' '}
             · {b.displayName}
-            <HelpTip
-              text={b.capabilities.requiresGpu ? HELP.backendGpu : HELP.backendCpu}
-              ariaLabel={`About ${b.displayName} badge`}
-            />
           </span>
         ))}
       </div>
@@ -259,7 +266,6 @@ export function PowerExtras() {
       <label>
         <span className="label-with-tip">
           <span className="label-with-tip-text">Audio path</span>
-          <HelpTip text={HELP.backendSelect} ariaLabel="About audio path" />
         </span>
         <select
           value={backendId}
@@ -302,7 +308,6 @@ export function PowerExtras() {
           <span className="chip">
             {retailCapLabel('sampleRatesHz')} · {caps.sampleRatesHz.join('/')} Hz
           </span>
-          <HelpTip text={HELP.powerCaps} ariaLabel="About engine capabilities" />
         </div>
       )}
 
@@ -311,7 +316,6 @@ export function PowerExtras() {
           Studio models live on your GPU PC (not downloaded in this tab). Loaded:{' '}
           {aceCheckpoint ?? 'unknown until the GPU server answers'}.
         </span>
-        <HelpTip text={HELP.aceModels} ariaLabel="About Studio models" />
       </p>
       <div className="model-slots">
         {STUDIO_MODELS.map((m) => (
@@ -328,7 +332,6 @@ export function PowerExtras() {
                 : 'Not loaded'}
             </span>
             <span style={{ display: 'block', marginTop: '0.35rem' }}>{m.hint}</span>
-            <HelpTip text={HELP.aceModels} ariaLabel={`About ${m.label}`} />
           </div>
         ))}
       </div>
@@ -339,7 +342,6 @@ export function PowerExtras() {
         <label>
           <span className="label-with-tip">
             <span className="label-with-tip-text">LoRA</span>
-            <HelpTip text={HELP.loraPack} ariaLabel="About LoRA adapters" />
           </span>
           <select
             value={loraPath ?? ''}

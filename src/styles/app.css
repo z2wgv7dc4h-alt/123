@@ -1065,6 +1065,38 @@ details summary:hover { color: var(--text); }
 
 .more-toggle-row { margin: 0 0 0.85rem; }
 
+/* UI-7: glass More sheet with collapsible groups. */
+.more-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.more-sheet.glass {
+  background: var(--glass);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 0.75rem;
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+.more-group {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 0.35rem 0.65rem 0.75rem;
+}
+.more-group > summary {
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.35rem 0;
+  list-style: none;
+}
+.more-group > summary::-webkit-details-marker { display: none; }
+.more-group > summary::before { content: '▸ '; opacity: 0.7; }
+.more-group[open] > summary::before { content: '▾ '; }
+.more-group .panel { box-shadow: none; }
+
 .simple-status { margin-top: 0.25rem; }
 
 

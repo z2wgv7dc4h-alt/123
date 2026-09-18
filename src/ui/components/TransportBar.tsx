@@ -130,7 +130,7 @@ export function TransportBar() {
             <span className="transport-btn-wrap">
               <button
                 type="button"
-                className="btn accent btn-vary-primary"
+                className="btn ghost btn-vary-primary"
                 disabled={!canGenerate}
                 title="New seed + chaos nudge — fresh arrangement (V)"
                 onClick={() => void vary()}
@@ -207,7 +207,6 @@ export function ExportControls() {
   const result = useStudioStore((s) => s.result);
   const flowStep = useStudioStore((s) => s.flowStep);
   const exportStems = useStudioStore((s) => s.exportStems);
-  const finishTake = useStudioStore((s) => s.finishTake);
   const exportBitDepth = useStudioStore((s) => s.exportBitDepth);
   const aceHasGpu = useStudioStore((s) => s.aceHasGpu);
   const productTier = useStudioStore((s) => s.productTier);
@@ -278,15 +277,6 @@ export function ExportControls() {
           {HELP.exportDisabled}
         </span>
       ) : null}
-      <button
-        type="button"
-        className="btn ghost btn-finish"
-        disabled={!result || !String(result.backendId).startsWith('ace-step')}
-        onClick={() => void finishTake()}
-        title="Bridge Demucs stem rebalance + pedalboard/pyloudnorm club master (new take version)"
-      >
-        Finish (club)
-      </button>
       {exportCoachOpen && result ? (
         <span className="first-export-coach" role="status">
           Ready to Export ZIP?
